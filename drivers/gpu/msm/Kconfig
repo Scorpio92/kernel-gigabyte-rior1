@@ -73,14 +73,14 @@ config KGSL_PER_PROCESS_PAGE_TABLE
 
 config MSM_KGSL_PAGE_TABLE_SIZE
 	hex "Size of pagetables"
-	default 0x8000000
+	default 0xFFF0000
 	---help---
 	  Sets the pagetable size used by the MMU.  The max value
 	  is 0xFFF0000 or (256M - 64K).
 
 config MSM_KGSL_PAGE_TABLE_COUNT
 	int "Minimum of concurrent pagetables to support"
-	default 7
+	default 8
 	depends on KGSL_PER_PROCESS_PAGE_TABLE
 	---help---
 	  Specify the number of pagetables to allocate at init time
@@ -94,5 +94,5 @@ config MSM_KGSL_MMU_PAGE_FAULT
 
 config MSM_KGSL_DISABLE_SHADOW_WRITES
 	bool "Disable register shadow writes for context switches"
-	default y
+	default n
 	depends on MSM_KGSL
