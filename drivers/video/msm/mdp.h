@@ -87,6 +87,23 @@ extern struct mdp_ccs mdp_ccs_yuv2rgb ;
 extern struct mdp_ccs mdp_ccs_rgb2yuv ;
 extern unsigned char hdmi_prim_display;
 
+struct vsync {
+	ktime_t vsync_time;
+	struct completion vsync_comp;
+	struct device *dev;
+	struct work_struct vsync_work;
+	int vsync_irq_enabled;
+	int vsync_dma_enabled;
+	int disabled_clocks;
+	struct completion vsync_wait;
+	atomic_t suspend;
+	atomic_t vsync_resume;
+	int sysfs_created;
+};
+
+extern struct vsync vsync_cntrl;
+
+
 /*
  * MDP Image Structure
  */
@@ -280,6 +297,7 @@ extern struct mdp_hist_mgmt *mdp_hist_mgmt_array[];
 #define MDP_HISTOGRAM_TERM_DMA_S 0x200
 #define MDP_HISTOGRAM_TERM_VG_1 0x400
 #define MDP_HISTOGRAM_TERM_VG_2 0x800
+#define MDP_VSYNC_TERM 0x1000
 
 #define ACTIVE_START_X_EN BIT(31)
 #define ACTIVE_START_Y_EN BIT(31)
@@ -299,6 +317,7 @@ extern struct mdp_hist_mgmt *mdp_hist_mgmt_array[];
 #define MDP_PPP_DONE 				BIT(0)
 #define TV_OUT_DMA3_DONE    BIT(6)
 #define TV_ENC_UNDERRUN     BIT(7)
+#define MDP_PRIM_RDPTR      BIT(8)
 #define TV_OUT_DMA3_START   BIT(13)
 #define MDP_HIST_DONE       BIT(20)
 
