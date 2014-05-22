@@ -874,7 +874,8 @@ static void fix_sizes(void)
 		pmem_adsp_size = MSM7x25A_MSM_PMEM_ADSP_SIZE;
 	} else {
 		//pmem_mdp_size = get_mdp_pmem_size();
-        pmem_mdp_size = 0x1C00000;
+        //pmem_mdp_size = 0x1C00000;
+        pmem_mdp_size = 0x2300000;
 		printk("pmem_mdp_size=%08x\n",pmem_mdp_size);
 		pmem_adsp_size = get_pmem_adsp_size();
 		printk("pmem_adsp_size=%08x\n",pmem_adsp_size);
