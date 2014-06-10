@@ -111,36 +111,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg);
 static int msm_fb_mmap(struct fb_info *info, struct vm_area_struct * vma);
 
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-#define NUM_ALLOC 3
-#define ION_CLIENT_FB_PJT "msmfb_projector"
-static struct ion_client *usb_pjt_client = NULL;
-static struct ion_handle *usb_pjt_handle[NUM_ALLOC] = { NULL };
-static void *virt_addr[NUM_ALLOC] = {0};
-static int mem_fd[NUM_ALLOC] = {0};
-static struct msmfb_usb_projector_info usb_pjt_info = {0, 0};
-static int mem_mapped = 0;
-
-char *get_fb_addr(void)
-{
-	int i;
-
-	if (!usb_pjt_info.latest_offset) {
-		printk(KERN_WARNING "%s: wrong address sent via ioctl?\n", __func__);
-		return 0;
-	}
-
-	usb_pjt_info.usb_offset = usb_pjt_info.latest_offset;
-
-	for (i=0; i<NUM_ALLOC; i++)
-		if (mem_fd[i] == usb_pjt_info.usb_offset)
-			return (char *)virt_addr[i];
-
-	printk(KERN_ERR "%s: <FATAL> Impossible to be here.\n", __func__);
-	return 0;
-}
-#endif
-
 #ifdef MSM_FB_ENABLE_DBGFS
 
 #define MSM_FB_MAX_DBGFS 1024
@@ -364,13 +334,12 @@ static int msm_fb_probe(struct platform_device *pdev)
 
 	MSM_FB_DEBUG("msm_fb_probe\n");
 
-    if ((pdev->id == 0) && (pdev->num_resources > 0)) {
+	if ((pdev->id == 0) && (pdev->num_resources > 0)) {
 		msm_fb_pdata = pdev->dev.platform_data;
 		fbram_size =
 			pdev->resource[0].end - pdev->resource[0].start + 1;
 		fbram_phys = (char *)pdev->resource[0].start;
-		
-		fbram = ioremap((unsigned long)fbram_phys, fbram_size);
+		fbram = __va(fbram_phys);
 
 		if (!fbram) {
 			printk(KERN_ERR "fbram ioremap failed!\n");
@@ -389,7 +358,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 		msm_fb_resource_initialized = 1;
 		return 0;
 	}
-
 
 	if (!msm_fb_resource_initialized)
 		return -EPERM;
@@ -3276,8 +3244,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 	struct msmfb_mdp_pp mdp_pp;
 	int ret = 0;
 
-	struct msmfb_usb_projector_info tmp_info;
-
 	switch (cmd) {
 #ifdef CONFIG_FB_MSM_OVERLAY
 	case MSMFB_OVERLAY_GET:
@@ -3580,91 +3546,6 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = msmfb_handle_pp_ioctl(&mdp_pp);
 		break;
 
-	case MSMFB_GET_USB_PROJECTOR_INFO:
-		printk(KERN_DEBUG "MSMFB_GET_USB_PROJECTOR_INFO!\n");
-		ret = copy_to_user(argp, &usb_pjt_info, sizeof(usb_pjt_info));
-		if (ret)
-			return ret;
-		break;
-	case MSMFB_SET_USB_PROJECTOR_INFO:
-	{
-		int i;
-		printk(KERN_DEBUG "MSMFB_SET_USB_PROJECTOR_INFO!\n");
-		ret = copy_from_user(&tmp_info, argp, sizeof(tmp_info));
-		if (!tmp_info.latest_offset) {
-			
-			usb_pjt_info.latest_offset = 0;
-			mem_mapped = 0;
-			for (i=0; i<NUM_ALLOC; i++) {
-				if (usb_pjt_client && usb_pjt_handle[i]) {
-					ion_unmap_kernel(usb_pjt_client, usb_pjt_handle[i]);
-					ion_free(usb_pjt_client, usb_pjt_handle[i]);
-					usb_pjt_handle[i] = NULL;
-				}
-				mem_fd[i] = 0;
-			}
-		} else {
-			if (mem_mapped >= NUM_ALLOC) {
-				
-#if 0
-				mm_segment_t oldfs;
-				struct file *fp;
-#endif
-				usb_pjt_info.latest_offset = tmp_info.latest_offset;
-#if 0
-				oldfs = get_fs();
-				set_fs(KERNEL_DS);
-				fp=filp_open("/data/dump.rgb" , O_RDWR|O_CREAT|O_TRUNC, 0666);
-				for (i=0; i<NUM_ALLOC; i++){
-					if (mem_fd[i] == usb_pjt_info.latest_offset){
-							fp->f_op->write(fp,virt_addr[i], 480*800*2, &fp->f_pos);
-						}
-				}
-				filp_close(fp, NULL);
-				set_fs(oldfs);
-#endif
-				break;
-			}
-			
-			for (i=0; i<NUM_ALLOC; i++) {
-				unsigned long ionflag;
-				if (mem_fd[i]) {
-					usb_pjt_info.latest_offset = tmp_info.latest_offset;
-					if (mem_fd[i] == tmp_info.latest_offset) {
-						MSM_FB_ERR("fd %d just received again.\n", mem_fd[i]);
-						break;
-					} else
-						continue;
-				}
-				if (!usb_pjt_client) {
-					MSM_FB_ERR("No ION client created.\n");
-					break;
-				}
-				usb_pjt_handle[i] = ion_import_dma_buf(usb_pjt_client, tmp_info.latest_offset);
-				if (!usb_pjt_handle[i]) {
-					MSM_FB_ERR("Failed to get ION handle, client %p, fd = %d\n",
-						usb_pjt_client, tmp_info.latest_offset);
-					break;
-				}
-				ret = ion_handle_get_flags(usb_pjt_client, usb_pjt_handle[i], &ionflag);
-				if (ret) {
-					MSM_FB_ERR("Failed to get ION flag, client %p, handle %p, fd = %d\n",
-						usb_pjt_client, usb_pjt_handle[i], tmp_info.latest_offset);
-					break;
-				}
-				virt_addr[i] = ion_map_kernel(usb_pjt_client, usb_pjt_handle[i], ionflag);
-				mem_fd[i] = tmp_info.latest_offset;
-				usb_pjt_info.latest_offset = tmp_info.latest_offset;
-				MSM_FB_INFO("%s: fd = %d, virt %p\n", __func__, mem_fd[i], virt_addr[i]);
-				mem_mapped++;
-				break;
-			}
-		}
-		if (ret)
-			return ret;
-		break;
-	}
-
 	default:
 		MSM_FB_INFO("MDP: unknown ioctl (cmd=%x) received!\n", cmd);
 		ret = -EINVAL;
@@ -3873,10 +3754,6 @@ int __init msm_fb_init(void)
 
 	if (msm_fb_register_driver())
 		return rc;
-
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	usb_pjt_client = msm_ion_client_create(-1, ION_CLIENT_FB_PJT);
-#endif
 
 #ifdef MSM_FB_ENABLE_DBGFS
 	{
