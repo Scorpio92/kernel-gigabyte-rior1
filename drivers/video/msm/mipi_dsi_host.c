@@ -1260,12 +1260,14 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 	mipi_dsi_enable_irq(DSI_CMD_TERM);
 	mipi_dsi_buf_init(tp);
 	mipi_dsi_cmd_dma_add(tp, cmds);
+/*
 #if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
 	if(MIPI_CMD_HX8369A_TIANMA_FWVGA == get_lcd_panel_type()
 	|| MIPI_CMD_OTM8009A_CHIMEI_WVGA == get_lcd_panel_type()
 	|| MIPI_CMD_OTM8009A_CHIMEI_FWVGA == get_lcd_panel_type())
 		mipi_set_tx_power_mode(0);//entry high speed mode  
 #endif
+*/
 	/* transmit read comamnd to client */
 	mipi_dsi_cmd_dma_tx(tp);
 
@@ -1283,12 +1285,14 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 		 */
 		rp->data += 2;
 	}
+/*
 #if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
 	if(MIPI_CMD_HX8369A_TIANMA_FWVGA == get_lcd_panel_type()
 	|| MIPI_CMD_OTM8009A_CHIMEI_WVGA == get_lcd_panel_type()
 	|| MIPI_CMD_OTM8009A_CHIMEI_FWVGA == get_lcd_panel_type())
 		mipi_set_tx_power_mode(1);//entry low power mode  
 #endif
+*/
 	mipi_dsi_cmd_dma_rx(rp, cnt);
 
 	spin_lock_irqsave(&dsi_mdp_lock, flag);
@@ -1329,13 +1333,14 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 	default:
 		break;
 	}
-
+/*
 	#if (LCD_HX8369A_TIANMA_ESD_SIGN || LCD_OTM8009A_CMI_ESD_SIGN)
 	if(MIPI_CMD_HX8369A_TIANMA_FWVGA == get_lcd_panel_type()
 	|| MIPI_CMD_OTM8009A_CHIMEI_WVGA == get_lcd_panel_type()
 	|| MIPI_CMD_OTM8009A_CHIMEI_FWVGA == get_lcd_panel_type())
 		mipi_set_tx_power_mode(0);//entry high speed mode  
 #endif
+*/
 
 	return rp->len;
 }
@@ -1463,7 +1468,7 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 {
 
 	unsigned long flags;
-    lcd_panel_type panel_type = get_lcd_panel_type();
+    //lcd_panel_type panel_type = get_lcd_panel_type();
 
 #ifdef DSI_HOST_DEBUG
 	int i;
@@ -1500,22 +1505,7 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 	wmb();
 	spin_unlock_irqrestore(&dsi_mdp_lock, flags);
 
-	/* remove otm8009a panel */
-	/* remove hx8369a panel */
-    /* judge the panel type */
-    if( ((MIPI_CMD_OTM8009A_CHIMEI_WVGA == panel_type) && LCD_OTM8009A_CMI_ESD_SIGN)
-        || (MIPI_CMD_NT35510_BOE_FWVGA == panel_type)
-        || (MIPI_CMD_NT35510_BOE_WVGA == panel_type)
-        || (MIPI_CMD_NT35510_CHIMEI_WVGA == panel_type)
-        ||(MIPI_CMD_OTM8009A_CHIMEI_WVGA == panel_type))
-    {
-        /* set the time out. thread will go on beyond the time restriction */
-        wait_for_completion_timeout(&dsi_dma_comp,HZ/10);
-    }
-    else
-    {        
-        wait_for_completion(&dsi_dma_comp);
-    }
+	wait_for_completion(&dsi_dma_comp);
 
 	dma_unmap_single(&dsi_dev, tp->dmap, tp->len, DMA_TO_DEVICE);
 	tp->dmap = 0;

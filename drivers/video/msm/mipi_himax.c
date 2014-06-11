@@ -165,7 +165,7 @@ static int mipi_himax_lcd_on(struct platform_device *pdev)
 		return -EINVAL;
 
 	msleep(20);
-	mipi_dsi_cmds_tx(mfd, &himax_tx_buf, himax_cmd_on_cmds_video_mode,
+	mipi_dsi_cmds_tx(&himax_tx_buf, himax_cmd_on_cmds_video_mode,
 			ARRAY_SIZE(himax_cmd_on_cmds_video_mode));
 
 	return 0;
@@ -184,7 +184,7 @@ static int mipi_himax_lcd_off(struct platform_device *pdev)
 	if (mfd->key != MFD_KEY)
 		return -EINVAL;
 
-	mipi_dsi_cmds_tx(mfd, &himax_tx_buf, himax_display_off_cmds,
+	mipi_dsi_cmds_tx(&himax_tx_buf, himax_display_off_cmds,
 			ARRAY_SIZE(himax_display_off_cmds));
 
 	return 0;
