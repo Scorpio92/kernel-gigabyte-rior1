@@ -48,14 +48,38 @@
 #include "tvenc.h"
 #include "mdp.h"
 #include "mdp4.h"
+/*add the code for dynamic gamma function  */
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+#include <linux/hardware_self_adapt.h>
+#endif
+#ifdef CONFIG_HUAWEI_KERNEL
+#include "hw_lcd_common.h"
+#endif
 
+#ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
+#include <mach/msm_battery.h>
+#endif
+#ifdef CONFIG_FB_MSM_LOGO
+#ifndef CONFIG_HUAWEI_KERNEL
+#define INIT_IMAGE_FILE "/initlogo.rle"
+extern int load_565rle_image(char *filename);
+#else
+#define INIT_IMAGE_FILE	"/initlogo.rle"
+extern int load_888rle_image(char *filename);
+#endif
+#endif
+
+/* ÉŸ³ýŽË¶ÎŽúÂë */
+
+/*modify the number of framebuffer*/
+/*Add 4 framebuffer and delete the mem adapter strategy*/	
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_NUM	3
 #endif
-
-/*  Idle wakelock to prevent PC between wake up and Vsync */
-struct wake_lock mdp_idle_wakelock;
-
+/*add the code for dynamic gamma function  */
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+extern int nt35560_dimytic_gamma_setting_gamma(int);
+#endif
 static unsigned char *fbram;
 static unsigned char *fbram_phys;
 static int fbram_size;
@@ -110,6 +134,19 @@ static int msm_fb_suspend_sub(struct msm_fb_data_type *mfd);
 static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg);
 static int msm_fb_mmap(struct fb_info *info, struct vm_area_struct * vma);
+static int mdp_bl_scale_config(struct msm_fb_data_type *mfd,
+						struct mdp_bl_scale_data *data);
+static void msm_fb_scale_bl(__u32 *bl_lvl);
+
+/*function declare*/
+#ifdef CONFIG_FB_AUTO_CABC
+int msm_fb_config_cabc(struct msm_fb_data_type *mfd, struct msmfb_cabc_config cabc_cfg);
+#endif
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+int msm_fb_set_dynamic_gamma(struct msm_fb_data_type *mfd, enum danymic_gamma_mode gamma_mode);
+#endif
+
+/* ÉŸ³ýŽË¶ÎŽúÂë */
 
 #ifdef MSM_FB_ENABLE_DBGFS
 
@@ -119,6 +156,36 @@ static int msm_fb_mmap(struct fb_info *info, struct vm_area_struct * vma);
 int msm_fb_debugfs_file_index;
 struct dentry *msm_fb_debugfs_root;
 struct dentry *msm_fb_debugfs_file[MSM_FB_MAX_DBGFS];
+static int bl_scale, bl_min_lvl;
+
+#ifdef CONFIG_HUAWEI_KERNEL
+boolean lcd_have_resume = FALSE;
+/* Remove qcom backlight mechanism,user our own */
+boolean last_backlight_setting = FALSE;
+int last_backlight_level = 0;
+int last_gamma_mode = GAMMA25;
+struct msmfb_cabc_config last_cabc_mode;
+boolean last_cabc_setting = FALSE;
+boolean last_gamma_setting = FALSE;
+/*delete some lines*/
+#endif
+#ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION
+static int bright = -1;
+static struct timer_list bright_timer;
+static struct work_struct light_notify_work; 
+/*lcd consume notify work*/
+static void light_notify_work_func(struct work_struct *work)  
+{  
+    huawei_rpc_current_consuem_notify(EVENT_LCD_STATE, bright); 
+}  
+
+/* add  timer func for lcd backlight report */
+static void light_notify_timer_func(unsigned long data)
+{
+    /*lcd consume notify */
+	schedule_work(&light_notify_work);  
+}
+#endif
 
 DEFINE_MUTEX(msm_fb_notify_update_sem);
 void msmfb_no_update_notify_timer_cb(unsigned long data)
@@ -179,8 +246,22 @@ static void msm_fb_set_bl_brightness(struct led_classdev *led_cdev,
 
 	if (!bl_lvl && value)
 		bl_lvl = 1;
-
+/* Remove qcom backlight mechanism,user our own */
+/* If LCD don't resume ,don't turn on LCD backlight */
+#ifdef CONFIG_HUAWEI_KERNEL
+	if(FALSE == lcd_have_resume)
+	{
+		last_backlight_level = bl_lvl;
+		last_backlight_setting = TRUE;
+	}
+	else
+	{
+		msm_fb_set_backlight(mfd, bl_lvl);
+		last_backlight_setting = FALSE;
+	}
+#else
 	msm_fb_set_backlight(mfd, bl_lvl);
+#endif
 }
 
 static struct led_classdev backlight_led = {
@@ -192,6 +273,7 @@ static struct led_classdev backlight_led = {
 
 static struct msm_fb_platform_data *msm_fb_pdata;
 unsigned char hdmi_prim_display;
+unsigned char hdmi_prim_resolution;
 
 int msm_fb_detect_client(const char *name)
 {
@@ -212,6 +294,8 @@ int msm_fb_detect_client(const char *name)
 			if (!strncmp((char *)msm_fb_pdata->prim_panel_name,
 				"hdmi_msm", len))
 				hdmi_prim_display = 1;
+				hdmi_prim_resolution =
+					msm_fb_pdata->ext_resolution;
 			return 0;
 		} else {
 			ret = -EPERM;
@@ -339,6 +423,7 @@ static int msm_fb_probe(struct platform_device *pdev)
 		fbram_size =
 			pdev->resource[0].end - pdev->resource[0].start + 1;
 		fbram_phys = (char *)pdev->resource[0].start;
+		/*Add 4 framebuffer and delete the mem adapter strategy*/	
 		fbram = __va(fbram_phys);
 
 		if (!fbram) {
@@ -373,8 +458,11 @@ static int msm_fb_probe(struct platform_device *pdev)
 	if (pdev_list_cnt >= MSM_FB_MAX_DEV_LIST)
 		return -ENOMEM;
 
+	vsync_cntrl.dev = mfd->fbi->dev;
 	mfd->panel_info.frame_count = 0;
 	mfd->bl_level = 0;
+	bl_scale = 1024;
+	bl_min_lvl = 255;
 #ifdef CONFIG_FB_MSM_OVERLAY
 	mfd->overlay_play_enable = 1;
 #endif
@@ -445,10 +533,6 @@ static int msm_fb_remove(struct platform_device *pdev)
 		del_timer(&mfd->msmfb_no_update_notify_timer);
 	complete(&mfd->msmfb_no_update_notify);
 	complete(&mfd->msmfb_update_notify);
-
-	/* Do this only for the primary panel */
-	if (mfd->fbi->node == 0)
-		wake_lock_destroy(&mdp_idle_wakelock);
 
 	/* remove /dev/fb* */
 	unregister_framebuffer(mfd->fbi);
@@ -582,9 +666,6 @@ static int msm_fb_resume_sub(struct msm_fb_data_type *mfd)
 				      mfd->op_enable);
 		if (ret)
 			MSM_FB_INFO("msm_fb_resume: can't turn on display!\n");
-	} else {
-		if (pdata->power_ctrl)
-			pdata->power_ctrl(TRUE);
 	}
 
 	return ret;
@@ -640,14 +721,30 @@ static int msm_fb_runtime_idle(struct device *dev)
 static int msm_fb_ext_suspend(struct device *dev)
 {
 	struct msm_fb_data_type *mfd = dev_get_drvdata(dev);
+	struct msm_fb_panel_data *pdata = NULL;
 	int ret = 0;
+
+	if (hdmi_prim_display) {
+		MSM_FB_INFO("%s: hdmi primary handles early suspend only\n",
+			__func__);
+		return 0;
+	}
 
 	if ((!mfd) || (mfd->key != MFD_KEY))
 		return 0;
 
+	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 	if (mfd->panel_info.type == HDMI_PANEL ||
-		mfd->panel_info.type == DTV_PANEL)
+		mfd->panel_info.type == DTV_PANEL) {
 		ret = msm_fb_suspend_sub(mfd);
+
+		/* Turn off the HPD circuitry */
+		if (pdata->power_ctrl) {
+			MSM_FB_INFO("%s: Turning off HPD circuitry\n",
+					__func__);
+			pdata->power_ctrl(FALSE);
+		}
+	}
 
 	return ret;
 }
@@ -655,14 +752,30 @@ static int msm_fb_ext_suspend(struct device *dev)
 static int msm_fb_ext_resume(struct device *dev)
 {
 	struct msm_fb_data_type *mfd = dev_get_drvdata(dev);
+	struct msm_fb_panel_data *pdata = NULL;
 	int ret = 0;
+
+	if (hdmi_prim_display) {
+		MSM_FB_INFO("%s: hdmi primary handles early resume only\n",
+			__func__);
+		return 0;
+	}
 
 	if ((!mfd) || (mfd->key != MFD_KEY))
 		return 0;
 
+	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 	if (mfd->panel_info.type == HDMI_PANEL ||
-		mfd->panel_info.type == DTV_PANEL)
+		mfd->panel_info.type == DTV_PANEL) {
+		/* Turn on the HPD circuitry */
+		if (pdata->power_ctrl) {
+			pdata->power_ctrl(TRUE);
+			MSM_FB_INFO("%s: Turning on HPD circuitry\n",
+					__func__);
+		}
+
 		ret = msm_fb_resume_sub(mfd);
+	}
 
 	return ret;
 }
@@ -672,7 +785,8 @@ static struct dev_pm_ops msm_fb_dev_pm_ops = {
 	.runtime_suspend = msm_fb_runtime_suspend,
 	.runtime_resume = msm_fb_runtime_resume,
 	.runtime_idle = msm_fb_runtime_idle,
-#if (defined(CONFIG_SUSPEND) && defined(CONFIG_FB_MSM_HDMI_MSM_PANEL))
+#if (defined(CONFIG_SUSPEND) && defined(CONFIG_FB_MSM_HDMI_MSM_PANEL) && \
+	!defined(CONFIG_FB_MSM_HDMI_AS_PRIMARY))
 	.suspend = msm_fb_ext_suspend,
 	.resume = msm_fb_ext_resume,
 #endif
@@ -692,7 +806,7 @@ static struct platform_driver msm_fb_driver = {
 		   .pm = &msm_fb_dev_pm_ops,
 		   },
 };
-#if 0 //disable flush FB when suspend, if using HDMI, enable this
+
 #if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_FB_MSM_MDP303)
 static void memset32_io(u32 __iomem *_ptr, u32 val, size_t count)
 {
@@ -701,13 +815,14 @@ static void memset32_io(u32 __iomem *_ptr, u32 val, size_t count)
 		writel(val, _ptr++);
 }
 #endif
-#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void msmfb_early_suspend(struct early_suspend *h)
 {
 	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
-						    early_suspend);
-#if 0 //disable flush FB when suspend, if using HDMI, enable this
+						early_suspend);
+	struct msm_fb_panel_data *pdata = NULL;
+
 #if defined(CONFIG_FB_MSM_MDP303)
 	/*
 	* For MDP with overlay, set framebuffer with black pixels
@@ -723,57 +838,180 @@ static void msmfb_early_suspend(struct early_suspend *h)
 		memset32_io((void *)fbi->screen_base, 0x00, fbi->fix.smem_len);
 		break;
 	}
-#endif
+/* Clean cache before dma */
+	dma_cache_pre_ops((void *)fbi->screen_base, fbi->fix.smem_len, DMA_TO_DEVICE);
 #endif
 	msm_fb_suspend_sub(mfd);
+
+	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+	if (hdmi_prim_display &&
+		(mfd->panel_info.type == HDMI_PANEL ||
+		 mfd->panel_info.type == DTV_PANEL)) {
+		/* Turn off the HPD circuitry */
+		if (pdata->power_ctrl) {
+			MSM_FB_INFO("%s: Turning off HPD circuitry\n",
+				__func__);
+			pdata->power_ctrl(FALSE);
+		}
+	}
 }
 
 static void msmfb_early_resume(struct early_suspend *h)
 {
 	struct msm_fb_data_type *mfd = container_of(h, struct msm_fb_data_type,
-						    early_suspend);
+						early_suspend);
+	struct msm_fb_panel_data *pdata = NULL;
+
+	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+	if (hdmi_prim_display &&
+		(mfd->panel_info.type == HDMI_PANEL ||
+		 mfd->panel_info.type == DTV_PANEL)) {
+		/* Turn on the HPD circuitry */
+		if (pdata->power_ctrl) {
+			MSM_FB_INFO("%s: Turning on HPD circuitry\n", __func__);
+			pdata->power_ctrl(TRUE);
+		}
+	}
+
 	msm_fb_resume_sub(mfd);
 }
 #endif
 
+/* Remove qcom backlight mechanism,user our own */
+#ifndef CONFIG_HUAWEI_KERNEL
 static int unset_bl_level, bl_updated;
+#endif
 static int bl_level_old;
+static int mdp_bl_scale_config(struct msm_fb_data_type *mfd,
+						struct mdp_bl_scale_data *data)
+{
+	int ret = 0;
+	int curr_bl = mfd->bl_level;
+	bl_scale = data->scale;
+	bl_min_lvl = data->min_lvl;
+	pr_debug("%s: update scale = %d, min_lvl = %d\n", __func__, bl_scale,
+								bl_min_lvl);
+
+	/* update current backlight to use new scaling*/
+	msm_fb_set_backlight(mfd, curr_bl);
+
+	return ret;
+}
+
+static void msm_fb_scale_bl(__u32 *bl_lvl)
+{
+	__u32 temp = *bl_lvl;
+	if (temp >= bl_min_lvl) {
+		/* bl_scale is the numerator of scaling fraction (x/1024)*/
+		temp = ((*bl_lvl) * bl_scale) / 1024;
+
+		/*if less than minimum level, use min level*/
+		if (temp < bl_min_lvl)
+			temp = bl_min_lvl;
+	}
+
+	(*bl_lvl) = temp;
+}
 
 void msm_fb_set_backlight(struct msm_fb_data_type *mfd, __u32 bkl_lvl)
 {
 	struct msm_fb_panel_data *pdata;
+	__u32 temp = bkl_lvl;
 
-	/*remove the bl_updated for the backlight in recovery can't light up*/
-	if (!mfd->panel_power_on ) {
+/* Remove qcom backlight mechanism,user our own */
+#ifndef CONFIG_HUAWEI_KERNEL
+	if (!mfd->panel_power_on || !bl_updated) {
 		unset_bl_level = bkl_lvl;
 		return;
 	} else {
 		unset_bl_level = 0;
 	}
+#endif
 
+	msm_fb_scale_bl(&temp);
 	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
 	if ((pdata) && (pdata->set_backlight)) {
+#ifndef CONFIG_HUAWEI_KERNEL
 		down(&mfd->sem);
-		if (bl_level_old == bkl_lvl) {
+		if (bl_level_old == temp) {
 			up(&mfd->sem);
 			return;
 		}
-		mfd->bl_level = bkl_lvl;
+		mfd->bl_level = temp;
 		pdata->set_backlight(mfd);
-		bl_level_old = mfd->bl_level;
+		mfd->bl_level = bkl_lvl;
+		bl_level_old = temp;
 		up(&mfd->sem);
+#else
+		if (bl_level_old == bkl_lvl) {
+			return;
+		}
+		if (get_hw_lcd_ctrl_bl_type() == CTRL_BL_BY_LCD)
+		{
+			/* MIPI use two semaphores */
+			if(get_hw_lcd_interface_type() == LCD_IS_MIPI_CMD)
+			{
+				down(&mfd->dma->mutex);
+				down(&mfd->sem);
+				mfd->bl_level = bkl_lvl;
+				pdata->set_backlight(mfd);
+				up(&mfd->sem);
+				up(&mfd->dma->mutex);
+			}
+			else if (get_hw_lcd_interface_type() == LCD_IS_MIPI_VIDEO)
+			{
+				down(&mfd->dma->mutex);
+				mfd->bl_level = bkl_lvl;
+				pdata->set_backlight(mfd);
+				up(&mfd->dma->mutex);
+			}
+			/* MDDI don't use semaphore */
+			else if((get_hw_lcd_interface_type() == LCD_IS_MDDI_TYPE1)
+				||(get_hw_lcd_interface_type() == LCD_IS_MDDI_TYPE2))
+			{
+				mfd->bl_level = bkl_lvl;
+				pdata->set_backlight(mfd);
+			}
+			else
+			{
+				down(&mfd->sem);
+				mfd->bl_level = bkl_lvl;
+				pdata->set_backlight(mfd);
+				up(&mfd->sem);
+			}
+		}
+		else
+		{
+			down(&mfd->sem);
+			mfd->bl_level = bkl_lvl;
+			pdata->set_backlight(mfd);
+			up(&mfd->sem);
+		}
+		bl_level_old = mfd->bl_level;
+#endif
+#ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION
+        bright = bkl_lvl;
+     	/*notify lcd consume after 1 seconds*/
+	    mod_timer(&bright_timer, jiffies + msecs_to_jiffies(1000));
+		/*use timer to notify msm current backlight level*/
+#endif
 	}
 }
 
+#ifdef CONFIG_HUAWEI_KERNEL
+int is_pwdn_chg_resume = 0;
+int from_pwdn_chg_resume(void)
+{
+    return is_pwdn_chg_resume;
+}
+#endif
 static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			    boolean op_enable)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct msm_fb_panel_data *pdata = NULL;
 	int ret = 0;
-
-	MSM_FB_INFO("%s: call address %p blank %d\n", __func__, __builtin_frame_address(0), op_enable);
 
 	if (!op_enable)
 		return -EPERM;
@@ -786,11 +1024,15 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
-		MSM_FB_INFO("%s: FB_BLANK_UNBLANK mode\n",__func__);
 		if (!mfd->panel_power_on) {
+			msleep(16);
+         #ifdef CONFIG_HUAWEI_KERNEL
+            is_pwdn_chg_resume = 0;
+         #endif            
 			ret = pdata->on(mfd->pdev);
 			if (ret == 0) {
 				mfd->panel_power_on = TRUE;
+
 /* ToDo: possible conflict with android which doesn't expect sw refresher */
 /*
 	  if (!mfd->hw_refresh)
@@ -800,33 +1042,98 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 	      MSM_FB_INFO("msm_fb_blank_sub: msm_fb_resume_sw_refresher failed = %d!\n",ret);
 	    }
 	  }
-*/
+*/	
+/* LCD resume completed ,then turn on lcd backlight */
+#ifdef CONFIG_HUAWEI_KERNEL
+				lcd_have_resume = TRUE;
+				/* Remove qcom backlight mechanism,user our own */
+				if(TRUE == last_backlight_setting)
+				{
+					msm_fb_set_backlight(mfd,last_backlight_level);
+					last_backlight_setting = FALSE;
+					printk("%s:Waiting for LCD resume ,then set backlight level=%d\n",__func__,last_backlight_level);
+				}
+                
+                /* delete the judgement is_panel_support_dynamic_gamma() */
+				if(TRUE == last_gamma_setting)
+				{
+					msm_fb_set_dynamic_gamma(mfd,last_gamma_mode);
+					last_gamma_setting = FALSE;
+					printk("%s:Waiting for LCD resume ,then set gamma mode =%d\n",__func__,last_gamma_mode);
+				}
+
+                /* delete the judgement is_panel_support_auto_cabc() */
+				if(TRUE == last_cabc_setting)
+				{
+					msm_fb_config_cabc(mfd, last_cabc_mode);
+					last_cabc_setting =FALSE;
+					printk("%s:Waiting for LCD resume ,then set cabc mode =%d\n",__func__,last_cabc_mode.mode);
+				}
+
+#endif
 			}
 		}
 		break;
+#ifdef CONFIG_HUAWEI_KERNEL
+	case FB_BLANK_PWDN_GHG_RESUME:
+		mdelay(100);
+        is_pwdn_chg_resume = 1;
+		ret = pdata->on(mfd->pdev);
+        mfd->panel_power_on = TRUE;
+/* LCD resume completed ,then turn on lcd backlight */
+#ifdef CONFIG_HUAWEI_KERNEL
+		lcd_have_resume = TRUE;
+		/* Remove qcom backlight mechanism,user our own */
+		if(TRUE == last_backlight_setting)
+		{
+			msm_fb_set_backlight(mfd,last_backlight_level);
+			last_backlight_setting = FALSE;
+			printk("%s:Waiting for LCD resume ,then set backlight level=%d\n",__func__,last_backlight_level);
+		}
+        /* delete the judgement is_panel_support_dynamic_gamma() */
+		if(TRUE == last_gamma_setting)
+		{
+			msm_fb_set_dynamic_gamma(mfd,last_gamma_mode);
+			last_gamma_setting = FALSE;
+			printk("%s:Waiting for LCD resume ,then set gamma mode =%d\n",__func__,last_gamma_mode);
+		}
 
+        /* delete the judgement is_panel_support_auto_cabc() */
+		if(TRUE == last_cabc_setting)
+		{
+			msm_fb_config_cabc(mfd, last_cabc_mode);
+			last_cabc_setting =FALSE;
+			printk("%s:Waiting for LCD resume ,then set cabc mode =%d\n",__func__,last_cabc_mode.mode);
+		}
+#endif
+        break;
+#endif
 	case FB_BLANK_VSYNC_SUSPEND:
 	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_NORMAL:
 	case FB_BLANK_POWERDOWN:
 	default:
-		MSM_FB_INFO("%s: FB_default mode \n",__func__);
 		if (mfd->panel_power_on) {
 			int curr_pwr_state;
 
+			/* Prevent the download of the cabc sequences than lcd_on , set flag to prevent it */
+#ifdef CONFIG_HUAWEI_KERNEL
+			lcd_have_resume = FALSE;
+#endif
 			mfd->op_enable = FALSE;
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = FALSE;
+/* Remove qcom backlight mechanism,user our own */
+#ifndef CONFIG_HUAWEI_KERNEL
 			bl_updated = 0;
+#endif
 
+			msleep(16);
 			ret = pdata->off(mfd->pdev);
 			if (ret)
 				mfd->panel_power_on = curr_pwr_state;
 
 			mfd->op_enable = TRUE;
-		} else {
-			if (pdata->power_ctrl)
-				pdata->power_ctrl(FALSE);
 		}
 		break;
 	}
@@ -926,7 +1233,6 @@ static void msm_fb_imageblit(struct fb_info *info, const struct fb_image *image)
 static int msm_fb_blank(int blank_mode, struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-	MSM_FB_INFO("%s: %d\n",__func__, __LINE__);
 	return msm_fb_blank_sub(blank_mode, info, mfd->op_enable);
 }
 
@@ -1227,14 +1533,15 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	var->bits_per_pixel = bpp * 8;	/* FrameBuffer color depth */
 	if (mfd->dest == DISPLAY_LCD) {
 		if (panel_info->type == MDDI_PANEL && panel_info->mddi.is_type1)
-			var->reserved[4] = panel_info->lcd.refx100 / (100 * 2);
+			var->reserved[3] = panel_info->lcd.refx100 / (100 * 2);
 		else
-			var->reserved[4] = panel_info->lcd.refx100 / 100;
+			var->reserved[3] = panel_info->lcd.refx100 / 100;
+
 	} else {
 		if (panel_info->type == MIPI_VIDEO_PANEL) {
-			var->reserved[4] = panel_info->mipi.frame_rate;
+			var->reserved[3] = panel_info->mipi.frame_rate;
 		} else {
-			var->reserved[4] = panel_info->clk_rate /
+			var->reserved[3] = panel_info->clk_rate /
 				((panel_info->lcdc.h_back_porch +
 				  panel_info->lcdc.h_front_porch +
 				  panel_info->lcdc.h_pulse_width +
@@ -1245,7 +1552,7 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 				  panel_info->yres));
 		}
 	}
-	pr_debug("reserved[4] %u\n", var->reserved[4]);
+	pr_debug("reserved[3] %u\n", var->reserved[3]);
 
 		/*
 		 * id field for fb app
@@ -1323,20 +1630,24 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	fbi->screen_base = fbram;
 	fbi->fix.smem_start = (unsigned long)fbram_phys;
 
+#ifndef CONFIG_HUAWEI_KERNEL
+    memset(fbi->screen_base, 0x0, fix->smem_len);
+#endif
+    
 	msm_iommu_map_contig_buffer(fbi->fix.smem_start,
-					DISPLAY_DOMAIN,
+					DISPLAY_READ_DOMAIN,
 					GEN_POOL,
 					fbi->fix.smem_len,
 					SZ_4K,
-					1,
+					0,
 					&(mfd->display_iova));
 
 	msm_iommu_map_contig_buffer(fbi->fix.smem_start,
-					ROTATOR_DOMAIN,
+					ROTATOR_SRC_DOMAIN,
 					GEN_POOL,
 					fbi->fix.smem_len,
 					SZ_4K,
-					1,
+					0,
 					&(mfd->rotator_iova));
 
 	if (!bf_supported || mfd->index == 0)
@@ -1376,9 +1687,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		return -EPERM;
 	}
 
-	if (fbi->node == 0)
-		wake_lock_init(&mdp_idle_wakelock, WAKE_LOCK_IDLE, "mdp");
-
 	fbram += fix->smem_len;
 	fbram_phys += fix->smem_len;
 	fbram_size -= fix->smem_len;
@@ -1388,14 +1696,20 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	     mfd->index, fbi->var.xres, fbi->var.yres, fbi->fix.smem_len);
 
 #ifdef CONFIG_FB_MSM_LOGO
+#ifndef CONFIG_HUAWEI_KERNEL
 	/* Flip buffer */
 	if (!load_565rle_image(INIT_IMAGE_FILE, bf_supported))
 		;
+#else
+	/* Flip buffer */
+	if (!load_888rle_image(INIT_IMAGE_FILE, bf_supported))
+		;
+#endif
 #endif
 	ret = 0;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	if (mfd->panel_info.type != DTV_PANEL) {
+	if (hdmi_prim_display || mfd->panel_info.type != DTV_PANEL) {
 		mfd->early_suspend.suspend = msmfb_early_suspend;
 		mfd->early_suspend.resume = msmfb_early_resume;
 		mfd->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 2;
@@ -1601,13 +1915,22 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	struct mdp_dirty_region dirty;
 	struct mdp_dirty_region *dirtyPtr = NULL;
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+/* < lishubin update baseline to J version begin */
+#ifndef CONFIG_HUAWEI_KERNEL
 	struct msm_fb_panel_data *pdata;
+#endif
+/* lishubin update baseline to J version end > */
 
+#ifdef CONFIG_HUAWEI_KERNEL
+    static bool is_first_frame = TRUE;
+#endif
+
+/* ÉŸ³ýŽË¶ÎŽúÂë */
+    
 	/*
-	 * If framebuffer is 1 or 2, io pen display is not allowed.
+	 * If framebuffer is 2, io pen display is not allowed.
 	 */
-	if (bf_supported &&
-		(info->node == 1 || info->node == 2)) {
+	if (bf_supported && info->node == 2) {
 		pr_err("%s: no pan display for fb%d!",
 		       __func__, info->node);
 		return -EPERM;
@@ -1669,8 +1992,7 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	if (mfd->msmfb_no_update_notify_timer.function)
 		del_timer(&mfd->msmfb_no_update_notify_timer);
 
-	mfd->msmfb_no_update_notify_timer.expires =
-				jiffies + ((1000 * HZ) / 1000);
+	mfd->msmfb_no_update_notify_timer.expires = jiffies + (2 * HZ);
 	add_timer(&mfd->msmfb_no_update_notify_timer);
 	mutex_unlock(&msm_fb_notify_update_sem);
 
@@ -1686,9 +2008,20 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 
 	mdp_set_dma_pan_info(info, dirtyPtr,
 			     (var->activate == FB_ACTIVATE_VBL));
+/* Do not refresh the first frame, because the frame's data is 0x00 */
+#ifdef CONFIG_HUAWEI_KERNEL
+	if(unlikely(is_first_frame == TRUE))
+	{
+		is_first_frame = FALSE;
+		printk("%s:Don't refresh the first frame to LCD\n",__func__);
+	}
+	else
+#endif
 	mdp_dma_pan_update(info);
 	up(&msm_fb_pan_sem);
 
+/* Remove qcom backlight mechanism,user our own */
+#ifndef CONFIG_HUAWEI_KERNEL		
 	if (unset_bl_level && !bl_updated) {
 		pdata = (struct msm_fb_panel_data *)mfd->pdev->
 			dev.platform_data;
@@ -1701,6 +2034,7 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 			bl_updated = 1;
 		}
 	}
+#endif
 
 	++mfd->panel_info.frame_count;
 	return 0;
@@ -2087,6 +2421,9 @@ int mdp_blit(struct fb_info *info, struct mdp_blit_req *req)
 		}
 	}
 #endif
+
+/* ÉŸ³ýŽË¶ÎŽúÂë */
+
 	if (unlikely(req->src_rect.h == 0 || req->src_rect.w == 0)) {
 		printk(KERN_ERR "mpd_ppp: src img of zero size!\n");
 		return -EINVAL;
@@ -2788,7 +3125,7 @@ static int msmfb_overlay_set(struct fb_info *info, void __user *p)
 
 static int msmfb_overlay_unset(struct fb_info *info, unsigned long *argp)
 {
-	int	ret, ndx;
+	int ret, ndx;
 
 	ret = copy_from_user(&ndx, argp, sizeof(ndx));
 	if (ret) {
@@ -2836,6 +3173,19 @@ static int msmfb_overlay_play_wait(struct fb_info *info, unsigned long *argp)
 	return ret;
 }
 
+static int msmfb_overlay_commit(struct fb_info *info, unsigned long *argp)
+{
+	int ret, ndx;
+
+	ret = copy_from_user(&ndx, argp, sizeof(ndx));
+	if (ret) {
+		pr_err("%s: ioctl failed\n", __func__);
+		return ret;
+	}
+
+	return mdp4_overlay_commit(info, ndx);
+}
+
 static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 {
 	int	ret;
@@ -2858,8 +3208,7 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 	if (mfd->msmfb_no_update_notify_timer.function)
 		del_timer(&mfd->msmfb_no_update_notify_timer);
 
-	mfd->msmfb_no_update_notify_timer.expires =
-				jiffies + ((1000 * HZ) / 1000);
+	mfd->msmfb_no_update_notify_timer.expires = jiffies + (2 * HZ);
 	add_timer(&mfd->msmfb_no_update_notify_timer);
 	mutex_unlock(&msm_fb_notify_update_sem);
 
@@ -2873,6 +3222,8 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 
 	ret = mdp4_overlay_play(info, &req);
 
+/* Remove qcom backlight mechanism,user our own */
+#ifndef CONFIG_HUAWEI_KERNEL		
 	if (unset_bl_level && !bl_updated) {
 		pdata = (struct msm_fb_panel_data *)mfd->pdev->
 			dev.platform_data;
@@ -2885,6 +3236,7 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 			bl_updated = 1;
 		}
 	}
+#endif
 
 	return ret;
 }
@@ -2918,27 +3270,6 @@ static int msmfb_overlay_blt(struct fb_info *info, unsigned long *argp)
 	}
 
 	ret = mdp4_overlay_blt(info, &req);
-
-	return ret;
-}
-
-static int msmfb_overlay_blt_off(struct fb_info *info, unsigned long *argp)
-{
-	int	ret;
-	struct msmfb_overlay_blt req;
-
-	ret = copy_from_user(&req, argp, sizeof(req));
-	if (ret) {
-		pr_err("%s: failed\n", __func__);
-		return ret;
-	}
-
-	ret = mdp4_overlay_blt_offset(info, &req);
-
-	ret = copy_to_user(argp, &req, sizeof(req));
-	if (ret)
-		printk(KERN_ERR "%s:msmfb_overlay_blt_off ioctl failed\n",
-		__func__);
 
 	return ret;
 }
@@ -3147,6 +3478,84 @@ static void msmfb_set_color_conv(struct mdp_csc *p)
 }
 #endif
 
+/*< add for dynamic gamma function begin */ 
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+int msm_fb_set_dynamic_gamma(struct msm_fb_data_type *mfd, enum danymic_gamma_mode gamma_mode)
+{
+    int ret = 0;
+    struct msm_fb_panel_data *pdata = NULL;
+
+    pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+    if ((pdata) && (pdata->set_dynamic_gamma))
+    {
+		/* add mipi video interface */
+    	if(get_hw_lcd_interface_type() == LCD_IS_MIPI_CMD)
+    	{
+			down(&mfd->dma->mutex);
+			down(&mfd->sem);
+       	 	ret = pdata->set_dynamic_gamma(gamma_mode,mfd);
+			up(&mfd->sem);
+			up(&mfd->dma->mutex);
+    	}
+		else if (get_hw_lcd_interface_type() == LCD_IS_MIPI_VIDEO)
+		{
+			down(&mfd->dma->mutex);
+        	ret = pdata->set_dynamic_gamma(gamma_mode,mfd);
+			up(&mfd->dma->mutex);
+		}
+    }
+    else
+    {
+        MSM_FB_INFO("This panel can not support dynamic gamma function");
+    }
+
+    return ret;
+}
+#endif
+
+#ifdef CONFIG_FB_AUTO_CABC
+/***************************************************************
+Function: msm_fb_config_cabc
+Description: Config CABC parameter
+Parameters:
+    struct msm_fb_data_type *mfd: mfd pointer
+    struct msmfb_cabc_config cabc_cfg: CABC config structure
+Return:
+    0: success
+***************************************************************/
+int msm_fb_config_cabc(struct msm_fb_data_type *mfd, struct msmfb_cabc_config cabc_cfg)
+{
+    int ret = 0;
+    struct msm_fb_panel_data *pdata = NULL;
+
+    pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+    if ((pdata) && (pdata->config_cabc))
+    {
+		/* add mipi video interface */
+    	if(get_hw_lcd_interface_type() == LCD_IS_MIPI_CMD)
+    	{
+			down(&mfd->dma->mutex);
+			down(&mfd->sem);
+       	 	ret = pdata->config_cabc(cabc_cfg,mfd);
+			up(&mfd->sem);
+			up(&mfd->dma->mutex);
+    	}
+		else if (get_hw_lcd_interface_type() == LCD_IS_MIPI_VIDEO)
+		{
+			down(&mfd->dma->mutex);
+        	ret = pdata->config_cabc(cabc_cfg,mfd);
+			up(&mfd->dma->mutex);
+		}
+    }
+    else
+    {
+        MSM_FB_INFO("This panel can not support auto cabc function");
+    }
+
+    return ret;
+}
+#endif
+
 static int msmfb_notify_update(struct fb_info *info, unsigned long *argp)
 {
 	int ret, notify;
@@ -3163,15 +3572,18 @@ static int msmfb_notify_update(struct fb_info *info, unsigned long *argp)
 
 	if (notify == NOTIFY_UPDATE_START) {
 		INIT_COMPLETION(mfd->msmfb_update_notify);
-		wait_for_completion_interruptible(&mfd->msmfb_update_notify);
+		ret = wait_for_completion_interruptible_timeout(
+		&mfd->msmfb_update_notify, 4*HZ);
 	} else {
 		INIT_COMPLETION(mfd->msmfb_no_update_notify);
-		wait_for_completion_interruptible(&mfd->msmfb_no_update_notify);
+		ret = wait_for_completion_interruptible_timeout(
+		&mfd->msmfb_no_update_notify, 4*HZ);
 	}
-	return 0;
+	return (ret > 0) ? 0 : -1;
 }
 
-static int msmfb_handle_pp_ioctl(struct msmfb_mdp_pp *pp_ptr)
+static int msmfb_handle_pp_ioctl(struct msm_fb_data_type *mfd,
+						struct msmfb_mdp_pp *pp_ptr)
 {
 	int ret = -1;
 
@@ -3216,6 +3628,11 @@ static int msmfb_handle_pp_ioctl(struct msmfb_mdp_pp *pp_ptr)
 						&pp_ptr->data.qseed_cfg_data);
 		break;
 #endif
+	case mdp_bl_scale_cfg:
+		ret = mdp_bl_scale_config(mfd, (struct mdp_bl_scale_data *)
+				&pp_ptr->data.bl_scale_data);
+		break;
+
 	default:
 		pr_warn("Unsupported request to MDP_PP IOCTL.\n");
 		ret = -EINVAL;
@@ -3224,7 +3641,24 @@ static int msmfb_handle_pp_ioctl(struct msmfb_mdp_pp *pp_ptr)
 
 	return ret;
 }
-
+static int msmfb_handle_metadata_ioctl(struct msm_fb_data_type *mfd,
+				struct msmfb_metadata *metadata_ptr)
+{
+	int ret;
+	switch (metadata_ptr->op) {
+#ifdef CONFIG_FB_MSM_MDP40
+	case metadata_op_base_blend:
+		ret = mdp4_update_base_blend(mfd,
+						&metadata_ptr->data.blend_cfg);
+		break;
+#endif
+	default:
+		pr_warn("Unsupported request to MDP META IOCTL.\n");
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
 static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg)
 {
@@ -3235,6 +3669,9 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 	struct mdp_histogram_data hist;
 	struct mdp_histogram_start_req hist_req;
 	uint32_t block;
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+	int gamma_setting_value;
+#endif
 #ifndef CONFIG_FB_MSM_MDP40
 	struct mdp_ccs ccs_matrix;
 #else
@@ -3242,59 +3679,42 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 #endif
 	struct mdp_page_protection fb_page_protection;
 	struct msmfb_mdp_pp mdp_pp;
+	struct msmfb_metadata mdp_metadata;
 	int ret = 0;
 
 	switch (cmd) {
 #ifdef CONFIG_FB_MSM_OVERLAY
 	case MSMFB_OVERLAY_GET:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_get(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_SET:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_set(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_UNSET:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_unset(info, argp);
+		break;
+	case MSMFB_OVERLAY_COMMIT:
+		down(&msm_fb_ioctl_ppp_sem);
+		ret = msmfb_overlay_commit(info, argp);
 		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_PLAY:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_play(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_PLAY_ENABLE:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_play_enable(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_PLAY_WAIT:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_play_wait(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_BLT:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_blt(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
-		break;
-	case MSMFB_OVERLAY_BLT_OFFSET:
-		down(&msm_fb_ioctl_ppp_sem);
-		ret = msmfb_overlay_blt_off(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_OVERLAY_3D:
-		down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_overlay_3d_sbys(info, argp);
-		up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_MIXER_INFO:
-		//down(&msm_fb_ioctl_ppp_sem);
 		ret = msmfb_mixer_info(info, argp);
-		//up(&msm_fb_ioctl_ppp_sem);
 		break;
 	case MSMFB_WRITEBACK_INIT:
 		ret = msmfb_overlay_ioctl_writeback_init(info);
@@ -3322,9 +3742,9 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 	case MSMFB_VSYNC_CTRL:
 	case MSMFB_OVERLAY_VSYNC_CTRL:
 		down(&msm_fb_ioctl_ppp_sem);
-		//if (mdp_rev >= MDP_REV_40)
-		//	ret = msmfb_overlay_vsync_ctrl(info, argp);
-		//else
+		if (mdp_rev >= MDP_REV_40)
+			ret = msmfb_overlay_vsync_ctrl(info, argp);
+		else
 			ret = msmfb_vsync_ctrl(info, argp);
 		up(&msm_fb_ioctl_ppp_sem);
 		break;
@@ -3335,7 +3755,7 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 
 		break;
 
-		/* Ioctl for setting ccs matrix from user space */
+	/* Ioctl for setting ccs matrix from user space */
 	case MSMFB_SET_CCS_MATRIX:
 #ifndef CONFIG_FB_MSM_MDP40
 		ret = copy_from_user(&ccs_matrix, argp, sizeof(ccs_matrix));
@@ -3543,7 +3963,75 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		if (ret)
 			return ret;
 
-		ret = msmfb_handle_pp_ioctl(&mdp_pp);
+		ret = msmfb_handle_pp_ioctl(mfd, &mdp_pp);
+		break;
+
+/* add for dynamic gamma function begin*/ 
+#ifdef CONFIG_FB_DYNAMIC_GAMMA
+    case MSMFB_DYNAMIC_GAMMA:
+        /* delete the judgement is_panel_support_dynamic_gamma() */
+        ret = copy_from_user(&gamma_setting_value, argp, sizeof(gamma_setting_value));
+        if (ret)
+        {
+            printk(KERN_ERR
+                "%s:MSMFB_DYNAMIC_GAMMA ioctl failed \n",
+                 __func__);
+            return ret;
+        }
+		if(FALSE == lcd_have_resume)
+		{
+			/* backup gamma_mode that want to set */
+			last_gamma_mode = gamma_setting_value;
+			last_gamma_setting = TRUE;
+            printk(KERN_ERR
+                "%s:MSMFB_DYNAMIC_GAMMA ioctl failed \n",
+                 __func__);
+		}
+		else
+		{
+			ret = msm_fb_set_dynamic_gamma(mfd, gamma_setting_value);
+			last_gamma_setting = FALSE;
+		}
+		break;
+#endif
+#ifdef CONFIG_FB_AUTO_CABC
+    case MSMFB_AUTO_CABC:
+        /* delete the judgement is_panel_support_auto_cabc() */
+        {
+            struct msmfb_cabc_config cabc_cfg;
+
+            ret = copy_from_user(&cabc_cfg, argp, sizeof(cabc_cfg));
+            if (ret)
+            {
+                printk(KERN_ERR
+                    "%s:MSMFB_AUTO_CABC ioctl failed \n",
+                     __func__);
+                return ret;
+            }
+			if(FALSE == lcd_have_resume)
+			{
+				/* backup gamma_mode that want to set */
+				last_cabc_mode = cabc_cfg;
+				last_cabc_setting =TRUE;
+                printk(KERN_ERR
+                    "%s:MSMFB_AUTO_CABC ioctl failed \n",
+                     __func__);
+			}
+			else
+			{
+				ret = msm_fb_config_cabc(mfd, cabc_cfg);
+				last_cabc_setting =FALSE;
+			}
+
+        }
+        break;
+#endif
+
+	case MSMFB_METADATA_SET:
+		ret = copy_from_user(&mdp_metadata, argp, sizeof(mdp_metadata));
+		if (ret)
+			return ret;
+		ret = msmfb_handle_metadata_ioctl(mfd, &mdp_metadata);
 		break;
 
 	default:
@@ -3747,7 +4235,15 @@ int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num,
 	return 0;
 }
 EXPORT_SYMBOL(get_fb_phys_info);
+#ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
+static void __exit msm_fb_exit(void)
+{
+/* ÉŸ³ýŽË¶ÎŽúÂë */
 
+     /*lcd consume notify timer cancel*/
+	 del_timer(&bright_timer);
+}
+#endif
 int __init msm_fb_init(void)
 {
 	int rc = -ENODEV;
@@ -3771,6 +4267,14 @@ int __init msm_fb_init(void)
 		}
 	}
 #endif
+#ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
+    /*init lcd consume notify timer */
+	setup_timer(&bright_timer, light_notify_timer_func, 0);
+	/*init lcd consume notify work */
+	INIT_WORK(&light_notify_work, light_notify_work_func);  
+#endif
+
+/* ÉŸ³ýŽË¶ÎŽúÂë */
 
 	return 0;
 }
@@ -3830,3 +4334,6 @@ int msm_fb_v4l2_update(void *par,
 EXPORT_SYMBOL(msm_fb_v4l2_update);
 
 module_init(msm_fb_init);
+#ifdef CONFIG_HUAWEI_EVALUATE_POWER_CONSUMPTION 
+module_exit(msm_fb_exit);
+#endif

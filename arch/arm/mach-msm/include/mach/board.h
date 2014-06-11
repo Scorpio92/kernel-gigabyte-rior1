@@ -278,6 +278,7 @@ struct msm_camera_sensor_info {
 	int vcm_enable;
 	int mclk;
 	int flash_type;
+    bool standby_is_supported;
 	struct msm_camera_sensor_platform_info *sensor_platform_info;
 	struct msm_camera_device_platform_data *pdata;
 	struct resource *resource;
@@ -292,6 +293,7 @@ struct msm_camera_sensor_info {
 	struct msm_actuator_info *actuator_info;
 	int pmic_gpio_enable;
 	struct msm_eeprom_info *eeprom_info;
+	void (* get_camera_vreg)(struct msm_camera_sensor_platform_info *);
 };
 
 struct msm_camera_board_info {
@@ -467,6 +469,7 @@ struct lvds_panel_platform_data {
 struct msm_fb_platform_data {
 	int (*detect_client)(const char *name);
 	int mddi_prescan;
+	unsigned char ext_resolution;
 	int (*allow_set_offset)(void);
 	char prim_panel_name[PANEL_NAME_MAX_LEN];
 	char ext_panel_name[PANEL_NAME_MAX_LEN];

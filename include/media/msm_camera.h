@@ -190,6 +190,11 @@
 #define MSM_CAM_IOCTL_EEPROM_IO_CFG \
 	_IOW(MSM_CAM_IOCTL_MAGIC, 53, struct msm_eeprom_cfg_data *)
 
+#define MSM_CAM_IOCTL_GET_SENSOR_INFO_PROJECTMENU \
+	_IOR(MSM_CAM_IOCTL_MAGIC, 90, struct msm_camsensor_info *)
+#define MSM_CAM_IOCTL_ISPIF_IO_CFG \
+	_IOR(MSM_CAM_IOCTL_MAGIC, 54, struct ispif_cfg_data *)
+
 struct msm_mctl_pp_cmd {
 	int32_t  id;
 	uint16_t length;
@@ -561,6 +566,8 @@ struct outputCfg {
 #define OUTPUT_TYPE_ST_L (1<<5)
 #define OUTPUT_TYPE_ST_R (1<<6)
 #define OUTPUT_TYPE_ST_D (1<<7)
+#define OUTPUT_TYPE_R    BIT(8)
+#define OUTPUT_TYPE_R1   BIT(9)
 
 struct fd_roi_info {
 	void *info;
@@ -675,7 +682,13 @@ struct msm_stats_buf {
 	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+4)
 #define MSM_V4L2_EXT_CAPTURE_MODE_RAW \
 	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+5)
-#define MSM_V4L2_EXT_CAPTURE_MODE_MAX (MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+6)
+#define MSM_V4L2_EXT_CAPTURE_MODE_RDI \
+	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+6)
+#define MSM_V4L2_EXT_CAPTURE_MODE_RDI1 \
+	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+7)
+#define MSM_V4L2_EXT_CAPTURE_MODE_RDI2 \
+	(MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+8)
+#define MSM_V4L2_EXT_CAPTURE_MODE_MAX (MSM_V4L2_EXT_CAPTURE_MODE_DEFAULT+9)
 
 
 #define MSM_V4L2_PID_MOTION_ISO              V4L2_CID_PRIVATE_BASE
@@ -796,6 +809,11 @@ struct msm_snapshot_pp_status {
 #define CFG_SET_AUTO_LED_START			44
 #define CFG_READ_AVG_LUMINANCE			45
 #define CFG_MAX			                46
+#define CFG_START_STREAM              47
+#define CFG_STOP_STREAM               48
+#define CFG_GET_CSI_PARAMS            49
+/*lijuan add for AWB OTP*/
+#define CFG_OTP_READING     235
 
 
 #define MOVE_NEAR	0
@@ -1133,6 +1151,14 @@ struct msm_eeprom_data_t {
 	uint16_t index;
 };
 
+struct csi_lane_params_t {
+	uint8_t csi_lane_assign;
+	uint8_t csi_lane_mask;
+	uint8_t csi_if;
+	uint8_t csid_core;
+	uint32_t csid_version;
+};
+
 struct sensor_cfg_data {
 	int cfgtype;
 	int mode;
@@ -1159,6 +1185,7 @@ struct sensor_cfg_data {
 		struct sensor_calib_data calib_info;
 		struct sensor_output_info_t output_info;
 		struct msm_eeprom_data_t eeprom_data;
+		struct csi_lane_params_t csi_lane_params;
 		/* QRD */
 		uint16_t antibanding;
 		uint8_t contrast;
@@ -1418,6 +1445,7 @@ struct msm_camsensor_info {
 	uint8_t flash_enabled;
 	uint8_t strobe_flash_enabled;
 	uint8_t actuator_enabled;
+	uint8_t ispif_supported;
 	int8_t total_steps;
 	uint8_t support_3d;
 	enum flash_type flashtype;
@@ -1427,6 +1455,7 @@ struct msm_camsensor_info {
 	int mount_angle;
 	uint32_t max_width;
 	uint32_t max_height;
+	int flip_and_mirror;
 };
 
 #define V4L2_SINGLE_PLANE	0
