@@ -123,7 +123,7 @@ static int get_ion_region_info(int fd, struct adsp_ion_region *region)
 	void *temp_ptr;
 	int rc = -EINVAL;
 
-	//region->client = msm_ion_client_create(UINT_MAX, "Video_Client");
+	region->client = msm_ion_client_create(UINT_MAX, "Video_Client");
 	if (IS_ERR_OR_NULL(region->client)) {
 		pr_err("Unable to create ION client\n");
 		goto client_error;
@@ -268,8 +268,8 @@ int adsp_ion_do_cache_op(struct msm_adsp_module *module,
 	}
 	if ((region->ion_flag == CACHED) && region->handle) {
 		len = ((((len) + 31) & (~31)) + 32);
-		//ret = msm_ion_do_cache_op(region->client, region->handle,
-		//		(void *)paddr, len, cmd);
+		ret = msm_ion_do_cache_op(region->client, region->handle,
+				(void *)paddr, len, cmd);
 	}
 	return ret;
 }
