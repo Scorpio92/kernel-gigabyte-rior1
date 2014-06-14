@@ -1777,7 +1777,7 @@ static int __devinit vcap_probe(struct platform_device *pdev)
 		goto rel_vdev;
 	}
 
-	dev->ion_client = msm_ion_client_create(-1, "vcap");
+	//dev->ion_client = msm_ion_client_create(-1, "vcap");
 	if (IS_ERR((void *)dev->ion_client)) {
 		pr_err("could not get ion client");
 		goto rel_vcap_wq;
