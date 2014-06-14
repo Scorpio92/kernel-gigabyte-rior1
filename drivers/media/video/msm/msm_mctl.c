@@ -178,7 +178,7 @@ static int msm_get_sensor_info(
 	info.actuator_enabled = sdata->actuator_info ? 1 : 0;
 	info.strobe_flash_enabled = sdata->strobe_flash_data ? 1 : 0;
 	info.ispif_supported = mctl->ispif_sdev ? 1 : 0;
-	info.flip_and_mirror = ( HW_MIRROR_AND_FLIP == (get_hw_camera_mirror_type() & HW_MIRROR_AND_FLIP) )? 1 : 0;
+	//info.flip_and_mirror = ( HW_MIRROR_AND_FLIP == (get_hw_camera_mirror_type() & HW_MIRROR_AND_FLIP) )? 1 : 0;
 
 	/* copy back to user space */
 	if (copy_to_user((void *)arg,
@@ -574,8 +574,7 @@ static int msm_mctl_open(struct msm_cam_media_controller *p_mctl,
 	if (!p_mctl->opencnt) {
 		struct msm_sensor_csi_info csi_info;
 		uint32_t csid_version;
-		pm_qos_update_request(&p_mctl->idle_pm_qos,
-			msm_cpuidle_get_deep_idle_latency());
+		wake_lock(&p_mctl->idle_pm_qos);
 
 		csid_core = camdev->csid_core;
 		rc = msm_mctl_register_subdevs(p_mctl, csid_core);
@@ -720,7 +719,7 @@ act_power_up_failed:
 		pr_err("%s: sensor powerdown failed: %d\n", __func__, rc);
 sensor_sdev_failed:
 register_sdev_failed:
-	pm_qos_update_request(&p_mctl->idle_pm_qos, PM_QOS_DEFAULT_VALUE);
+	wake_unlock(&p_mctl->idle_pm_qos);
 	mutex_unlock(&p_mctl->lock);
 	return rc;
 }
@@ -765,8 +764,7 @@ static int msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 			VIDIOC_MSM_CSIPHY_RELEASE, NULL);
 	}
 
-	pm_qos_update_request(&p_mctl->pm_qos_req_list,
-			PM_QOS_DEFAULT_VALUE);
+	wake_unlock(&p_mctl->idle_pm_qos);
 	pm_qos_remove_request(&p_mctl->pm_qos_req_list);
 
 	if (p_mctl->act_sdev) {
@@ -776,7 +774,7 @@ static int msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 
 	v4l2_subdev_call(p_mctl->sensor_sdev, core, s_power, 0);
 
-	pm_qos_update_request(&p_mctl->idle_pm_qos, PM_QOS_DEFAULT_VALUE);
+	wake_unlock(&p_mctl->idle_pm_qos);
 	return rc;
 }
 
@@ -861,8 +859,7 @@ int msm_mctl_init(struct msm_cam_v4l2_device *pcam)
 		return -EINVAL;
 	}
 
-	pm_qos_add_request(&pmctl->idle_pm_qos, PM_QOS_CPU_DMA_LATENCY,
-		PM_QOS_DEFAULT_VALUE);
+	wake_lock_init(&pmctl->idle_pm_qos, WAKE_LOCK_IDLE, "msm_camera");
 	mutex_init(&pmctl->lock);
 	pmctl->opencnt = 0;
 
@@ -902,7 +899,7 @@ int msm_mctl_free(struct msm_cam_v4l2_device *pcam)
 	}
 
 	mutex_destroy(&pmctl->lock);
-	pm_qos_remove_request(&pmctl->idle_pm_qos);
+	wake_lock_destroy(&pmctl->idle_pm_qos);
 	msm_camera_free_mctl(pcam->mctl_handle);
 	return rc;
 }

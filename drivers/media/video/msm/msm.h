@@ -20,7 +20,7 @@
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/videodev2.h>
-#include <linux/pm_qos.h>
+#include <linux/pm_qos_params.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-device.h>
@@ -258,8 +258,8 @@ struct msm_cam_media_controller {
 	uint8_t opencnt; /*mctl ref count*/
 	const char *apps_id; /*ID for app that open this session*/
 	struct mutex lock;
-	struct pm_qos_request idle_pm_qos; /*avoid low power mode when active*/
-	struct pm_qos_request pm_qos_req_list;
+	struct wake_lock idle_pm_qos; /*avoid low power mode when active*/
+	struct pm_qos_request_list pm_qos_req_list;
 	struct msm_mctl_pp_info pp_info;
 	struct msm_mctl_stats_t stats_info; /*stats pmem info*/
 	uint32_t vfe_output_mode; /* VFE output mode */
