@@ -84,13 +84,11 @@ enum msm_cpu {
 	MSM_CPU_7X25AB,
 	MSM_CPU_8064,
 	MSM_CPU_8930,
-	MSM_CPU_8930AA,
 	MSM_CPU_7X27AA,
 	MSM_CPU_9615,
 	MSM_CPU_COPPER,
 	MSM_CPU_8627,
 	MSM_CPU_8625,
-	MSM_CPU_8625Q,
 	MSM_CPU_9625
 };
 
@@ -276,15 +274,6 @@ static inline int cpu_is_msm8930(void)
 #endif
 }
 
-static inline int cpu_is_msm8930aa(void)
-{
-#ifdef CONFIG_ARCH_MSM8930
-	return read_msm_cpu_type() == MSM_CPU_8930AA;
-#else
-	return 0;
-#endif
-}
-
 static inline int cpu_is_msm8627(void)
 {
 /* 8930 and 8627 will share the same CONFIG_ARCH type unless otherwise needed */
@@ -326,18 +315,6 @@ static inline int cpu_is_msm8625(void)
 
 	BUG_ON(cpu == MSM_CPU_UNKNOWN);
 	return cpu == MSM_CPU_8625;
-#else
-	return 0;
-#endif
-}
-
-static inline int cpu_is_msm8625q(void)
-{
-#ifdef CONFIG_ARCH_MSM8625
-	enum msm_cpu cpu = socinfo_get_msm_cpu();
-
-	BUG_ON(cpu == MSM_CPU_UNKNOWN);
-	return cpu == MSM_CPU_8625Q;
 #else
 	return 0;
 #endif

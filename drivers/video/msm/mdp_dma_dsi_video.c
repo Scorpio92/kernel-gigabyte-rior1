@@ -34,33 +34,6 @@
 static int first_pixel_start_x;
 static int first_pixel_start_y;
 
-static ssize_t vsync_show_event(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	ssize_t ret = 0;
-
-	INIT_COMPLETION(vsync_cntrl.vsync_wait);
-
-	if (atomic_read(&vsync_cntrl.suspend) > 0 ||
-		atomic_read(&vsync_cntrl.vsync_resume) == 0)
-		return 0;
-
-	wait_for_completion(&vsync_cntrl.vsync_wait);
-	ret = snprintf(buf, PAGE_SIZE, "VSYNC=%llu",
-	ktime_to_ns(vsync_cntrl.vsync_time));
-	buf[strlen(buf) + 1] = '\0';
-	return ret;
-}
-
-static DEVICE_ATTR(vsync_event, S_IRUGO, vsync_show_event, NULL);
-static struct attribute *vsync_fs_attrs[] = {
-	&dev_attr_vsync_event.attr,
-	NULL,
-};
-static struct attribute_group vsync_fs_attr_group = {
-	.attrs = vsync_fs_attrs,
-};
-
 int mdp_dsi_video_on(struct platform_device *pdev)
 {
 	int dsi_width;
@@ -114,8 +87,6 @@ int mdp_dsi_video_on(struct platform_device *pdev)
 	fbi = mfd->fbi;
 	var = &fbi->var;
 
-	vsync_cntrl.dev = mfd->fbi->dev;
-	atomic_set(&vsync_cntrl.suspend, 0);
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
 
@@ -157,7 +128,6 @@ int mdp_dsi_video_on(struct platform_device *pdev)
 	}
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-
 
 	/* starting address */
 	MDP_OUTP(MDP_BASE + DMA_P_BASE + 0x8, (uint32) buf);
@@ -223,8 +193,8 @@ int mdp_dsi_video_on(struct platform_device *pdev)
 		(vsync_polarity << 1) | (hsync_polarity);
 
 	if (!(mfd->cont_splash_done)) {
-		mdp_pipe_ctrl(MDP_CMD_BLOCK,
-			MDP_BLOCK_POWER_OFF, FALSE);
+		//mfd->cont_splash_done = 1;
+		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 		MDP_OUTP(MDP_BASE + DSI_VIDEO_BASE, 0);
 		mipi_dsi_controller_cfg(0);
 	}
@@ -254,20 +224,6 @@ int mdp_dsi_video_on(struct platform_device *pdev)
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
-	if (!vsync_cntrl.sysfs_created) {
-		ret = sysfs_create_group(&vsync_cntrl.dev->kobj,
-			&vsync_fs_attr_group);
-		if (ret) {
-			pr_err("%s: sysfs creation failed, ret=%d\n",
-				__func__, ret);
-			return ret;
-		}
-
-		kobject_uevent(&vsync_cntrl.dev->kobj, KOBJ_ADD);
-		pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
-		vsync_cntrl.sysfs_created = 1;
-	}
-
 	return ret;
 }
 
@@ -283,49 +239,10 @@ int mdp_dsi_video_off(struct platform_device *pdev)
 	mdp_pipe_ctrl(MDP_DMA2_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	ret = panel_next_off(pdev);
-
-	atomic_set(&vsync_cntrl.suspend, 1);
-	atomic_set(&vsync_cntrl.vsync_resume, 0);
-	complete_all(&vsync_cntrl.vsync_wait);
 	/* delay to make sure the last frame finishes */
 	msleep(20);
 
 	return ret;
-}
-
-/* merge qcom patch to solve blue screen when power on */
-void mdp_dma_video_vsync_ctrl(int enable)
-{
-	unsigned long flag;
-	int disabled_clocks;
-	if (vsync_cntrl.vsync_irq_enabled == enable)
-		return;
-
-	spin_lock_irqsave(&mdp_spin_lock, flag);
-	if (!enable)
-		INIT_COMPLETION(vsync_cntrl.vsync_wait);
-
-	vsync_cntrl.vsync_irq_enabled = enable;
-	/* delete two lines */
-	disabled_clocks = vsync_cntrl.disabled_clocks;
-	spin_unlock_irqrestore(&mdp_spin_lock, flag);
-
-	if (enable && disabled_clocks)
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
-
-	spin_lock_irqsave(&mdp_spin_lock, flag);
-	if (enable && vsync_cntrl.disabled_clocks) {
-		outp32(MDP_INTR_CLEAR, LCDC_FRAME_START);
-		mdp_intr_mask |= LCDC_FRAME_START;
-		outp32(MDP_INTR_ENABLE, mdp_intr_mask);
-		mdp_enable_irq(MDP_VSYNC_TERM);
-		vsync_cntrl.disabled_clocks = 0;
-	}
-	spin_unlock_irqrestore(&mdp_spin_lock, flag);
-
-	if (vsync_cntrl.vsync_irq_enabled &&
-		atomic_read(&vsync_cntrl.suspend) == 0)
-		atomic_set(&vsync_cntrl.vsync_resume, 1);
 }
 
 void mdp_dsi_video_update(struct msm_fb_data_type *mfd)
