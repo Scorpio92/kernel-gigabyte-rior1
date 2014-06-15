@@ -168,14 +168,10 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 #define CAMERA_ZSL_SIZE		(SZ_1M * 60)
 
 #define MSM_3M_PMEM_ADSP_SIZE	(0x1048000)
-/*   enlarge the pmem space for HDR on 8950s
- */
-/*
 static unsigned int get_pmem_adsp_size(void)
 {
 		return MSM_PMEM_ADSP_SIZE;
 }
-*/
 #endif
 
 
