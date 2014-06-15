@@ -23,8 +23,6 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 #include <linux/dmi.h>
-#include <asm/memory.h>
-#include <asm/cacheflush.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -57,14 +55,14 @@ static long no_blink(int state)
 long (*panic_blink)(int state);
 EXPORT_SYMBOL(panic_blink);
 
-#ifdef CONFIG_ARCH_MSM
-#define __LOG_BUF_LEN   (1 << CONFIG_LOG_BUF_SHIFT)
-extern char __log_buf[];
-static void flush_log_buf(void *ignored)
+/*
+ * Stop ourself in panic -- architecture code may override this
+ */
+void __weak panic_smp_self_stop(void)
 {
-	dmac_clean_range(__log_buf, __log_buf + __LOG_BUF_LEN);
+	while (1)
+		cpu_relax();
 }
-#endif
 
 /**
  *	panic - halt the system
@@ -74,22 +72,34 @@ static void flush_log_buf(void *ignored)
  *
  *	This function never returns.
  */
-NORET_TYPE void panic(const char * fmt, ...)
+void panic(const char *fmt, ...)
 {
+	static DEFINE_SPINLOCK(panic_lock);
 	static char buf[1024];
 	va_list args;
 	long i, i_next = 0;
 	int state = 0;
-#if defined(CONFIG_ARCH_MSM) && defined(CONFIG_OUTER_CACHE)
-	unsigned long paddr;
-#endif
+
+	/*
+	 * Disable local interrupts. This will prevent panic_smp_self_stop
+	 * from deadlocking the first cpu that invokes the panic, since
+	 * there is nothing to prevent an interrupt handler (that runs
+	 * after the panic_lock is acquired) from invoking panic again.
+	 */
+	local_irq_disable();
 
 	/*
 	 * It's possible to come here directly from a panic-assertion and
 	 * not have preempt disabled. Some functions called from here want
 	 * preempt to be disabled. No point enabling it later though...
+	 *
+	 * Only one CPU is allowed to execute the panic code from here. For
+	 * multiple parallel invocations of panic, all other CPUs either
+	 * stop themself or will wait until they are stopped by the 1st CPU
+	 * with smp_send_stop().
 	 */
-	preempt_disable();
+	if (!spin_trylock(&panic_lock))
+		panic_smp_self_stop();
 
 	console_verbose();
 	bust_spinlocks(1);
@@ -98,25 +108,13 @@ NORET_TYPE void panic(const char * fmt, ...)
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
-	dump_stack();
+	/*
+	 * Avoid nested stack-dumping if a panic occurs during oops processing
+	 */
+	if (!test_taint(TAINT_DIE) && oops_in_progress <= 1)
+		dump_stack();
 #endif
 
-#ifdef CONFIG_ARCH_MSM
-	/* XXX: on_each_cpu "should" work in UP case, but the UP
-	 * version is wrapped with local_irq_disable/enable,
-	 * other than local_irq_save/restore. The previous will
-	 * corrupt the environment, so use "ifdef" here.
-	 */
-#ifdef CONFIG_SMP
-	on_each_cpu(flush_log_buf, NULL, 1);
-#else
-	flush_log_buf(NULL);
-#endif
-#ifdef CONFIG_OUTER_CACHE
-	paddr = (unsigned long)__virt_to_phys((unsigned long)__log_buf);
-	outer_clean_range(paddr, paddr + __LOG_BUF_LEN);
-#endif
-#endif
 	/*
 	 * If we have crashed and we have a crash kernel loaded let it handle
 	 * everything else.
@@ -155,6 +153,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 			}
 			mdelay(PANIC_TIMER_STEP);
 		}
+	}
+	if (panic_timeout != 0) {
 		/*
 		 * This will not be a clean reboot, with everything
 		 * shutting down.  But if there is a chance of
@@ -211,6 +211,7 @@ static const struct tnt tnts[] = {
 	{ TAINT_WARN,			'W', ' ' },
 	{ TAINT_CRAP,			'C', ' ' },
 	{ TAINT_FIRMWARE_WORKAROUND,	'I', ' ' },
+	{ TAINT_OOT_MODULE,		'O', ' ' },
 };
 
 /**
@@ -228,6 +229,7 @@ static const struct tnt tnts[] = {
  *  'W' - Taint on warning.
  *  'C' - modules from drivers/staging are loaded.
  *  'I' - Working around severe firmware bug.
+ *  'O' - Out-of-tree module has been loaded.
  *
  *	The string is overwritten by the next call to print_tainted().
  */
@@ -269,11 +271,12 @@ void add_taint(unsigned flag)
 	 * Can't trust the integrity of the kernel anymore.
 	 * We don't call directly debug_locks_off() because the issue
 	 * is not necessarily serious enough to set oops_in_progress to 1
-	 * Also we want to keep up lockdep for staging development and
-	 * post-warning case.
+	 * Also we want to keep up lockdep for staging/out-of-tree
+	 * development and post-warning case.
 	 */
 	switch (flag) {
 	case TAINT_CRAP:
+	case TAINT_OOT_MODULE:
 	case TAINT_WARN:
 	case TAINT_FIRMWARE_WORKAROUND:
 		break;
@@ -416,9 +419,6 @@ static void warn_slowpath_common(const char *file, int line, void *caller,
 				 unsigned taint, struct slowpath_args *args)
 {
 	const char *board;
-#if defined(CONFIG_ARCH_MSM) && defined(CONFIG_OUTER_CACHE)
-	unsigned long paddr;
-#endif
 
 	printk(KERN_WARNING "------------[ cut here ]------------\n");
 	printk(KERN_WARNING "WARNING: at %s:%d %pS()\n", file, line, caller);
@@ -433,19 +433,6 @@ static void warn_slowpath_common(const char *file, int line, void *caller,
 	dump_stack();
 	print_oops_end_marker();
 	add_taint(taint);
-#ifdef CONFIG_ARCH_MSM
-	/* XXX: we can not flush it in every online CPU by calling
-	 * on_each_cpu here in case of the endless recursion, due
-	 * to WARN_ON_ONCE(cpu_online(this_cpu) && irqs_disabled() \
-	 * && !oops_in_progress && !early_boot_irqs_disabled) in
-	 * smp_call_function_many() function.
-	 */
-	flush_log_buf(NULL);
-#ifdef CONFIG_OUTER_CACHE
-	paddr = (unsigned long)__virt_to_phys((unsigned long)__log_buf);
-	outer_clean_range(paddr, paddr + __LOG_BUF_LEN);
-#endif
-#endif
 }
 
 void warn_slowpath_fmt(const char *file, int line, const char *fmt, ...)

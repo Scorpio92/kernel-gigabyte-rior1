@@ -10,15 +10,12 @@
 #include <linux/sched.h>
 #include <linux/unistd.h>
 #include <linux/cpu.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/kthread.h>
 #include <linux/stop_machine.h>
 #include <linux/mutex.h>
 #include <linux/gfp.h>
 #include <linux/suspend.h>
-
-#define CREATE_TRACE_POINTS
-#include <trace/events/cpu_hotplug.h>
 
 #ifdef CONFIG_SMP
 /* Serializes the updates to cpu_online_mask, cpu_present_mask */
@@ -181,8 +178,7 @@ static inline void check_for_tasks(int cpu)
 	write_lock_irq(&tasklist_lock);
 	for_each_process(p) {
 		if (task_cpu(p) == cpu && p->state == TASK_RUNNING &&
-		    (!cputime_eq(p->utime, cputime_zero) ||
-		     !cputime_eq(p->stime, cputime_zero)))
+		    (p->utime || p->stime))
 			printk(KERN_WARNING "Task %s (pid = %d) is on cpu %d "
 				"(state = %ld, flags = %x)\n",
 				p->comm, task_pid_nr(p), cpu,
@@ -285,7 +281,6 @@ int __ref cpu_down(unsigned int cpu)
 	}
 
 	err = _cpu_down(cpu, 0);
-	trace_cpu_online(0);
 
 out:
 	cpu_maps_update_done();
@@ -379,12 +374,12 @@ int __cpuinit cpu_up(unsigned int cpu)
 	}
 
 	err = _cpu_up(cpu, 0);
-	trace_cpu_online(1);
 
 out:
 	cpu_maps_update_done();
 	return err;
 }
+EXPORT_SYMBOL_GPL(cpu_up);
 
 #ifdef CONFIG_PM_SLEEP_SMP
 static cpumask_var_t frozen_cpus;
@@ -475,7 +470,7 @@ out:
 	cpu_maps_update_done();
 }
 
-static int alloc_frozen_cpus(void)
+static int __init alloc_frozen_cpus(void)
 {
 	if (!alloc_cpumask_var(&frozen_cpus, GFP_KERNEL|__GFP_ZERO))
 		return -ENOMEM;
@@ -548,7 +543,7 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
 }
 
 
-int cpu_hotplug_pm_sync_init(void)
+static int __init cpu_hotplug_pm_sync_init(void)
 {
 	pm_notifier(cpu_hotplug_pm_callback, 0);
 	return 0;
