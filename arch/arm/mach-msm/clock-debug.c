@@ -24,10 +24,6 @@
 
 #include "clock.h"
 
-#ifdef CONFIG_MSM_SM_EVENT
-#include <linux/sm_event.h>
-#include <linux/sm_event_log.h>
-#endif
 static int clock_debug_rate_set(void *data, u64 val)
 {
 	struct clk *clock = data;
@@ -44,7 +40,7 @@ static int clock_debug_rate_set(void *data, u64 val)
 	return ret;
 }
 
-int clock_debug_rate_get(void *data, u64 *val)
+static int clock_debug_rate_get(void *data, u64 *val)
 {
 	struct clk *clock = data;
 	*val = clk_get_rate(clock);
@@ -173,16 +169,23 @@ int __init clock_debug_init(struct clock_init_data *data)
 
 static int clock_debug_print_clock(struct clk *c)
 {
-	size_t ln = 0;
-	char s[128];
+	char *start = "";
 
 	if (!c || !c->count)
 		return 0;
 
-	ln += snprintf(s, sizeof(s), "\t%s", c->dbg_name);
-	while (ln < sizeof(s) && (c = clk_get_parent(c)))
-		ln += snprintf(s + ln, sizeof(s) - ln, " -> %s", c->dbg_name);
-	pr_info("%s\n", s);
+	pr_info("\t");
+	do {
+		if (c->vdd_class)
+			pr_cont("%s%s [%ld, %lu]", start, c->dbg_name, c->rate,
+				c->vdd_class->cur_level);
+		else
+			pr_cont("%s%s [%ld]", start, c->dbg_name, c->rate);
+		start = " -> ";
+	} while ((c = clk_get_parent(c)));
+
+	pr_cont("\n");
+
 	return 1;
 }
 
@@ -190,20 +193,6 @@ void clock_debug_print_enabled(void)
 {
 	unsigned i;
 	int cnt = 0;
-
-#ifdef CONFIG_MSM_SM_EVENT
-	struct clk *clk;
-	for (i = 0; i < num_msm_clocks; i++) {
-		clk = msm_clocks[i].clk;
-
-		if (clk && clk->ops->is_enabled(clk)) {
-		//	pr_info("\t%s\n", clk->dbg_name);
-			sm_add_event(SM_CLOCK_EVENT | SM_CLK_EVENT_SET_ENABLE, 0, 0, (void *)clk->dbg_name, strlen(clk->dbg_name)+1);
-			cnt++;
-		}
-	}
-
-#endif
 
 	if (likely(!debug_suspend))
 		return;
