@@ -27,10 +27,17 @@
 #include "a2xx_reg.h"
 #include "a3xx_reg.h"
 
+#ifdef CONFIG_DEVICE_CHECK
+#include <linux/dev_check.h>
+/* 在实际测试时，发现GPU挂死之前，会进入adreno_dump函数多次，导致会多次向exception节点写入数据，
+   在此加入一个全局变量，当第一次进入dump流程时，向节点写数据，然后把这个全局变置1，之后再进入dump
+   流程时，不再向节点写数据
+*/
+static int dc_adreno_dump_flag = 0;
+#endif /* End of CONFIG_DEVICE_CHECK */
+
 #define INVALID_RB_CMD 0xaaaaaaaa
 #define NUM_DWORDS_OF_RINGBUFFER_HISTORY 100
-
-extern int parse_aux_buffers;
 
 struct pm_id_name {
 	uint32_t id;
@@ -701,12 +708,24 @@ static int adreno_dump(struct kgsl_device *device)
 
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 
+	struct kgsl_memdesc **reg_map;
+	void *reg_map_array;
+	int num_iommu_units = 0;
+
 	mb();
 
 	if (adreno_is_a2xx(adreno_dev))
 		adreno_dump_a2xx(device);
 	else if (adreno_is_a3xx(adreno_dev))
 		adreno_dump_a3xx(device);
+		
+#ifdef CONFIG_DEVICE_CHECK
+    if(0 == dc_adreno_dump_flag)
+    {
+        DC_PRINT2EXCEPTION("Device_Check", "Device_Check: %s %d abnormal,handler!!!", "adreno_postmortem", 0);
+        dc_adreno_dump_flag = 1;
+    }
+#endif /* End of CONFIG_DEVICE_CHECK */
 
 	pt_base = kgsl_mmu_get_current_ptbase(&device->mmu);
 	cur_pt_base = pt_base;
@@ -782,6 +801,10 @@ static int adreno_dump(struct kgsl_device *device)
 	/* extract the latest ib commands from the buffer */
 	ib_list.count = 0;
 	i = 0;
+	/* get the register mapped array in case we are using IOMMU */
+	num_iommu_units = kgsl_mmu_get_reg_map_desc(&device->mmu,
+							&reg_map_array);
+	reg_map = reg_map_array;
 	for (read_idx = 0; read_idx < num_item; ) {
 		uint32_t this_cmd = rb_copy[read_idx++];
 		if (adreno_cmd_is_ib(this_cmd)) {
@@ -794,7 +817,10 @@ static int adreno_dump(struct kgsl_device *device)
 					ib_list.offsets[i],
 					ib_list.bases[i],
 					ib_list.sizes[i], 0);
-		} else if (this_cmd == cp_type0_packet(MH_MMU_PT_BASE, 1)) {
+		} else if (this_cmd == cp_type0_packet(MH_MMU_PT_BASE, 1) ||
+			(num_iommu_units && this_cmd == (reg_map[0]->gpuaddr +
+			(KGSL_IOMMU_CONTEXT_USER << KGSL_IOMMU_CTX_SHIFT) +
+			KGSL_IOMMU_TTBR0))) {
 
 			KGSL_LOG_DUMP(device, "Current pagetable: %x\t"
 				"pagetable base: %x\n",
@@ -810,6 +836,8 @@ static int adreno_dump(struct kgsl_device *device)
 				cur_pt_base);
 		}
 	}
+	if (num_iommu_units)
+		kfree(reg_map_array);
 
 	/* Restore cur_pt_base back to the pt_base of
 	   the process in whose context the GPU hung */
@@ -883,8 +911,6 @@ end:
  *           dump automaticlaly triggered from a hang
 */
 
-extern int kgsl_aidle, kgsl_asetstate, kgsl_amsleep;
-
 int adreno_postmortem_dump(struct kgsl_device *device, int manual)
 {
 	bool saved_nap;
@@ -904,35 +930,20 @@ int adreno_postmortem_dump(struct kgsl_device *device, int manual)
 		}
 
 		if (device->state == KGSL_STATE_ACTIVE)
-			kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
+			kgsl_idle(device);
 
 	}
-
-#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
-	KGSL_LOG_DUMP(device, "KGSL_PER_PROCESS_PAGE_TABLE enabled");
-#endif
-
-#ifdef CONFIG_MSM_KGSL_DISABLE_SHADOW_WRITES
-	KGSL_LOG_DUMP(device, "MSM_KGSL_DISABLE_SHADOW_WRITES enabled");
-#endif
-
-#ifdef CONFIG_ARCH_HAS_BARRIERS
-	KGSL_LOG_DUMP(device, "ARCH_HAS_BARRIERS enabled");
-#endif
-
-	KGSL_LOG_DUMP(device, "aidle = %08X | asetstate = %08X | amsleep = %08X ", kgsl_aidle, kgsl_asetstate, kgsl_amsleep);
-
 	KGSL_LOG_DUMP(device, "POWER: FLAGS = %08lX | ACTIVE POWERLEVEL = %08X",
 			pwr->power_flags, pwr->active_pwrlevel);
 
 	KGSL_LOG_DUMP(device, "POWER: INTERVAL TIMEOUT = %08X ",
 		pwr->interval_timeout);
 
-	KGSL_LOG_DUMP(device, "GRP_CLK = %lu strtstp_sleepwake = %08X ",
-				  kgsl_get_clkrate(pwr->grp_clks[0]), pwr->strtstp_sleepwake);
+	KGSL_LOG_DUMP(device, "GRP_CLK = %lu ",
+				  kgsl_get_clkrate(pwr->grp_clks[0]));
 
-	KGSL_LOG_DUMP(device, "BUS CLK = %lu parse_aux_buffers = %08X ",
-		kgsl_get_clkrate(pwr->ebi1_clk), parse_aux_buffers);
+	KGSL_LOG_DUMP(device, "BUS CLK = %lu ",
+		kgsl_get_clkrate(pwr->ebi1_clk));
 
 	/* Disable the idle timer so we don't get interrupted */
 	del_timer_sync(&device->idle_timer);

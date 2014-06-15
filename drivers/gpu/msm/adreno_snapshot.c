@@ -19,8 +19,6 @@
 #include "a2xx_reg.h"
 #include "a3xx_reg.h"
 
-int parse_aux_buffers = 0;
-
 /* Number of dwords of ringbuffer history to record */
 #define NUM_DWORDS_OF_RINGBUFFER_HISTORY 100
 
@@ -372,9 +370,6 @@ static void ib_parse_draw_indx(struct kgsl_device *device, unsigned int *pkt,
 static void ib_parse_type3(struct kgsl_device *device, unsigned int *ptr,
 	unsigned int ptbase)
 {
-	if (!parse_aux_buffers)
-		return;
-
 	switch (cp_type3_opcode(*ptr)) {
 	case CP_LOAD_STATE:
 		ib_parse_load_state(device, ptr, ptbase);
@@ -405,9 +400,6 @@ static void ib_parse_type0(struct kgsl_device *device, unsigned int *ptr,
 	int size = type0_pkt_size(*ptr);
 	int offset = type0_pkt_offset(*ptr);
 	int i;
-
-	if (!parse_aux_buffers)
-		return;
 
 	for (i = 0; i < size; i++, offset++) {
 
@@ -697,6 +689,12 @@ static int snapshot_rb(struct kgsl_device *device, void *snapshot,
 				adreno_find_ctxtmem(device, ptbase, ibaddr,
 					ibsize);
 
+			/* IOMMU uses a NOP IB placed in setsate memory */
+			if (NULL == memdesc)
+				if (kgsl_gpuaddr_in_memdesc(
+						&device->mmu.setstate_memory,
+						ibaddr, ibsize))
+					memdesc = &device->mmu.setstate_memory;
 			/*
 			 * The IB from CP_IB1_BASE and the IBs for legacy
 			 * context switch go into the snapshot all
