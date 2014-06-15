@@ -1262,7 +1262,7 @@ static void __init msm7x2x_init_early(void)
 }
 
 MACHINE_START(MSM7X27A_RUMI3, "QCT MSM7x27a RUMI3")
-	.boot_params	= PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7x27a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1272,7 +1272,7 @@ MACHINE_START(MSM7X27A_RUMI3, "QCT MSM7x27a RUMI3")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7X27A_SURF, "QCT MSM7x27a SURF")
-	.boot_params	= PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7x27a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1282,7 +1282,7 @@ MACHINE_START(MSM7X27A_SURF, "QCT MSM7x27a SURF")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7X27A_FFA, "QCT MSM7x27a FFA")
-	.boot_params	= PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7x27a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1292,7 +1292,7 @@ MACHINE_START(MSM7X27A_FFA, "QCT MSM7x27a FFA")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7625A_SURF, "QCT MSM7625a SURF")
-	.boot_params    = PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io         = msm_common_io_init,
 	.reserve        = msm7x27a_reserve,
 	.init_irq       = msm_init_irq,
@@ -1302,7 +1302,7 @@ MACHINE_START(MSM7625A_SURF, "QCT MSM7625a SURF")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7625A_FFA, "QCT MSM7625a FFA")
-	.boot_params    = PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io         = msm_common_io_init,
 	.reserve        = msm7x27a_reserve,
 	.init_irq       = msm_init_irq,
@@ -1312,7 +1312,7 @@ MACHINE_START(MSM7625A_FFA, "QCT MSM7625a FFA")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_RUMI3, "QCT MSM8625 RUMI3")
-	.boot_params    = PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io         = msm8625_map_io,
 	.reserve        = msm8625_reserve,
 	.init_irq       = msm8625_init_irq,
@@ -1321,7 +1321,7 @@ MACHINE_START(MSM8625_RUMI3, "QCT MSM8625 RUMI3")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_SURF, "QCT MSM8625 SURF")
-	.boot_params    = PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io         = msm8625_map_io,
 	.reserve        = msm8625_reserve,
 	.init_irq       = msm8625_init_irq,
@@ -1331,7 +1331,7 @@ MACHINE_START(MSM8625_SURF, "QCT MSM8625 SURF")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_FFA, "QCT MSM8625 FFA")
-	.boot_params    = PHYS_OFFSET + 0x100,
+    .atag_offset	= 0x100,
 	.map_io         = msm8625_map_io,
 	.reserve        = msm8625_reserve,
 	.init_irq       = msm8625_init_irq,
