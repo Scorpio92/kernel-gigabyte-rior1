@@ -6,6 +6,7 @@
 #include <asm/smp_plat.h>
 #include <asm/opcodes.h>
 #include <asm/mmu_writeable.h>
+#include <linux/kconfig.h>
 
 #include "patch.h"
 

@@ -21,7 +21,6 @@
 #include <mach/socinfo.h>
 
 #include "smd_private.h"
-#include "proc_comm.h"
 
 #define BUILD_ID_LENGTH 32
 
@@ -35,12 +34,7 @@ enum {
 	HW_PLATFORM_MTP  = 8,
 	HW_PLATFORM_LIQUID  = 9,
 	/* Dragonboard platform id is assigned as 10 in CDT */
-	HW_PLATFORM_8X25_EVB = 0xC,
 	HW_PLATFORM_DRAGON	= 10,
-	HW_PLATFORM_SKU7  = 0xF,
-	HW_PLATFORM_ALASKA  = 0xA0,
-	HW_PLATFORM_8X25_QRD5 = 0xA2,
-	HW_PLATFORM_7X27_QRD5A = 0xA3,
 	HW_PLATFORM_INVALID
 };
 
@@ -53,25 +47,9 @@ const char *hw_platform[] = {
 	[HW_PLATFORM_SVLTE_SURF] = "SLVTE_SURF",
 	[HW_PLATFORM_MTP] = "MTP",
 	[HW_PLATFORM_LIQUID] = "Liquid",
-	[HW_PLATFORM_8X25_EVB] = "msm8x25_evb",
-	[HW_PLATFORM_DRAGON] = "Dragon",
-	[HW_PLATFORM_SKU7] = "msm7627a_sku7",
-	[HW_PLATFORM_ALASKA] = "msm7627a_skua",
-	[HW_PLATFORM_8X25_QRD5] = "msm8x25_sku5",
-	[HW_PLATFORM_7X27_QRD5A] = "msm7x27_sku5a" 
+	[HW_PLATFORM_DRAGON] = "Dragon"
 };
 
-enum {
-	MULTI_NO_DSDS = 0,
-	MULTI = 1,
-	UMTS = 2
-};
-
-const char *modem_type[] = {
-	[MULTI_NO_DSDS] = "MULTI_NO_DSDS",
-	[MULTI] = "MULTI",
-	[UMTS] = "UMTS"
-};
 enum {
 	ACCESSORY_CHIP_UNKNOWN = 0,
 	ACCESSORY_CHIP_CHARM = 58,
@@ -136,6 +114,14 @@ struct socinfo_v6 {
 	uint32_t hw_platform_subtype;
 };
 
+struct socinfo_v7 {
+	struct socinfo_v6 v6;
+
+	/* only valid when format==7 */
+	uint32_t pmic_model;
+	uint32_t pmic_die_revision;
+};
+
 static union {
 	struct socinfo_v1 v1;
 	struct socinfo_v2 v2;
@@ -143,6 +129,7 @@ static union {
 	struct socinfo_v4 v4;
 	struct socinfo_v5 v5;
 	struct socinfo_v6 v6;
+	struct socinfo_v7 v7;
 } *socinfo;
 
 static enum msm_cpu cpu_of_id[] = {
@@ -231,6 +218,7 @@ static enum msm_cpu cpu_of_id[] = {
 	[101] = MSM_CPU_7X27AA,
 	[102] = MSM_CPU_7X27AA,
 	[103] = MSM_CPU_7X27AA,
+	[136] = MSM_CPU_7X27AA,
 
 	/* 9x15 ID */
 	[104] = MSM_CPU_9615,
@@ -260,13 +248,14 @@ static enum msm_cpu cpu_of_id[] = {
 	/* 8060A ID */
 	[124] = MSM_CPU_8960,
 
-	/* Copper IDs */
-	[126] = MSM_CPU_COPPER,
+	/* 8974 IDs */
+	[126] = MSM_CPU_8974,
 
 	/* 8625 IDs */
 	[127] = MSM_CPU_8625,
 	[128] = MSM_CPU_8625,
 	[129] = MSM_CPU_8625,
+	[137] = MSM_CPU_8625,
 
 	/* 8064 MPQ ID */
 	[130] = MSM_CPU_8064,
@@ -275,9 +264,21 @@ static enum msm_cpu cpu_of_id[] = {
 	[131] = MSM_CPU_7X25AB,
 	[132] = MSM_CPU_7X25AB,
 	[133] = MSM_CPU_7X25AB,
+	[135] = MSM_CPU_7X25AB,
 
 	/* 9625 IDs */
 	[134] = MSM_CPU_9625,
+
+	/* 8960AB IDs */
+	[138] = MSM_CPU_8960AB,
+	[139] = MSM_CPU_8960AB,
+	[140] = MSM_CPU_8960AB,
+	[141] = MSM_CPU_8960AB,
+
+	/* 8930AA IDs */
+	[142] = MSM_CPU_8930AA,
+	[143] = MSM_CPU_8930AA,
+	[144] = MSM_CPU_8930AA,
 
 	/* Uninitialized IDs are not known to run Linux.
 	   MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
@@ -352,6 +353,21 @@ uint32_t socinfo_get_platform_subtype(void)
 		: 0;
 }
 
+enum pmic_model socinfo_get_pmic_model(void)
+{
+	return socinfo ?
+		(socinfo->v1.format >= 7 ? socinfo->v7.pmic_model
+			: PMIC_MODEL_UNKNOWN)
+		: PMIC_MODEL_UNKNOWN;
+}
+
+uint32_t socinfo_get_pmic_die_revision(void)
+{
+	return socinfo ?
+		(socinfo->v1.format >= 7 ? socinfo->v7.pmic_die_revision : 0)
+		: 0;
+}
+
 enum msm_cpu socinfo_get_msm_cpu(void)
 {
 	return cur_cpu;
@@ -387,26 +403,6 @@ socinfo_show_version(struct sys_device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u.%u\n",
 			SOCINFO_VERSION_MAJOR(version),
 			SOCINFO_VERSION_MINOR(version));
-}
-
-static ssize_t
-socinfo_show_modem_type(struct sys_device *dev,
-		      struct sysdev_attribute *attr,
-		      char *buf)
-{
-	uint32_t version;
-	int ret;
-
-	if (!socinfo) {
-		pr_err("%s: No socinfo found!\n", __func__);
-		return 0;
-	}
-
-	ret = msm_proc_comm(PCOM_GET_MODEM_VERSION, &version, NULL);
-	if ((ret >= 0) && (version <= UMTS))
-		return snprintf(buf, PAGE_SIZE, "%s\n", modem_type[version]);
-	else
-		return 0;
 }
 
 static ssize_t
@@ -473,19 +469,12 @@ socinfo_show_platform_type(struct sys_device *dev,
 	}
 
 	hw_type = socinfo_get_platform_type();
-
-	if(machine_is_msm7x27a_qrd5a())
-	{
-		hw_type = HW_PLATFORM_7X27_QRD5A;
-	}
-
-
 	if (hw_type >= HW_PLATFORM_INVALID) {
 		pr_err("%s: Invalid hardware platform type found\n",
 								   __func__);
 		hw_type = HW_PLATFORM_UNKNOWN;
 	}
-	
+
 	return snprintf(buf, PAGE_SIZE, "%-.32s\n", hw_platform[hw_type]);
 }
 
@@ -551,11 +540,46 @@ socinfo_show_platform_subtype(struct sys_device *dev,
 		hw_platform_subtype[hw_subtype]);
 }
 
+static ssize_t
+socinfo_show_pmic_model(struct sys_device *dev,
+			struct sysdev_attribute *attr,
+			char *buf)
+{
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+	if (socinfo->v1.format < 7) {
+		pr_err("%s: pmic_model not available!\n", __func__);
+		return 0;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		socinfo_get_pmic_model());
+}
+
+static ssize_t
+socinfo_show_pmic_die_revision(struct sys_device *dev,
+			       struct sysdev_attribute *attr,
+			       char *buf)
+{
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+	if (socinfo->v1.format < 7) {
+		pr_err("%s: pmic_die_revision not available!\n", __func__);
+		return 0;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		socinfo_get_pmic_die_revision());
+}
+
 static struct sysdev_attribute socinfo_v1_files[] = {
 	_SYSDEV_ATTR(id, 0444, socinfo_show_id, NULL),
 	_SYSDEV_ATTR(version, 0444, socinfo_show_version, NULL),
 	_SYSDEV_ATTR(build_id, 0444, socinfo_show_build_id, NULL),
-	_SYSDEV_ATTR(modem_type, 0444, socinfo_show_modem_type, NULL),
 };
 
 static struct sysdev_attribute socinfo_v2_files[] = {
@@ -580,6 +604,13 @@ static struct sysdev_attribute socinfo_v5_files[] = {
 static struct sysdev_attribute socinfo_v6_files[] = {
 	_SYSDEV_ATTR(platform_subtype, 0444,
 			socinfo_show_platform_subtype, NULL),
+};
+
+static struct sysdev_attribute socinfo_v7_files[] = {
+	_SYSDEV_ATTR(pmic_model, 0444,
+			socinfo_show_pmic_model, NULL),
+	_SYSDEV_ATTR(pmic_die_revision, 0444,
+			socinfo_show_pmic_die_revision, NULL),
 };
 
 static struct sysdev_class soc_sysdev_class = {
@@ -656,9 +687,14 @@ static int __init socinfo_init_sysdev(void)
 	if (socinfo->v1.format < 6)
 		return err;
 
-	return socinfo_create_files(&soc_sys_device, socinfo_v6_files,
+	socinfo_create_files(&soc_sys_device, socinfo_v6_files,
 				ARRAY_SIZE(socinfo_v6_files));
 
+	if (socinfo->v1.format < 7)
+		return err;
+
+	return socinfo_create_files(&soc_sys_device, socinfo_v7_files,
+				ARRAY_SIZE(socinfo_v7_files));
 }
 
 arch_initcall(socinfo_init_sysdev);
@@ -672,9 +708,9 @@ static void * __init setup_dummy_socinfo(void)
 		dummy_socinfo.id = 109;
 	else if (machine_is_msm9615_mtp() || machine_is_msm9615_cdp())
 		dummy_socinfo.id = 104;
-	else if (early_machine_is_copper()) {
+	else if (early_machine_is_msm8974()) {
 		dummy_socinfo.id = 126;
-		strlcpy(dummy_socinfo.build_id, "copper - ",
+		strlcpy(dummy_socinfo.build_id, "msm8974 - ",
 			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_msm9625()) {
 		dummy_socinfo.id = 134;
@@ -689,7 +725,11 @@ static void * __init setup_dummy_socinfo(void)
 
 int __init socinfo_init(void)
 {
-	socinfo = smem_alloc(SMEM_HW_SW_BUILD_ID, sizeof(struct socinfo_v6));
+	socinfo = smem_alloc(SMEM_HW_SW_BUILD_ID, sizeof(struct socinfo_v7));
+
+	if (!socinfo)
+		socinfo = smem_alloc(SMEM_HW_SW_BUILD_ID,
+				sizeof(struct socinfo_v6));
 
 	if (!socinfo)
 		socinfo = smem_alloc(SMEM_HW_SW_BUILD_ID,
@@ -780,6 +820,20 @@ int __init socinfo_init(void)
 			socinfo->v3.hw_platform, socinfo->v4.platform_version,
 			socinfo->v5.accessory_chip,
 			socinfo->v6.hw_platform_subtype);
+		break;
+	case 7:
+		pr_info("%s: v%u, id=%u, ver=%u.%u, raw_id=%u, raw_ver=%u, hw_plat=%u, hw_plat_ver=%u\n accessory_chip=%u, hw_plat_subtype=%u, pmic_model=%u, pmic_die_revision=%u\n",
+			__func__,
+			socinfo->v1.format,
+			socinfo->v1.id,
+			SOCINFO_VERSION_MAJOR(socinfo->v1.version),
+			SOCINFO_VERSION_MINOR(socinfo->v1.version),
+			socinfo->v2.raw_id, socinfo->v2.raw_version,
+			socinfo->v3.hw_platform, socinfo->v4.platform_version,
+			socinfo->v5.accessory_chip,
+			socinfo->v6.hw_platform_subtype,
+			socinfo->v7.pmic_model,
+			socinfo->v7.pmic_die_revision);
 		break;
 	default:
 		pr_err("%s: Unknown format found\n", __func__);

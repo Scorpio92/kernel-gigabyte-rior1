@@ -18,6 +18,7 @@
 #include <linux/smp.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 
 #include <asm/cacheflush.h>
 #include <asm/hardware/gic.h>
@@ -25,7 +26,6 @@
 #include <asm/smp_scu.h>
 #include <asm/unified.h>
 #include <mach/msm_iomap.h>
-#include <mach/smp.h>
 #include "pm.h"
 
 #define MSM_CORE1_RESET		0xA8600590
@@ -87,7 +87,7 @@ static void clear_pending_spi(unsigned int irq)
 	c->irq_mask(d);
 	local_irq_disable();
 	/* Clear the IRQ from the ENABLE_SET */
-	gic_clear_spi_pending(irq);
+	gic_clear_irq_pending(irq);
 	local_irq_enable();
 }
 
@@ -97,12 +97,6 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 
 	WARN_ON(msm_platform_secondary_init(cpu));
 
-	 /* Edge trigger PPIs */
-	writel_relaxed(0x555555F5,
-		MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-	writel_relaxed(0x0000FFFF,
-			MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
-	mb();
 	/*
 	 * if any interrupts are already enabled for the primary
 	 * core (e.g. timer irq), then they will not have been enabled
