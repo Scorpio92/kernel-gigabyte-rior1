@@ -21,16 +21,11 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/pm.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <linux/suspend.h>
-#include <linux/reboot.h>
 #include <linux/io.h>
 #include <linux/tick.h>
 #include <linux/memory.h>
-#ifdef CONFIG_HAS_WAKELOCK
-#include <linux/wakelock.h>
-#endif
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
 #ifdef CONFIG_CPU_V7
@@ -48,18 +43,13 @@
 #include <mach/msm_migrate_pages.h>
 #endif
 #include <mach/socinfo.h>
+#include <mach/proc_comm.h>
 #include <asm/smp_scu.h>
-
-#ifdef CONFIG_MSM_SM_EVENT
-#include <linux/sm_event_log.h>
-#include <linux/sm_event.h>
-#endif
 
 #include "smd_private.h"
 #include "smd_rpcrouter.h"
 #include "acpuclock.h"
 #include "clock.h"
-#include "proc_comm.h"
 #include "idle.h"
 #include "irq.h"
 #include "gpio.h"
@@ -162,6 +152,7 @@ static char *msm_pm_sleep_mode_labels[MSM_PM_SLEEP_MODE_NR] = {
 
 static struct msm_pm_platform_data *msm_pm_modes;
 static struct msm_pm_irq_calls *msm_pm_irq_extns;
+static struct msm_pm_cpr_ops *msm_cpr_ops;
 
 struct msm_pm_kobj_attribute {
 	unsigned int cpu;
@@ -398,6 +389,12 @@ mode_sysfs_add_exit:
 	return ret;
 }
 
+s32 msm_cpuidle_get_deep_idle_latency(void)
+{
+	int i = MSM_PM_MODE(0, MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN);
+	return msm_pm_modes[i].latency - 1;
+}
+
 void __init msm_pm_set_platform_data(
 	struct msm_pm_platform_data *data, int count)
 {
@@ -417,6 +414,11 @@ void __init msm_pm_set_irq_extns(struct msm_pm_irq_calls *irq_calls)
 		irq_calls->exit_sleep3 == NULL);
 
 	msm_pm_irq_extns = irq_calls;
+}
+
+void __init msm_pm_set_cpr_ops(struct msm_pm_cpr_ops *ops)
+{
+	msm_cpr_ops = ops;
 }
 
 /******************************************************************************
@@ -475,7 +477,7 @@ static void msm_pm_config_hw_before_power_down(void)
 	__raw_writel(1, APPS_PWRDOWN);
 	mb();
 }
-
+#ifdef CONFIG_HAVE_ARM_SCU
 /*
  * Program the top csr from core0 context to put the
  * core1 into GDFS, as core1 is not running yet.
@@ -541,6 +543,7 @@ static void configure_top_csr(void)
 	__raw_writel(0x0, base_ptr);
 	mb();
 }
+#endif
 
 /*
  * Clear hardware registers after Apps powers up.
@@ -563,11 +566,13 @@ static void msm_pm_config_hw_after_power_up(void)
 			 * enable the SCU while coming out of power
 			 * collapse.
 			 */
+			#ifdef CONFIG_HAVE_ARM_SCU
 			scu_enable(MSM_SCU_BASE);
 			/*
 			 * Program the top csr to put the core1 into GDFS.
 			 */
 			configure_top_csr();
+			#endif
 		}
 	} else {
 		__raw_writel(0, APPS_PWRDOWN);
@@ -855,9 +860,6 @@ static int msm_pm_power_collapse
 	struct msm_pm_polled_group state_grps[2];
 	unsigned long saved_acpuclk_rate;
 	int collapsed = 0;
-#ifdef CONFIG_MSM_SM_EVENT
-	uint64_t sclk_suspend_time = 0, sclk_resume_time, sclk_period;
-#endif
 	int ret;
 	int val;
 	int modem_early_exit = 0;
@@ -882,6 +884,9 @@ static int msm_pm_power_collapse
 									false);
 		WARN_ON(ret);
 	}
+
+	if (msm_cpr_ops)
+		msm_cpr_ops->cpr_suspend();
 
 	msm_pm_irq_extns->enter_sleep1(true, from_idle,
 						&msm_pm_smem_data->irq_mask);
@@ -940,10 +945,6 @@ static int msm_pm_power_collapse
 		goto power_collapse_early_exit;
 	}
 
-#ifdef CONFIG_MSM_SM_EVENT
-	if (!from_idle)
-		sclk_suspend_time = msm_timer_get_sclk_time(&sclk_period);
-#endif
 	msm_pm_config_hw_before_power_down();
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): pre power down");
 
@@ -957,17 +958,12 @@ static int msm_pm_power_collapse
 		goto power_collapse_early_exit;
 	}
 
-#ifdef CONFIG_MSM_SM_EVENT
-	if (!from_idle) {
-		sm_add_event(SM_POWER_EVENT | SM_POWER_EVENT_SUSPEND, SM_EVENT_END, 0, 0, 0);
-	}
-#endif
 	msm_pm_boot_config_before_pc(smp_processor_id(),
 			virt_to_phys(msm_pm_collapse_exit));
 
 #ifdef CONFIG_VFP
 	if (from_idle)
-		vfp_flush_context();
+		vfp_pm_suspend();
 #endif
 
 #ifdef CONFIG_CACHE_L2X0
@@ -1012,7 +1008,7 @@ static int msm_pm_power_collapse
 	if (collapsed) {
 #ifdef CONFIG_VFP
 		if (from_idle)
-			vfp_reinit();
+			vfp_pm_resume();
 #endif
 		cpu_init();
 		local_fiq_enable();
@@ -1102,19 +1098,6 @@ static int msm_pm_power_collapse
 		goto power_collapse_restore_gpio_bail;
 	}
 
-#ifdef CONFIG_MSM_SM_EVENT
-	if (!from_idle) {
-		int64_t time;
-		sm_set_system_state (SM_STATE_RESUME);
-		sclk_resume_time = msm_timer_get_sclk_time(NULL);
-
-		time = sclk_resume_time - sclk_suspend_time;
-		if (time < 0)
-			time += sclk_period;
-		do_div (time, 1000000);//milli-second
-		sm_add_event(SM_POWER_EVENT | SM_POWER_EVENT_RESUME, SM_EVENT_START, (uint32_t)time, (void *)msm_pm_smem_data, sizeof(*msm_pm_smem_data));
-	}
-#endif
 	/* DEM Master == RUN */
 
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): WFPI RUN");
@@ -1141,6 +1124,9 @@ static int msm_pm_power_collapse
 									false);
 		WARN_ON(ret);
 	}
+
+	if (msm_cpr_ops)
+		msm_cpr_ops->cpr_resume();
 
 	return 0;
 
@@ -1194,6 +1180,9 @@ power_collapse_restore_gpio_bail:
 	if (collapsed)
 		smd_sleep_exit();
 
+	if (msm_cpr_ops)
+		msm_cpr_ops->cpr_resume();
+
 power_collapse_bail:
 	if (cpu_is_msm8625()) {
 		ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING,
@@ -1229,7 +1218,7 @@ static int __ref msm_pm_power_collapse_standalone(bool from_idle)
 						virt_to_phys(entry));
 
 #ifdef CONFIG_VFP
-	vfp_flush_context();
+	vfp_pm_suspend();
 #endif
 
 #ifdef CONFIG_CACHE_L2X0
@@ -1248,7 +1237,7 @@ static int __ref msm_pm_power_collapse_standalone(bool from_idle)
 
 	if (collapsed) {
 #ifdef CONFIG_VFP
-		vfp_reinit();
+		vfp_pm_resume();
 #endif
 		cpu_init();
 		local_fiq_enable();
@@ -1368,9 +1357,6 @@ void arch_idle(void)
 
 	if (num_online_cpus() > 1 ||
 		(timer_expiration < msm_pm_idle_sleep_min_time) ||
-#ifdef CONFIG_HAS_WAKELOCK
-		has_wake_lock(WAKE_LOCK_IDLE) ||
-#endif
 		!msm_pm_irq_extns->idle_sleep_allowed()) {
 		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE] = false;
 		allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_NO_XO_SHUTDOWN] = false;
@@ -1606,64 +1592,6 @@ void msm_pm_cpu_enter_lowpower(unsigned int cpu)
 	}
 }
 
-/******************************************************************************
- * Restart Definitions
- *****************************************************************************/
-extern void rmt_storage_client_shutdown_complete(void);
-
-static uint32_t restart_reason = 0x776655AA;
-
-static void msm_pm_power_off(void)
-{
-	printk("%s\n", __func__);
-	rmt_storage_client_shutdown_complete();
-	msm_rpcrouter_close();
-	msm_proc_comm(PCOM_POWER_DOWN, 0, 0);
-	printk("%s sent\n", __func__);
-	for (;;)
-		;
-}
-
-static void msm_pm_restart(char str, const char *cmd)
-{
-	printk("%s\n", __func__);
-	rmt_storage_client_shutdown_complete();
-	msm_rpcrouter_close();
-
-	printk("restart str %c cmd %s",str,cmd);
-	if(str=='i')
-		msm_proc_comm(PCOM_RESET_CHIP_IMM, NULL, NULL);
-	else msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
-	printk("%s sent\n", __func__);
-	for (;;)
-		;
-}
-
-static int msm_reboot_call
-	(struct notifier_block *this, unsigned long code, void *_cmd)
-{
-	if ((code == SYS_RESTART) && _cmd) {
-		char *cmd = _cmd;
-		if (!strcmp(cmd, "bootloader")) {
-			restart_reason = 0x77665500;
-		} else if (!strcmp(cmd, "recovery")) {
-			restart_reason = 0x77665502;
-		} else if (!strcmp(cmd, "eraseflash")) {
-			restart_reason = 0x776655EF;
-		} else if (!strncmp(cmd, "oem-", 4)) {
-			unsigned code = simple_strtoul(cmd + 4, 0, 16) & 0xff;
-			restart_reason = 0x6f656d00 | code;
-		} else {
-			restart_reason = 0x77665501;
-		}
-	}
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block msm_reboot_notifier = {
-	.notifier_call = msm_reboot_call,
-};
-
 /*
  * Initialize the power management subsystem.
  *
@@ -1692,15 +1620,17 @@ static int __init msm_pm_init(void)
 	pgd_t *pc_pgd;
 	pmd_t *pmd;
 	unsigned long pmdval;
+	unsigned long exit_phys;
+
+	exit_phys = virt_to_phys(msm_pm_collapse_exit);
 
 	/* Page table for cores to come back up safely. */
 	pc_pgd = pgd_alloc(&init_mm);
 	if (!pc_pgd)
 		return -ENOMEM;
-	pmd = pmd_offset(pc_pgd +
-			 pgd_index(virt_to_phys(msm_pm_collapse_exit)),
-			 virt_to_phys(msm_pm_collapse_exit));
-	pmdval = (virt_to_phys(msm_pm_collapse_exit) & PGDIR_MASK) |
+	pmd = pmd_offset(pud_offset(pc_pgd + pgd_index(exit_phys), exit_phys),
+			 exit_phys);
+	pmdval = (exit_phys & PGDIR_MASK) |
 		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE;
 	pmd[0] = __pmd(pmdval);
 	pmd[1] = __pmd(pmdval + (1 << (PGDIR_SHIFT - 1)));
@@ -1728,10 +1658,6 @@ static int __init msm_pm_init(void)
 	clean_caches((unsigned long)&msm_pm_pc_pgd, sizeof(msm_pm_pc_pgd),
 		     virt_to_phys(&msm_pm_pc_pgd));
 #endif
-
-	pm_power_off = msm_pm_power_off;
-	arm_pm_restart = msm_pm_restart;
-	register_reboot_notifier(&msm_reboot_notifier);
 
 	msm_pm_smem_data = smem_alloc(SMEM_APPS_DEM_SLAVE_DATA,
 		sizeof(*msm_pm_smem_data));
