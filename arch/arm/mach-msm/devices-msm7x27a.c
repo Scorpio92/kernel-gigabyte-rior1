@@ -1523,6 +1523,103 @@ struct platform_device msm8625_kgsl_3d0 = {
 	},
 };
 
+static void __init msm_cpr_init(void)
+{
+	struct cpr_info_type *cpr_info = NULL;
+	uint8_t ring_osc = 0;
+
+	cpr_info = kzalloc(sizeof(struct cpr_info_type), GFP_KERNEL);
+	if (!cpr_info) {
+		pr_err("%s: Out of memory %d\n", __func__, -ENOMEM);
+		return;
+	}
+
+	msm_smem_get_cpr_info(cpr_info);
+	msm_cpr_pdata.disable_cpr = cpr_info->disable_cpr;
+
+	/**
+	 * Set the ring_osc based on efuse BIT(0)
+	 * CPR_fuse[0] = 0 selects 2nd RO (010)
+	 * CPR_fuse[0] = 1 select  3rd RO (011)
+	 */
+	if (cpr_info->ring_osc == 0x0)
+		ring_osc = 0x2;
+	else if (cpr_info->ring_osc == 0x1)
+		ring_osc = 0x3;
+
+	msm_cpr_mode_data[TURBO_MODE].ring_osc = ring_osc;
+	msm_cpr_mode_data[NORMAL_MODE].ring_osc = ring_osc;
+
+	/* GCNT = 1000 nsec/52nsec (@TCX0=19.2Mhz) = 19.2 */
+	msm_cpr_mode_data[TURBO_MODE].ring_osc_data[ring_osc].gcnt = 19;
+	msm_cpr_mode_data[NORMAL_MODE].ring_osc_data[ring_osc].gcnt = 19;
+
+	/**
+	 * The scaling factor and offset are as per chip characterization data
+	 * This formula is used since available fuse bits in the chip are not
+	 * enough to represent the value of maximum quot
+	 */
+	msm_cpr_pdata.max_quot = cpr_info->turbo_quot * 10 + 600;
+	/**
+	 * Fused Quot value for 1.2GHz on a 1.2GHz part is lower than
+	 * the quot value calculated using the scaling factor formula for
+	 * 1.2GHz when running on a 1.4GHz part. So, prop up the Quot for
+	 * a 1.2GHz part by a chip characterization recommended value.
+	 * Ditto for a 1.0GHz part.
+	 */
+	if (msm8625_cpu_id() == MSM8625A) {
+		msm_cpr_pdata.max_quot += 30;
+		if (msm_cpr_pdata.max_quot > 1400)
+			msm_cpr_pdata.max_quot = 1400;
+	} else if (msm8625_cpu_id() == MSM8625) {
+		msm_cpr_pdata.max_quot += 50;
+		if (msm_cpr_pdata.max_quot > 1350)
+			msm_cpr_pdata.max_quot = 1350;
+	}
+
+	/**
+	 * Bits 4:0 of pvs_fuse provide mapping to the safe boot up voltage.
+	 * Boot up mode is by default Turbo.
+	 */
+	msm_cpr_mode_data[TURBO_MODE].calibrated_uV =
+				msm_c2_pmic_mv[cpr_info->pvs_fuse & 0x1F];
+
+	if ((cpr_info->floor_fuse & 0x3) == 0x0) {
+		msm_cpr_mode_data[TURBO_MODE].nom_Vmin = 1000000;
+		msm_cpr_mode_data[TURBO_MODE].turbo_Vmin = 1100000;
+	} else if ((cpr_info->floor_fuse & 0x3) == 0x1) {
+		msm_cpr_mode_data[TURBO_MODE].nom_Vmin = 1050000;
+		msm_cpr_mode_data[TURBO_MODE].turbo_Vmin = 1100000;
+	} else if ((cpr_info->floor_fuse & 0x3) == 0x2) {
+		msm_cpr_mode_data[TURBO_MODE].nom_Vmin = 1100000;
+		msm_cpr_mode_data[TURBO_MODE].turbo_Vmin = 1100000;
+	}
+
+	pr_info("%s: cpr: ring_osc: 0x%x\n", __func__,
+		msm_cpr_mode_data[TURBO_MODE].ring_osc);
+	pr_info("%s: cpr: turbo_quot: 0x%x\n", __func__, cpr_info->turbo_quot);
+	pr_info("%s: cpr: pvs_fuse: 0x%x\n", __func__, cpr_info->pvs_fuse);
+	pr_info("%s: cpr: floor_fuse: 0x%x\n", __func__, cpr_info->floor_fuse);
+	pr_info("%s: cpr: nom_Vmin: %d, turbo_Vmin: %d\n", __func__,
+		msm_cpr_mode_data[TURBO_MODE].nom_Vmin,
+		msm_cpr_mode_data[TURBO_MODE].turbo_Vmin);
+	pr_info("%s: cpr: nom_Vmax: %d, turbo_Vmax: %d\n", __func__,
+		msm_cpr_mode_data[TURBO_MODE].nom_Vmax,
+		msm_cpr_mode_data[TURBO_MODE].turbo_Vmax);
+
+	kfree(cpr_info);
+
+	if (msm8625_cpu_id() == MSM8625A)
+		msm_cpr_pdata.max_freq = 1209600;
+	else if (msm8625_cpu_id() == MSM8625)
+		msm_cpr_pdata.max_freq = 1008000;
+
+	msm_cpr_clk_enable();
+
+	platform_device_register(&msm8625_vp_device);
+	platform_device_register(&msm8625_device_cpr);
+}
+
 static struct clk_lookup msm_clock_8625_dummy[] = {
 	CLK_DUMMY("core_clk",		adm_clk.c,	"msm_dmov", 0),
 	CLK_DUMMY("adsp_clk",		adsp_clk.c,	NULL, 0),
@@ -1624,21 +1721,32 @@ int __init msm7x2x_misc_init(void)
 {
 	if (machine_is_msm8625_rumi3()) {
 		msm_clock_init(&msm8625_dummy_clock_init_data);
+		msm_cpr_init();
 		return 0;
 	}
 
 	msm_clock_init(&msm7x27a_clock_init_data);
 	if (cpu_is_msm7x27aa() || cpu_is_msm7x25ab())
-		acpuclk_init(&acpuclk_7x27aa_soc_data);
+		platform_device_register(&msm7x27aa_device_acpuclk);
 	else if (cpu_is_msm8625()) {
 		if (msm8625_cpu_id() == MSM8625)
-			acpuclk_init(&acpuclk_7x27aa_soc_data);
+			platform_device_register(&msm7x27aa_device_acpuclk);
 		else if (msm8625_cpu_id() == MSM8625A)
-			acpuclk_init(&acpuclk_8625_soc_data);
-	 } else {
-		acpuclk_init(&acpuclk_7x27a_soc_data);
-	 }
+			platform_device_register(&msm8625_device_acpuclk);
+		else if (msm8625_cpu_id() == MSM8625AB)
+			platform_device_register(&msm8625ab_device_acpuclk);
+	} else {
+		platform_device_register(&msm7x27a_device_acpuclk);
+	}
 
+	if (cpu_is_msm8625() &&
+			(SOCINFO_VERSION_MAJOR(socinfo_get_version()) >= 2))
+		msm_cpr_init();
+
+	if (!cpu_is_msm8625())
+		pl310_resources[1].start = INT_L2CC_INTR;
+
+	platform_device_register(&pl310_erp_device);
 
 	return 0;
 }

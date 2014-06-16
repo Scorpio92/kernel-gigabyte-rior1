@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <linux/msm_adsp.h>
 #include <linux/ion.h>
+#include <linux/bug.h>
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_adsp.h>
 
