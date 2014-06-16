@@ -39,6 +39,8 @@
 #include "mpm-8625.h"
 #include "irq.h"
 #include "pm.h"
+#include "msm_cpr.h"
+#include "msm_smem_iface.h"
 
 /* Address of GSBI blocks */
 #define MSM_GSBI0_PHYS		0xA1200000
@@ -47,6 +49,12 @@
 /* GSBI QUPe devices */
 #define MSM_GSBI0_QUP_PHYS	(MSM_GSBI0_PHYS + 0x80000)
 #define MSM_GSBI1_QUP_PHYS	(MSM_GSBI1_PHYS + 0x80000)
+
+#define A11S_TEST_BUS_SEL_ADDR (MSM_CSR_BASE + 0x518)
+#define RBCPR_CLK_MUX_SEL (1 << 13)
+
+/* Reset Address of RBCPR (Active Low)*/
+#define RBCPR_SW_RESET_N       (MSM_CSR_BASE + 0x64)
 
 static struct resource gsbi0_qup_i2c_resources[] = {
 	{
@@ -1523,6 +1531,169 @@ struct platform_device msm8625_kgsl_3d0 = {
 	},
 };
 
+static uint32_t msm_c2_pmic_mv[] __initdata = {
+	1350000, 1337500, 1325000, 1312500, 1300000,
+	1287500, 1275000, 1262500, 1250000, 1237500,
+	1225000, 1212500, 1200000, 1187500, 1175000,
+	1162500, 1150000, 1137500, 1125000, 1112500,
+	1100000, 1087500, 1075000, 1062500, 0,
+	0,	 0,	  0,	   0,	    0,
+	0, 1050000,
+};
+
+
+static struct msm_cpr_mode msm_cpr_mode_data[] = {
+	[NORMAL_MODE] = {
+			.ring_osc_data = {
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+			},
+			.ring_osc = 0,
+			.step_quot = ~0,
+			.tgt_volt_offset = 0,
+			.nom_Vmax = 1350000,
+			.nom_Vmin = 1250000,
+			.calibrated_uV = 1100000,
+	},
+	[TURBO_MODE] = {
+			.ring_osc_data = {
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+				{0, },
+			},
+			.ring_osc = 0,
+			.step_quot = ~0,
+			.tgt_volt_offset = 0,
+			.turbo_Vmax = 1350000,
+			.turbo_Vmin = 1150000,
+			.nom_Vmax = 1350000,
+			.nom_Vmin = 1150000,
+			.calibrated_uV = 1300000,
+	},
+};
+
+struct msm_cpr_vp_data vp_data = {
+	.min_volt = 1000000,
+	.max_volt = 1350000,
+	.default_volt = 1300000,
+	.step_size = 12500,
+};
+
+static uint32_t
+msm_cpr_get_quot(uint32_t max_quot, uint32_t max_freq, uint32_t new_freq)
+{
+	uint32_t quot;
+
+	/* This formula is as per chip characterization data */
+	quot = max_quot - (((max_freq - new_freq) * 7) / 10);
+
+	return quot;
+}
+
+static void msm_cpr_clk_enable(void)
+{
+	uint32_t reg_val;
+
+	/* Select TCXO (19.2MHz) as clock source */
+	reg_val = readl_relaxed(A11S_TEST_BUS_SEL_ADDR);
+	reg_val |= RBCPR_CLK_MUX_SEL;
+	writel_relaxed(reg_val, A11S_TEST_BUS_SEL_ADDR);
+
+	/* Get CPR out of reset */
+	writel_relaxed(0x1, RBCPR_SW_RESET_N);
+}
+
+static struct msm_cpr_config msm_cpr_pdata = {
+	.ref_clk_khz = 19200,
+	.delay_us = 25000,
+	.irq_line = 0,
+	.cpr_mode_data = msm_cpr_mode_data,
+	.tgt_count_div_N = 1,
+	.floor = 0,
+	.ceiling = 40,
+	.sw_vlevel = 20,
+	.up_threshold = 1,
+	.dn_threshold = 3,
+	.up_margin = 0,
+	.dn_margin = 0,
+	.max_nom_freq = 700800,
+	.max_freq = 1401600,
+	.max_quot = 0,
+	.disable_cpr = false,
+	.vp_data = &vp_data,
+	.get_quot = msm_cpr_get_quot,
+	.clk_enable = msm_cpr_clk_enable,
+};
+
+enum {
+	MSM8625,
+	MSM8625A,
+};
+
+
+static int __init msm8625_cpu_id(void)
+{
+	int raw_id, cpu;
+
+	raw_id = socinfo_get_raw_id();
+	switch (raw_id) {
+	/* Part number for 1GHz part */
+	case 0x770:
+	case 0x771:
+	case 0x780:
+		cpu = MSM8625;
+		break;
+	/* Part number for 1.2GHz part */
+	case 0x773:
+	case 0x774:
+	case 0x781:
+		cpu = MSM8625A;
+		break;
+	default:
+		pr_err("Invalid Raw ID\n");
+		return -ENODEV;
+	}
+	return cpu;
+}
+
+static struct resource cpr_resources[] = {
+	{
+		.start = MSM8625_INT_CPR_IRQ0,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = MSM8625_CPR_PHYS,
+		.end = MSM8625_CPR_PHYS + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device msm8625_device_cpr = {
+	.name           = "msm-cpr",
+	.id             = -1,
+	.num_resources  = ARRAY_SIZE(cpr_resources),
+	.resource       = cpr_resources,
+	.dev = {
+		.platform_data = &msm_cpr_pdata,
+	},
+};
+
+static struct platform_device msm8625_vp_device = {
+	.name           = "vp-regulator",
+	.id             = -1,
+};
+
 static void __init msm_cpr_init(void)
 {
 	struct cpr_info_type *cpr_info = NULL;
@@ -1687,35 +1858,6 @@ struct clock_init_data msm8625_dummy_clock_init_data __initdata = {
 	.size = ARRAY_SIZE(msm_clock_8625_dummy),
 };
 
-enum {
-	MSM8625,
-	MSM8625A,
-};
-
-static int __init msm8625_cpu_id(void)
-{
-	int raw_id, cpu;
-
-	raw_id = socinfo_get_raw_id();
-	switch (raw_id) {
-	/* Part number for 1GHz part */
-	case 0x770:
-	case 0x771:
-	case 0x780:
-		cpu = MSM8625;
-		break;
-	/* Part number for 1.2GHz part */
-	case 0x773:
-	case 0x774:
-	case 0x781:
-		cpu = MSM8625A;
-		break;
-	default:
-		pr_err("Invalid Raw ID\n");
-		return -ENODEV;
-	}
-	return cpu;
-}
 
 int __init msm7x2x_misc_init(void)
 {

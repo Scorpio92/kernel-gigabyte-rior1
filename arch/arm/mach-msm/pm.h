@@ -86,9 +86,15 @@ struct msm_pm_sleep_ops {
 			bool notify_rpm, bool collapsed);
 };
 
+struct msm_pm_cpr_ops {
+	void (*cpr_suspend)(void);
+	void (*cpr_resume)(void);
+};
+
 void msm_pm_set_platform_data(struct msm_pm_platform_data *data, int count);
+int msm_pm_idle_prepare(struct cpuidle_device *dev,
+			struct cpuidle_driver *drv, int index);
 void msm_pm_set_irq_extns(struct msm_pm_irq_calls *irq_calls);
-int msm_pm_idle_prepare(struct cpuidle_device *dev);
 int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode);
 void msm_pm_cpu_enter_lowpower(unsigned int cpu);
 
@@ -136,5 +142,7 @@ static inline void msm_pm_add_stats(enum msm_pm_time_stats_id *enable_stats,
 		int size) {}
 static inline void msm_pm_add_stat(enum msm_pm_time_stats_id id, int64_t t) {}
 #endif
+
+void msm_pm_set_cpr_ops(struct msm_pm_cpr_ops *ops);
 
 #endif  /* __ARCH_ARM_MACH_MSM_PM_H */

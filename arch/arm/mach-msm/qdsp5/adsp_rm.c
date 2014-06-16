@@ -17,6 +17,7 @@
 #include <linux/sched.h>
 #include <linux/uaccess.h>
 #include <linux/msm_adsp.h>
+#include <linux/module.h>
 
 #include <mach/qdsp5/qdsp5rmtcmdi.h>
 #include <mach/qdsp5/qdsp5rmtmsg.h>
