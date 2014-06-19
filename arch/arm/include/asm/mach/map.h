@@ -11,7 +11,6 @@
  */
 #ifndef __ASM_ARM_MACH_MAP_H
 #define __ASM_ARM_MACH_MAP_H
-
 #include <asm/io.h>
 //#include <asm/page.h>
 
@@ -59,5 +58,4 @@ extern int ioremap_pages(unsigned long virt, unsigned long phys,
 #else
 #define iotable_init(map,num)	do { } while (0)
 #endif
-
 #endif

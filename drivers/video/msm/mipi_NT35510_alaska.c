@@ -261,7 +261,7 @@ static int mipi_nt35510_alaska_lcd_on(struct platform_device *pdev)
     if (mfd->key != MFD_KEY)
         return -EINVAL;
 
-    mipi_dsi_cmds_tx(&nt35510_alaska_tx_buf,
+    mipi_dsi_cmds_tx(mfd, &nt35510_alaska_tx_buf,
             nt35510_alaska_cmd_on_cmds_video_mode,    ARRAY_SIZE(nt35510_alaska_cmd_on_cmds_video_mode));
 
 #if 0
@@ -293,7 +293,7 @@ static int mipi_nt35510_alaska_lcd_off(struct platform_device *pdev)
         return -ENODEV;
     if (mfd->key != MFD_KEY)
         return -EINVAL;
-    mipi_dsi_cmds_tx(&nt35510_alaska_tx_buf, nt35510_alaska_display_off_cmds, ARRAY_SIZE(nt35510_alaska_display_off_cmds));
+    mipi_dsi_cmds_tx(mfd, &nt35510_alaska_tx_buf, nt35510_alaska_display_off_cmds, ARRAY_SIZE(nt35510_alaska_display_off_cmds));
 
     printk("%s: Done\n", __func__);
     return 0;

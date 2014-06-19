@@ -134,6 +134,4 @@ source "drivers/clocksource/Kconfig"
 
 source "drivers/gud/Kconfig"
 
-source "drivers/iommu/Kconfig"
-
 endmenu

@@ -485,7 +485,7 @@ a3xx_getchipid(struct kgsl_device *device)
 			patchid = 1;
 		else
 			patchid = 0;
-	} else if (cpu_is_msm8930() || cpu_is_msm8930aa() || cpu_is_msm8627()) {
+	} else if (cpu_is_msm8930() || cpu_is_msm8627()) {
 
 		
 		majorid = 0;
@@ -532,7 +532,7 @@ a2xx_getchipid(struct kgsl_device *device)
 	else if (cpu_is_msm8960() &&
 			SOCINFO_VERSION_MAJOR(soc_platform_version) == 3)
 		patchid = 6;
-	else if ((cpu_is_msm8625() || cpu_is_msm8625q()) && minorid == 0)
+	else if ((cpu_is_msm8625()) && minorid == 0)
 		minorid = 1;
 
 	chipid |= (minorid << 8) | patchid;
@@ -543,8 +543,7 @@ a2xx_getchipid(struct kgsl_device *device)
 static unsigned int
 adreno_getchipid(struct kgsl_device *device)
 {
-	if (cpu_is_apq8064() || cpu_is_msm8930() || cpu_is_msm8930aa() ||
-	    cpu_is_msm8627())
+	if (cpu_is_apq8064() || cpu_is_msm8930() || cpu_is_msm8627())
 		return a3xx_getchipid(device);
 	else
 		return a2xx_getchipid(device);

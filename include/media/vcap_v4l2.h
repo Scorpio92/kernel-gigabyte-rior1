@@ -29,8 +29,6 @@
 #include <media/vcap_fmt.h>
 #include <mach/board.h>
 
-#define to_client_data(val)     container_of(val, struct vcap_client_data, vfh)
-
 #define writel_iowmb(val, addr)		\
 	do {							\
 		__iowmb();					\
@@ -148,7 +146,6 @@ struct vcap_dev {
 	struct clk				*vcap_clk;
 	struct clk				*vcap_p_clk;
 	struct clk				*vcap_npl_clk;
-	struct device			*ddev;
 	/*struct platform_device	*pdev;*/
 
 	uint32_t				bus_client_handle;
@@ -159,10 +156,8 @@ struct vcap_dev {
 	atomic_t			    vc_enabled;
 	atomic_t			    vp_enabled;
 
-	spinlock_t				dev_slock;
-	atomic_t			    open_clients;
-	bool					vc_resource;
-	bool					vp_resource;
+	atomic_t				vc_resource;
+	atomic_t				vp_resource;
 
 	struct workqueue_struct	*vcap_wq;
 	struct vp_work_t		vp_work;
@@ -209,8 +204,6 @@ struct vcap_client_data {
 
 	spinlock_t				cap_slock;
 	bool					streaming;
-
-	struct v4l2_fh			vfh;
 };
 
 struct vcap_hacked_vals {

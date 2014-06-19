@@ -129,5 +129,3 @@ obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
 
 #MobiCore
 obj-$(CONFIG_MOBICORE_SUPPORT)  += gud/
-
-obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/

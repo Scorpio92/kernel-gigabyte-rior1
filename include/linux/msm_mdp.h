@@ -32,11 +32,8 @@
 #define MSMFB_OVERLAY_SET       _IOWR(MSMFB_IOCTL_MAGIC, 135, \
 						struct mdp_overlay)
 #define MSMFB_OVERLAY_UNSET     _IOW(MSMFB_IOCTL_MAGIC, 136, unsigned int)
-
 #define MSMFB_OVERLAY_PLAY      _IOW(MSMFB_IOCTL_MAGIC, 137, \
 						struct msmfb_overlay_data)
-#define MSMFB_OVERLAY_QUEUE	MSMFB_OVERLAY_PLAY
-
 #define MSMFB_GET_PAGE_PROTECTION _IOR(MSMFB_IOCTL_MAGIC, 138, \
 					struct mdp_page_protection)
 #define MSMFB_SET_PAGE_PROTECTION _IOW(MSMFB_IOCTL_MAGIC, 139, \
@@ -54,26 +51,6 @@
 
 #define MSMFB_OVERLAY_3D       _IOWR(MSMFB_IOCTL_MAGIC, 147, \
 						struct msmfb_overlay_3d)
-/* add the code for dynamic gamma function  */
-#ifdef CONFIG_FB_DYNAMIC_GAMMA
-#define MSMFB_DYNAMIC_GAMMA       _IOWR(MSMFB_IOCTL_MAGIC, 147, \
-						 unsigned  int)
-#endif
-
-#ifdef CONFIG_FB_AUTO_CABC
-#define MSMFB_AUTO_CABC           _IOWR(MSMFB_IOCTL_MAGIC, 148, struct msmfb_cabc_config)
-#endif
-
-#define MDP_IMGTYPE2_START 0x10000
-
-#ifdef CONFIG_FB_DYNAMIC_GAMMA
-enum danymic_gamma_mode {
-    GAMMA25 = 0,
-    GAMMA22,
-    HIGH_LIGHT,
-    LOW_LIGHT,
- };
-#endif
 
 #define MSMFB_MIXER_INFO       _IOWR(MSMFB_IOCTL_MAGIC, 148, \
 						struct msmfb_mixer_info_req)
@@ -88,10 +65,6 @@ enum danymic_gamma_mode {
 						struct msmfb_data)
 #define MSMFB_WRITEBACK_TERMINATE _IO(MSMFB_IOCTL_MAGIC, 155)
 #define MSMFB_MDP_PP _IOWR(MSMFB_IOCTL_MAGIC, 156, struct msmfb_mdp_pp)
-#define MSMFB_OVERLAY_VSYNC_CTRL _IOW(MSMFB_IOCTL_MAGIC, 160, unsigned int)
-#define MSMFB_VSYNC_CTRL  _IOW(MSMFB_IOCTL_MAGIC, 161, unsigned int)
-#define MSMFB_METADATA_SET  _IOW(MSMFB_IOCTL_MAGIC, 162, struct msmfb_metadata)
-#define MSMFB_OVERLAY_COMMIT      _IOW(MSMFB_IOCTL_MAGIC, 163, unsigned int)
 
 #define FB_TYPE_3D_PANEL 0x10101010
 #define MDP_IMGTYPE2_START 0x10000
@@ -113,8 +86,6 @@ enum {
 	MDP_YCRYCB_H2V1,  /* YCrYCb interleave */
 	MDP_Y_CRCB_H2V1,  /* Y and CrCb, pseduo planer w/ Cr is in MSB */
 	MDP_Y_CBCR_H2V1,   /* Y and CrCb, pseduo planer w/ Cr is in MSB */
-	MDP_Y_CRCB_H1V2,
-	MDP_Y_CBCR_H1V2,
 	MDP_RGBA_8888,    /* ARGB 888 */
 	MDP_BGRA_8888,	  /* ABGR 888 */
 	MDP_RGBX_8888,	  /* RGBX 888 */
@@ -127,10 +98,9 @@ enum {
 	MDP_Y_CBCR_H1V1,  /* Y and CbCr, pseduo planer w/ Cb is in MSB */
 	MDP_YCRCB_H1V1,   /* YCrCb interleave */
 	MDP_YCBCR_H1V1,   /* YCbCr interleave */
-	MDP_BGR_565,      /* BGR 565 planer */
 	MDP_IMGTYPE_LIMIT,
-	MDP_RGB_BORDERFILL,	/* border fill pipe */
-	MDP_FB_FORMAT = MDP_IMGTYPE2_START,    /* framebuffer format */
+	MDP_BGR_565 = MDP_IMGTYPE2_START,      /* BGR 565 planer */
+	MDP_FB_FORMAT,    /* framebuffer format */
 	MDP_IMGTYPE_LIMIT2 /* Non valid image type after this enum */
 };
 
@@ -146,9 +116,6 @@ enum {
 	HSIC_CON,
 	NUM_HSIC_PARAM,
 };
-
-#define MDSS_MDP_ROT_ONLY		0x80
-#define MDSS_MDP_RIGHT_MIXER		0x100
 
 /* mdp_blit_req flag values */
 #define MDP_ROT_NOP 0
@@ -277,7 +244,6 @@ struct msmfb_overlay_data {
 	uint32_t version_key;
 	struct msmfb_data plane1_data;
 	struct msmfb_data plane2_data;
-	struct msmfb_data dst_data;
 };
 
 struct msmfb_img {
@@ -461,6 +427,7 @@ struct mdp_hist_lut_data {
 	uint32_t *data;
 };
 
+
 struct mdp_lut_cfg_data {
 	uint32_t lut_type;
 	union {
@@ -478,17 +445,12 @@ struct mdp_qseed_cfg_data {
 	uint32_t *data;
 };
 
-struct mdp_bl_scale_data {
-	uint32_t min_lvl;
-	uint32_t scale;
-};
 
 enum {
 	mdp_op_pcc_cfg,
 	mdp_op_csc_cfg,
 	mdp_op_lut_cfg,
 	mdp_op_qseed_cfg,
-	mdp_bl_scale_cfg,
 	mdp_op_max,
 };
 
@@ -499,46 +461,15 @@ struct msmfb_mdp_pp {
 		struct mdp_csc_cfg_data csc_cfg_data;
 		struct mdp_lut_cfg_data lut_cfg_data;
 		struct mdp_qseed_cfg_data qseed_cfg_data;
-		struct mdp_bl_scale_data bl_scale_data;
 	} data;
 };
 
-enum {
-	metadata_op_none,
-	metadata_op_base_blend,
-	metadata_op_max
-};
 
-struct mdp_blend_cfg {
-	uint32_t is_premultiplied;
-};
-
-struct msmfb_metadata {
-	uint32_t op;
-	uint32_t flags;
-	union {
-		struct mdp_blend_cfg blend_cfg;
-	} data;
-};
 struct mdp_page_protection {
 	uint32_t page_protection;
 };
 
 
-#ifdef CONFIG_FB_AUTO_CABC
-enum cabc_mode {
-    CABC_MODE_OFF,
-    CABC_MODE_UI,
-    CABC_MODE_STILL,
-    CABC_MODE_MOVING,
-};
-
-struct msmfb_cabc_config {
-    uint32_t mode;
-    uint32_t dimming_on;
-    uint32_t mov_det_on;
-};
-#endif
 struct mdp_mixer_info {
 	int pndx;
 	int pnum;
