@@ -451,18 +451,6 @@ static struct msm_pm_irq_calls msm8625_pm_irq_calls = {
 	.exit_sleep3 = msm_gic_irq_exit_sleep3,
 };
 
-void msm_clk_dump_debug_info(void)
-{
-	pr_info("%s: GLBL_CLK_ENA: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x0));
-	pr_info("%s: GLBL_CLK_STATE: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x4));
-	pr_info("%s: GRP_NS_REG: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x84));
-	pr_info("%s: CLK_HALT_STATEB: 0x%08X\n", __func__,
-		readl_relaxed(MSM_CLK_CTL_BASE + 0x10C));
-}
-
 void __init msm_pm_register_irqs(void)
 {
 	if (cpu_is_msm8625())
@@ -858,10 +846,10 @@ void __init msm7x25a_kgsl_3d0_init(void)
 void __init msm8x25_kgsl_3d0_init(void)
 {
 	if (cpu_is_msm8625()) {
-		kgsl_3d0_pdata.idle_timeout = HZ;
-		kgsl_3d0_pdata.strtstp_sleepwake = true;
+		kgsl_3d0_pdata.idle_timeout = HZ/5;
+		kgsl_3d0_pdata.strtstp_sleepwake = false;
 		/* 8x25 supports a higher GPU frequency */
-		kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 300000000;
+		kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 320000000;
 		kgsl_3d0_pdata.pwrlevel[0].bus_freq = 200000000;
 	}
 }
@@ -1605,6 +1593,7 @@ struct clock_init_data msm8625_dummy_clock_init_data __initdata = {
 enum {
 	MSM8625,
 	MSM8625A,
+	MSM8625AB,
 };
 
 static int __init msm8625_cpu_id(void)
@@ -1616,14 +1605,24 @@ static int __init msm8625_cpu_id(void)
 	/* Part number for 1GHz part */
 	case 0x770:
 	case 0x771:
+	case 0x77C:
 	case 0x780:
+	case 0x8D0:
 		cpu = MSM8625;
 		break;
 	/* Part number for 1.2GHz part */
 	case 0x773:
 	case 0x774:
 	case 0x781:
+	case 0x8D1:
 		cpu = MSM8625A;
+		break;
+	case 0x775:
+	case 0x776:
+	case 0x77D:
+	case 0x782:
+	case 0x8D2:
+		cpu = MSM8625AB;
 		break;
 	default:
 		pr_err("Invalid Raw ID\n");
@@ -1647,10 +1646,12 @@ int __init msm7x2x_misc_init(void)
 			acpuclk_init(&acpuclk_7x27aa_soc_data);
 		else if (msm8625_cpu_id() == MSM8625A)
 			acpuclk_init(&acpuclk_8625_soc_data);
+		else if (msm8625_cpu_id() == MSM8625AB)
+			acpuclk_init(&acpuclk_8625ab_soc_data);
+
 	 } else {
 		acpuclk_init(&acpuclk_7x27a_soc_data);
 	 }
-
 
 	return 0;
 }
@@ -1737,7 +1738,6 @@ postcore_initcall(msm7627a_init_gpio);
 static int msm7627a_panic_handler(struct notifier_block *this,
 		unsigned long event, void *ptr)
 {
-	msm_clk_dump_debug_info();
 	flush_cache_all();
 	outer_flush_all();
 	return NOTIFY_DONE;

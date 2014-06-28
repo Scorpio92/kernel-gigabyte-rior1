@@ -200,6 +200,7 @@ static const uint32_t hs_key_map[] = {
 enum {
 	NO_DEVICE	= 0,
 	MSM_HEADSET	= 1,
+	MSM_HEADPHONE = 2,//add by fangxing for headphone insert.state = 2
 };
 /* Add newer versions at the top of array */
 static const unsigned int rpc_vers[] = {
@@ -603,6 +604,9 @@ static ssize_t msm_headset_print_name(struct switch_dev *sdev, char *buf)
 		return sprintf(buf, "No Device\n");
 	case MSM_HEADSET:
 		return sprintf(buf, "Headset\n");
+    //add by fangxing
+    case MSM_HEADPHONE:
+        return sprintf(buf, "Headphone\n");
 	}
 	return -EINVAL;
 }

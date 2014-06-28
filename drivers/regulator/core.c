@@ -1576,11 +1576,14 @@ int regulator_enable(struct regulator *regulator)
 	struct regulator_dev *rdev;
 	int ret = 0;
 
+	/*renwei add it by the patch at 2012-9-4*/
 	if (regulator == NULL || IS_ERR(regulator)) {
 		pr_err("%s NULL regulator pointer passed, return..\n", __func__);
 		return -EINVAL;
 	}
 	rdev = regulator->rdev;
+	/*add end*/
+
 	mutex_lock(&rdev->mutex);
 
 	if (!regulator_check_voltage_update(rdev)) {
@@ -1680,11 +1683,13 @@ int regulator_disable(struct regulator *regulator)
 	struct regulator_dev *supply_rdev = NULL;
 	int ret = 0;
 
+	/*renwei add it by the patch at 2012-9-4*/
 	if (regulator == NULL || IS_ERR(regulator)) {
 		pr_err("%s NULL regulator pointer passed, return..\n", __func__);
 		return -EINVAL;
 	}
 	rdev = regulator->rdev;
+        /*add end*/
 	mutex_lock(&rdev->mutex);
 	ret = _regulator_disable(rdev, &supply_rdev);
 	if (ret)
@@ -1751,12 +1756,13 @@ int regulator_force_disable(struct regulator *regulator)
 	struct regulator_dev *rdev;
 	struct regulator_dev *supply_rdev = NULL;
 	int ret;
-
+	/*renwei add it by the patch at 2012-9-4*/
 	if (regulator == NULL || IS_ERR(regulator)) {
 		pr_err("%s NULL regulator pointer passed, return..\n", __func__);
 		return -EINVAL;
 	}
 	rdev = regulator->rdev;
+        /*add end*/
 	mutex_lock(&rdev->mutex);
 	regulator->uA_load = 0;
 	ret = _regulator_force_disable(rdev, &supply_rdev);
@@ -1793,10 +1799,13 @@ static int _regulator_is_enabled(struct regulator_dev *rdev)
 int regulator_is_enabled(struct regulator *regulator)
 {
 	int ret;
+	
+	/*renwei add it by the patch at 2012-9-4*/
 	if (regulator == NULL || IS_ERR(regulator)) {
 		pr_err("%s NULL regulator pointer passed, return..\n", __func__);
 		return -EINVAL;
-	}
+	}	
+	/*add end*/
 	mutex_lock(&regulator->rdev->mutex);
 	ret = _regulator_is_enabled(regulator->rdev);
 	mutex_unlock(&regulator->rdev->mutex);

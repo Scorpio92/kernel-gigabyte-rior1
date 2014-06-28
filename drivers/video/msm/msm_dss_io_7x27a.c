@@ -314,6 +314,8 @@ void mipi_dsi_phy_init(int panel_ndx, struct msm_panel_info const *panel_info,
 
 void cont_splash_clk_ctrl(int enable)
 {
+#if 1
+//hxh: add for continue
     static int cont_splash_clks_enabled;
 
     if (enable && !cont_splash_clks_enabled) {
@@ -333,6 +335,8 @@ void cont_splash_clk_ctrl(int enable)
         clk_disable_unprepare(dsi_ref_clk);
         cont_splash_clks_enabled = 0;
     }
+//hxh: add end
+#endif
 }
 
 void mipi_dsi_prepare_clocks(void)

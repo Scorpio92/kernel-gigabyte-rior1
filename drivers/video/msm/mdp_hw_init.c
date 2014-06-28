@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -711,7 +711,7 @@ void mdp_hw_init(int cont_splash_enabled)
 	MDP_OUTP(MDP_CMD_DEBUG_ACCESS_BASE + 0x0104,
 		 ((16 << 6) << 16) | (16) << 6);
 #endif
-
+	//mdp_timer_duration = (200 * HZ);   /* 100 sec */ //luke:
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }

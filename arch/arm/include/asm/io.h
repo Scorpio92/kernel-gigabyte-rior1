@@ -121,7 +121,6 @@ extern void __iomem *__arm_ioremap_caller(unsigned long, size_t, unsigned int,
 extern void __iomem *__arm_ioremap_pfn(unsigned long, unsigned long, size_t, unsigned int);
 extern void __iomem *__arm_ioremap(unsigned long, size_t, unsigned int);
 extern void __iounmap(volatile void __iomem *addr);
-extern void __arm_iounmap(volatile void __iomem *addr);
 
 /*
  * Bad read/write accesses...
@@ -293,14 +292,11 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 						MT_DEVICE_STRONGLY_ORDERED)
 #define ioremap_cached(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
 #define ioremap_wc(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE_WC)
-//#define iounmap				__arch_iounmap
+#define iounmap				__arch_iounmap
 
 /*
  * io{read,write}{8,16,32} macros
  */
-
-#define iounmap				__arm_iounmap
-
 #ifndef ioread8
 #define ioread8(p)	({ unsigned int __v = __raw_readb(p); __iormb(); __v; })
 #define ioread16(p)	({ unsigned int __v = le16_to_cpu((__force __le16)__raw_readw(p)); __iormb(); __v; })

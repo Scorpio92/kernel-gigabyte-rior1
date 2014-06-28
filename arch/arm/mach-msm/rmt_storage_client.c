@@ -988,7 +988,7 @@ static long rmt_storage_ioctl(struct file *fp, unsigned int cmd,
 		}
 		if (ret < 0 || atomic_read(&rmc->total_events) == 0) {
 			pr_err("%s: wait for request ioctl err: %d\n", __func__, ret);
-			break;
+ 			break;
           }
 		atomic_dec(&rmc->total_events);
 
@@ -1581,8 +1581,14 @@ unregister_client:
 	return ret;
 }
 
-#define SHUTDOWN_WAIT_DELAY_MS	10000
+//WuYuehua : There is a bug in the process of the RMT-shutdown-wait , namely the process can't be completed normally but the timer and  it will result in that Shut-Down-Phone be long time.
+//Modified the timer by WuYuehua --- 2012-08-16
+//#define SHUTDOWN_WAIT_DELAY_MS	10000
+#define SHUTDOWN_WAIT_DELAY_MS	3000
+
 static DECLARE_COMPLETION(fs_sync_complete);
+static int rmt_storage_get_sync_status(struct msm_rpc_client *client);
+static int rmt_storage_force_sync(struct msm_rpc_client *client);
 
 void rmt_storage_client_shutdown_complete(void)
 {
@@ -1698,10 +1704,9 @@ static void rmt_storage_client_shutdown(struct platform_device *pdev)
 
 	rmt_storage_client_shutdown_prepare();
 
-
 	cancel_delayed_work_sync(&srv->restart_work);
-	rmt_storage_set_client_status(srv, 0);
-	pr_debug("%s end\n", __func__);
+ 	rmt_storage_set_client_status(srv, 0);
+	pr_debug("%s end\n", __func__);	
 }
 
 static void rmt_storage_destroy_rmc(void)
@@ -1782,7 +1787,7 @@ static uint32_t rmt_storage_get_sid(const char *path)
 static int __init boot_up_mode_setup(char *bootupmode)
 {
 	if(!strcmp(bootupmode,"recovery"))
-		current_qcomm_mode = MSM_BOOT_RECOVERY;  //FIX FOR RECOVERY MODE QCN UPDATE
+		current_qcomm_mode = MSM_BOOT_NORMAL;  //FIX FOR RECOVERY MODE QCN UPDATE
 	else if(!strcmp(bootupmode,"ftm"))
 		current_qcomm_mode = MSM_BOOT_FTM;
 	else
@@ -1799,6 +1804,8 @@ static int __init rmt_storage_init(void)
 #endif
 	int ret = 0;
 
+	if(current_qcomm_mode)
+		return ret;
 	rmc = kzalloc(sizeof(struct rmt_storage_client_info), GFP_KERNEL);
 	if (!rmc) {
 		pr_err("%s: Unable to allocate memory\n", __func__);

@@ -24,9 +24,13 @@
 #include <linux/irq.h>
 #include <asm/system.h>
 
+//#include <splash.h>
+
 #define fb_width(fb)	((fb)->var.xres)
 #define fb_height(fb)	((fb)->var.yres)
 #define fb_size(fb)	((fb)->var.xres * (fb)->var.yres * 2)
+
+#define DEBUG
 
 static void memset16(void *_ptr, unsigned short val, unsigned count)
 {
@@ -93,11 +97,59 @@ int load_565rle_image(char *filename, bool bf_supported)
 		ptr += 2;
 		count -= 4;
 	}
-
 err_logo_free_data:
 	kfree(data);
 err_logo_close_file:
 	sys_close(fd);
 	return err;
 }
+#if 0
+// add by wangtao 
+static int display_RGB8888_logo(void)
+{
+    struct fb_info *info = registered_fb[0];
+    unsigned i = 0;
+    unsigned total_x = fb_width(info);
+    unsigned total_y = fb_height(info);
+    unsigned bytes_per_bpp = (info->var.bits_per_pixel / 8);
+    unsigned image_base = ((((total_y/2) - (SPLASH_IMAGE_WIDTH / 2) - 1) *
+			    (total_x)) + (total_x/2 - (SPLASH_IMAGE_HEIGHT / 2)));
+//printk("wangtao: %s======start ======  %d \n", __func__, __LINE__);
+    if (bytes_per_bpp == 4)
+    {
+        for (i = 0; i < SPLASH_IMAGE_WIDTH; i++)
+        {
+            memcpy (info->screen_base + ((image_base + (i * (total_x))) * bytes_per_bpp),
+		    imageBuffer_argb8888 + (i * SPLASH_IMAGE_HEIGHT * bytes_per_bpp),
+		    SPLASH_IMAGE_HEIGHT * bytes_per_bpp);
+	}
+    }
+//printk("wangtao: %s======end ======  %d \n", __func__, __LINE__);
+    return 0;
+}
+#endif
+
+
+int load_565rle_image(char *filename)
+{
+	struct fb_info *info;
+	unsigned bytes_per_bpp;
+	int err = 0;
+
+	info = registered_fb[0];
+	bytes_per_bpp = (info->var.bits_per_pixel / 8);
+
+	if(bytes_per_bpp == 2) {
+		err = __load_565rle_image(filename);
+	}
+	else if(bytes_per_bpp == 4) {
+		//err = display_RGB8888_logo();
+	}
+	else {
+		err = -EIO;
+	}
+
+	return err;
+}
 EXPORT_SYMBOL(load_565rle_image);
+

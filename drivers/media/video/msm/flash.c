@@ -11,6 +11,9 @@
  * GNU General Public License for more details.
  *
  */
+#ifndef DEBUG
+#define DEBUG
+#endif
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/leds-pmic8058.h>
@@ -21,6 +24,8 @@
 #include <mach/pmic.h>
 #include <mach/camera.h>
 #include <mach/gpio.h>
+
+#include <linux/board-ragentek-cfg.h>
 
 struct i2c_client *sx150x_client;
 struct timer_list timer_flash;
@@ -219,7 +224,7 @@ int msm_camera_flash_led(
 {
 	int rc = 0;
 
-	CDBG("msm_camera_flash_led: %d\n", led_state);
+	CDBG("lilonghui msm_camera_flash_led: %d\n", led_state);
 	switch (led_state) {
 	case MSM_CAMERA_LED_INIT:
 		rc = gpio_request(external->led_en, "sgm3141");
@@ -251,19 +256,29 @@ int msm_camera_flash_led(
 		gpio_set_value_cansleep(external->led_en, 0);
 		gpio_set_value_cansleep(external->led_flash_en, 0);
 		break;
-
+       /*lilonghui modify it for the camera flash led 2012-6-28*/
 	case MSM_CAMERA_LED_LOW:
 		CDBG("MSM_CAMERA_LED_LOW\n");
-		gpio_set_value_cansleep(external->led_en, 1);
-		gpio_set_value_cansleep(external->led_flash_en, 1);
+		if(is_rgtk_product(RGTK_PRODUCT_Q801)){
+			gpio_set_value_cansleep(external->led_en, 0);
+			gpio_set_value_cansleep(external->led_flash_en, 1);
+		}else{
+			gpio_set_value_cansleep(external->led_en, 0);
+			gpio_set_value_cansleep(external->led_flash_en, 0);
+		}
 		break;
 
 	case MSM_CAMERA_LED_HIGH:
 		CDBG("MSM_CAMERA_LED_HIGH\n");
-		gpio_set_value_cansleep(external->led_en, 1);
-		gpio_set_value_cansleep(external->led_flash_en, 1);
+		if(is_rgtk_product(RGTK_PRODUCT_Q801)){
+			gpio_set_value_cansleep(external->led_en, 1);
+			gpio_set_value_cansleep(external->led_flash_en, 0);
+		}else{
+			gpio_set_value_cansleep(external->led_en, 1);
+			gpio_set_value_cansleep(external->led_flash_en, 1);
+		}
 		break;
-
+      /*end*/
 	default:
 		rc = -EFAULT;
 		break;

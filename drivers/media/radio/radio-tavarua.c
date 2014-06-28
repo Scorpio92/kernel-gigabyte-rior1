@@ -149,7 +149,54 @@ static int tavarua_request_irq(struct tavarua_device *radio);
 static void start_pending_xfr(struct tavarua_device *radio);
 /* work function */
 static void read_int_stat(struct work_struct *work);
+//add by zhoulidong for fm infor QELS-3235 
+#include <linux/proc_fs.h>
+static struct proc_dir_entry *proc_entry;
+static char *cookie_pot;
+static int cookie_index;
+static int next_for_fmInfor;
+#define MAX_COOKIE_LENGTH PAGE_SIZE
+extern void *vmalloc(unsigned long size);
+extern void  vfree(const void *addr);
+static int fm_infor_read(char *page, char **start, off_t off, int cont, int *eof, void *data)
+{
+	int len;
 
+	if(off>0)
+	{
+		*eof = 1;
+		return 0;
+	}
+	if(next_for_fmInfor >= cookie_index)
+		next_for_fmInfor = 0;
+	len = sprintf(page, "%s\n", &cookie_pot[next_for_fmInfor]); 
+	next_for_fmInfor += len;
+
+	return len;
+}
+
+static void create_fm_info_file(const char* fm_type)
+{
+	cookie_pot = (char *)vmalloc(MAX_COOKIE_LENGTH);
+	if(!cookie_pot){
+	}
+	else{
+		memset(cookie_pot, 0, MAX_COOKIE_LENGTH);
+		proc_entry = create_proc_entry("fmInfor", 0644, NULL);	
+		if(proc_entry == NULL){
+			vfree(cookie_pot);
+		}
+		else{
+			cookie_index = 0;
+			next_for_fmInfor = 0;
+			proc_entry->read_proc = fm_infor_read;
+			strncpy(&cookie_pot[cookie_index], fm_type, strlen(fm_type)); 
+			cookie_index += strlen(fm_type);
+			cookie_pot[cookie_index] = 0;
+		}
+	}
+}
+//add by zhoulidong for fm infor  QELS-3235 (end)
 static int is_bahama(void)
 {
 	int id = 0;
@@ -4174,6 +4221,9 @@ FUNCTION:  radio_module_init
 static int __init radio_module_init(void)
 {
 	printk(KERN_INFO DRIVER_DESC ", Version " DRIVER_VERSION "\n");
+	//add by zhoulidong for fm infor  QELS-3235 (start)
+	create_fm_info_file("radio-tavarua");
+	//add by zhoulidong for fm infor  QELS-3235 (end)
 	return platform_driver_probe(&tavarua_driver, tavarua_probe);
 }
 

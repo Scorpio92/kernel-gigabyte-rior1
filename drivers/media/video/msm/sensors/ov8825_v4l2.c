@@ -34,11 +34,10 @@
 #define CDBG_HIGH(fmt, args...) printk(fmt, ##args)
 #endif
 
-
 /* TO DO - Currently ov5647 typical values are used
  * Need to get the exact values */
-#define OV8825_RG_RATIO_TYPICAL_VALUE 64 /* R/G of typical camera module */
-#define OV8825_BG_RATIO_TYPICAL_VALUE 105 /* B/G of typical camera module */
+#define OV8825_RG_RATIO_TYPICAL_VALUE 0x58 /* R/G of typical camera module */
+#define OV8825_BG_RATIO_TYPICAL_VALUE 0x51 /* B/G of typical camera module */
 
 DEFINE_MUTEX(ov8825_mut);
 static struct msm_sensor_ctrl_t ov8825_s_ctrl;
@@ -49,7 +48,10 @@ struct otp_struct {
 	uint8_t lens_id;
 	uint8_t rg_ratio;
 	uint8_t bg_ratio;
-	uint8_t user_data[5];
+	uint8_t user_data[3];
+	uint8_t light_rg;
+	uint8_t light_bg;	
+	uint8_t lenc[62];		
 } st_ov8825_otp;
 
 static struct msm_camera_i2c_reg_conf ov8825_start_settings[] = {
@@ -70,153 +72,138 @@ static struct msm_camera_i2c_reg_conf ov8825_groupoff_settings[] = {
 };
 
 static struct msm_camera_i2c_reg_conf ov8825_prev_settings[] = {
-	{0x3003, 0xce}, /*PLL_CTRL0*/
-	{0x3004, 0xd4}, /*PLL_CTRL1*/
-	{0x3005, 0x00}, /*PLL_CTRL2*/
-	{0x3006, 0x10}, /*PLL_CTRL3*/
-	{0x3007, 0x3b}, /*PLL_CTRL4*/
-	{0x3011, 0x01}, /*MIPI_Lane_4_Lane*/
-	{0x3012, 0x80}, /*SC_PLL CTRL_S0*/
-	{0x3013, 0x39}, /*SC_PLL CTRL_S1*/
-	{0x3104, 0x20}, /*SCCB_PLL*/
-	{0x3106, 0x15}, /*SRB_CTRL*/
-	{0x3501, 0x4e}, /*AEC_HIGH*/
-	{0x3502, 0xa0}, /*AEC_LOW*/
-	{0x350b, 0x1f}, /*AGC*/
-	{0x3600, 0x06}, /*ANACTRL0*/
-	{0x3601, 0x34}, /*ANACTRL1*/
-	{0x3700, 0x20}, /*SENCTROL0 Sensor control*/
-	{0x3702, 0x50}, /*SENCTROL2 Sensor control*/
-	{0x3703, 0xcc}, /*SENCTROL3 Sensor control*/
-	{0x3704, 0x19}, /*SENCTROL4 Sensor control*/
-	{0x3705, 0x14}, /*SENCTROL5 Sensor control*/
-	{0x3706, 0x4b}, /*SENCTROL6 Sensor control*/
-	{0x3707, 0x63}, /*SENCTROL7 Sensor control*/
-	{0x3708, 0x84}, /*SENCTROL8 Sensor control*/
-	{0x3709, 0x40}, /*SENCTROL9 Sensor control*/
-	{0x370a, 0x12}, /*SENCTROLA Sensor control*/
-	{0x370e, 0x00}, /*SENCTROLE Sensor control*/
-	{0x3711, 0x0f}, /*SENCTROL11 Sensor control*/
-	{0x3712, 0x9c}, /*SENCTROL12 Sensor control*/
-	{0x3724, 0x01}, /*Reserved*/
-	{0x3725, 0x92}, /*Reserved*/
-	{0x3726, 0x01}, /*Reserved*/
-	{0x3727, 0xa9}, /*Reserved*/
-	{0x3800, 0x00}, /*HS(HREF start High)*/
-	{0x3801, 0x00}, /*HS(HREF start Low)*/
-	{0x3802, 0x00}, /*VS(Vertical start High)*/
-	{0x3803, 0x00}, /*VS(Vertical start Low)*/
-	{0x3804, 0x0c}, /*HW = 3295*/
-	{0x3805, 0xdf}, /*HW*/
-	{0x3806, 0x09}, /*VH = 2459*/
-	{0x3807, 0x9b}, /*VH*/
-	{0x3808, 0x06}, /*ISPHO = 1632*/
-	{0x3809, 0x60}, /*ISPHO*/
-	{0x380a, 0x04}, /*ISPVO = 1224*/
-	{0x380b, 0xc8}, /*ISPVO*/
-	{0x380c, 0x0d}, /*HTS = 3516*/
-	{0x380d, 0xbc}, /*HTS*/
-	{0x380e, 0x04}, /*VTS = 1264*/
-	{0x380f, 0xf0}, /*VTS*/
-	{0x3810, 0x00}, /*HOFF = 8*/
-	{0x3811, 0x08}, /*HOFF*/
-	{0x3812, 0x00}, /*VOFF = 4*/
-	{0x3813, 0x04}, /*VOFF*/
-	{0x3814, 0x31}, /*X INC*/
-	{0x3815, 0x31}, /*Y INC*/
-	{0x3820, 0x81}, /*Timing Reg20:Vflip*/
-	{0x3821, 0x17}, /*Timing Reg21:Hmirror*/
-	{0x3f00, 0x00}, /*PSRAM Ctrl0*/
-	{0x3f01, 0xfc}, /*PSRAM Ctrl1*/
-	{0x3f05, 0x10}, /*PSRAM Ctrl5*/
-	{0x4600, 0x04}, /*VFIFO Ctrl0*/
-	{0x4601, 0x00}, /*VFIFO Read ST High*/
-	{0x4602, 0x30}, /*VFIFO Read ST Low*/
-	{0x4837, 0x28}, /*MIPI PCLK PERIOD*/
-	{0x5068, 0x00}, /*HSCALE_CTRL*/
-	{0x506a, 0x00}, /*VSCALE_CTRL*/
-	{0x5c00, 0x80}, /*PBLC CTRL00*/
-	{0x5c01, 0x00}, /*PBLC CTRL01*/
-	{0x5c02, 0x00}, /*PBLC CTRL02*/
-	{0x5c03, 0x00}, /*PBLC CTRL03*/
-	{0x5c04, 0x00}, /*PBLC CTRL04*/
-	{0x5c08, 0x10}, /*PBLC CTRL08*/
-	{0x6900, 0x61}, /*CADC CTRL00*/
+  //@@1632_1224_2Lane_30fps_66.66Msysclk_720MBps/lane
+  //6c 0100 00 // sleep
+  {0x3003, 0xce}, // PLL_CTRL0
+  {0x3004, 0xd4}, // PLL_CTRL1
+  {0x3005, 0x00}, // PLL_CTRL2
+  {0x3006, 0x10}, // PLL_CTRL3
+  {0x3007, 0x3b}, // PLL_CTRL4
+  {0x3012, 0x81}, // SC_PLL CTRL_S0
+  {0x3013, 0x39}, // SC_PLL CTRL_S1
+  {0x3106, 0x11}, // SRB_CTRL
+  {0x3600, 0x07}, // ANACTRL0
+  {0x3601, 0x33}, // ANACTRL1
+  {0x3602, 0xc2}, //
+  {0x3700, 0x10}, // SENCTROL0 Sensor control
+  {0x3702, 0x28}, // SENCTROL2 Sensor control
+  {0x3703, 0x6c}, // SENCTROL3 Sensor control
+  {0x3704, 0x8d}, // SENCTROL4 Sensor control
+  {0x3705, 0x0a}, // SENCTROL5 Sensor control
+  {0x3706, 0x27}, // SENCTROL6 Sensor control
+  {0x3708, 0x40}, // SENCTROL8 Sensor control
+  {0x3709, 0x20}, // SENCTROL9 Sensor control
+  {0x370a, 0x33}, // SENCTROLA Sensor control
+  {0x370e, 0x08}, // SENCTROLE Sensor control
+  {0x3711, 0x07}, // SENCTROL11 Sensor control
+  {0x3712, 0x4e}, // SENCTROL12 Sensor control
+  {0x3724, 0x00}, // Reserved
+  {0x3725, 0xd4}, // Reserved
+  {0x3726, 0x00}, // Reserved
+  {0x3727, 0xe1}, // Reserved
+  {0x3800, 0x00}, // HS(HREF start High)
+  {0x3801, 0x00}, // HS(HREF start Low)670B
+  {0x3802, 0x00}, // VS(Vertical start High)
+  {0x3803, 0x00}, // VS(Vertical start Low)
+  {0x3804, 0x0c}, // HW = 3295
+  {0x3805, 0xdf}, // HW
+  {0x3806, 0x09}, // VH = 2459
+  {0x3807, 0x9b}, // VH
+  {0x3808, 0x06}, // ISPHO = 1632
+  {0x3809, 0x60}, // ISPHO
+  {0x380a, 0x04}, // ISPVO = 1224
+  {0x380b, 0xc8}, // ISPVO
+  {0x380c, 0x0d}, // HTS = 3516
+  {0x380d, 0xbc}, // HTS
+  {0x380e, 0x04}, // VTS = 1264
+  {0x380f, 0xf0}, // VTS
+  {0x3810, 0x00}, // HOFF = 8
+  {0x3811, 0x08}, // HOFF
+  {0x3812, 0x00}, // VOFF = 4
+  {0x3813, 0x04}, // VOFF
+  {0x3814, 0x31}, // X INC
+  {0x3815, 0x31}, // Y INC
+  /*lilonghui modify it for the camera */
+  {0x3820, 0x86}, // Timing Reg20:Vflip
+  {0x3821, 0x11}, // Timing Reg21:Hmirror
+  {0x3f00, 0x00}, // PSRAM Ctrl0
+  {0x4005, 0x18}, // Gain trigger for BLC
+  {0x404f, 0x8F}, // Auto BLC while more than value
+  {0x4600, 0x04}, // VFIFO Ctrl0
+  {0x4601, 0x00}, // VFIFO Read ST High
+  {0x4602, 0x78}, // VFIFO Read ST Low
+  {0x4837, 0x28}, // MIPI PCLK PERIOD
+  {0x5068, 0x00}, // HSCALE_CTRL
+  {0x506a, 0x00}, // VSCALE_CTRL
+  //6c 0100 01 // wake up
 };
 
 static struct msm_camera_i2c_reg_conf ov8825_snap_settings[] = {
-	{0x3003, 0xce}, /*PLL_CTRL0*/
-	{0x3004, 0xd8}, /*PLL_CTRL1*/
-	{0x3005, 0x00}, /*PLL_CTRL2*/
-	{0x3006, 0x10}, /*PLL_CTRL3*/
-	{0x3007, 0x3b}, /*PLL_CTRL4*/
-	{0x3011, 0x01}, /*MIPI_Lane_4_Lane*/
-	{0x3012, 0x81}, /*SC_PLL CTRL_S0*/
-	{0x3013, 0x39}, /*SC_PLL CTRL_S1*/
-	{0x3104, 0x20}, /*SCCB_PLL*/
-	{0x3106, 0x11}, /*SRB_CTRL*/
-	{0x3501, 0x9a}, /*AEC_HIGH*/
-	{0x3502, 0xa0}, /*AEC_LOW*/
-	{0x350b, 0x1f}, /*AGC*/
-	{0x3600, 0x07}, /*ANACTRL0*/
-	{0x3601, 0x33}, /*ANACTRL1*/
-	{0x3700, 0x10}, /*SENCTROL0 Sensor control*/
-	{0x3702, 0x28}, /*SENCTROL2 Sensor control*/
-	{0x3703, 0x6c}, /*SENCTROL3 Sensor control*/
-	{0x3704, 0x8d}, /*SENCTROL4 Sensor control*/
-	{0x3705, 0x0a}, /*SENCTROL5 Sensor control*/
-	{0x3706, 0x27}, /*SENCTROL6 Sensor control*/
-	{0x3707, 0x63}, /*SENCTROL7 Sensor control*/
-	{0x3708, 0x40}, /*SENCTROL8 Sensor control*/
-	{0x3709, 0x20}, /*SENCTROL9 Sensor control*/
-	{0x370a, 0x12}, /*SENCTROLA Sensor control*/
-	{0x370e, 0x00}, /*SENCTROLE Sensor control*/
-	{0x3711, 0x07}, /*SENCTROL11 Sensor control*/
-	{0x3712, 0x4e}, /*SENCTROL12 Sensor control*/
-	{0x3724, 0x00}, /*Reserved*/
-	{0x3725, 0xd4}, /*Reserved*/
-	{0x3726, 0x00}, /*Reserved*/
-	{0x3727, 0xe1}, /*Reserved*/
-	{0x3800, 0x00}, /*HS(HREF start High)*/
-	{0x3801, 0x00}, /*HS(HREF start Low)*/
-	{0x3802, 0x00}, /*VS(Vertical start Hgh)*/
-	{0x3803, 0x00}, /*VS(Vertical start Low)*/
-	{0x3804, 0x0c}, /*HW = 3295*/
-	{0x3805, 0xdf}, /*HW*/
-	{0x3806, 0x09}, /*VH = 2459*/
-	{0x3807, 0x9b}, /*VH*/
-	{0x3808, 0x0c}, /*ISPHO = 1632*/
-	{0x3809, 0xc0}, /*ISPHO*/
-	{0x380a, 0x09}, /*ISPVO = 1224*/
-	{0x380b, 0x90}, /*ISPVO*/
-	{0x380c, 0x0e}, /*HTS = 3516*/
-	{0x380d, 0x00}, /*HTS*/
-	{0x380e, 0x09}, /*VTS = 1264*/
-	{0x380f, 0xb0}, /*VTS*/
-	{0x3810, 0x00}, /*HOFF = 8*/
-	{0x3811, 0x10}, /*HOFF*/
-	{0x3812, 0x00}, /*VOFF = 4*/
-	{0x3813, 0x06}, /*VOFF*/
-	{0x3814, 0x11}, /*X INC*/
-	{0x3815, 0x11}, /*Y INC*/
-	{0x3820, 0x80}, /*Timing Reg20:Vflip*/
-	{0x3821, 0x16}, /*Timing Reg21:Hmirror*/
-	{0x3f00, 0x02}, /*PSRAM Ctrl0*/
-	{0x3f01, 0xfc}, /*PSRAM Ctrl1*/
-	{0x3f05, 0x10}, /*PSRAM Ctrl5*/
-	{0x4600, 0x04}, /*VFIFO Ctrl0*/
-	{0x4601, 0x00}, /*VFIFO Read ST High*/
-	{0x4602, 0x78}, /*VFIFO Read ST Low*/
-	{0x4837, 0x28}, /*MIPI PCLK PERIOD*/
-	{0x5068, 0x00}, /*HSCALE_CTRL*/
-	{0x506a, 0x00}, /*VSCALE_CTRL*/
-	{0x5c00, 0x80}, /*PBLC CTRL00*/
-	{0x5c01, 0x00}, /*PBLC CTRL01*/
-	{0x5c02, 0x00}, /*PBLC CTRL02*/
-	{0x5c03, 0x00}, /*PBLC CTRL03*/
-	{0x5c04, 0x00}, /*PBLC CTRL04*/
-	{0x5c08, 0x10}, /*PBLC CTRL08*/
-	{0x6900, 0x61}, /*CADC CTRL00*/
+  //5.1.1.3 3264x2448 15fps 656Mbps/Lane
+  //@@3264_2448_2lane_15fps_66.66Msysclk_656MBps/lane
+  //6c 0100 00 // sleep
+  {0x3003, 0xce}, // PLL_CTRL0
+  {0x3004, 0xd8}, // PLL_CTRL1
+  {0x3005, 0x00}, // PLL_CTRL2
+  {0x3006, 0x10}, // PLL_CTRL3
+  {0x3007, 0x3b}, // PLL_CTRL4
+  {0x3012, 0x81}, // SC_PLL CTRL_S0
+  {0x3013, 0x39}, // SC_PLL CTRL_S1
+  {0x3106, 0x11}, // SRB_CTRL
+  {0x3600, 0x07}, // ANACTRL0
+  {0x3601, 0x33}, // ANACTRL1
+  {0x3602, 0x42}, //
+  {0x3700, 0x10}, // SENCTROL0 Sensor control
+  {0x3702, 0x28}, // SENCTROL2 Sensor control
+  {0x3703, 0x6c}, // SENCTROL3 Sensor control
+  {0x3704, 0x8d}, // SENCTROL4 Sensor control
+  {0x3705, 0x0a}, // SENCTROL5 Sensor control
+  {0x3706, 0x27}, // SENCTROL6 Sensor control
+  {0x3708, 0x40}, // SENCTROL8 Sensor control
+  {0x3709, 0x20}, // SENCTROL9 Sensor control
+  {0x370a, 0x31}, // SENCTROLA Sensor control
+  {0x370e, 0x00}, // SENCTROLE Sensor control
+  {0x3711, 0x07}, // SENCTROL11 Sensor control
+  {0x3712, 0x4e}, // SENCTROL12 Sensor control
+  {0x3724, 0x00}, // Reserved
+  {0x3725, 0xd4}, // Reserved
+  {0x3726, 0x00}, // Reserved
+  {0x3727, 0xe1}, // Reserved
+  {0x3800, 0x00}, // HS(HREF start High)
+  {0x3801, 0x00}, // HS(HREF start Low)
+  {0x3802, 0x00}, // VS(Vertical start High)
+  {0x3803, 0x00}, // VS(Vertical start Low)
+  {0x3804, 0x0c}, // HW = 3295
+  {0x3805, 0xdf}, // HW
+  {0x3806, 0x09}, // VH = 2459
+  {0x3807, 0x9b}, // VH
+  {0x3808, 0x0c}, // ISPHO = 3264
+  {0x3809, 0xc0}, // ISPHO
+  {0x380a, 0x09}, // ISPVO = 2448
+  {0x380b, 0x90}, // ISPVO
+  {0x380c, 0x0e}, // HTS = 3584
+  {0x380d, 0x00}, // HTS
+  {0x380e, 0x09}, // VTS = 2480
+  {0x380f, 0xb0}, // VTS
+  {0x3810, 0x00}, // HOFF = 16
+  {0x3811, 0x10}, // HOFF
+  {0x3812, 0x00}, // VOFF = 6
+  {0x3813, 0x06}, // VOFF
+  {0x3814, 0x11}, // X INC
+  {0x3815, 0x11}, // Y INC
+/*lilonghui add it for the camera flip 2012-9-11*/
+  {0x3820, 0x06}, // Timing Reg20:Vflip
+  {0x3821, 0x10}, // Timing Reg21:Hmirror
+  {0x3f00, 0x02}, // PSRAM Ctrl0
+  {0x4005, 0x1A}, // Every frame do BLC
+  {0x404f, 0x7F}, //
+  {0x4600, 0x04}, // VFIFO Ctrl0
+  {0x4601, 0x00}, // VFIFO Read ST High
+  {0x4602, 0x78}, // VFIFO Read ST Low
+  {0x4837, 0x28}, // MIPI PCLK PERIOD
+  {0x5068, 0x00}, // HSCALE_CTRL
+  {0x506a, 0x00}, // VSCALE_CTRL
+  //6c 0100 01 // wake up
 };
 
 
@@ -225,199 +212,234 @@ static struct msm_camera_i2c_reg_conf ov8825_reset_settings[] = {
 };
 
 static struct msm_camera_i2c_reg_conf ov8825_recommend_settings[] = {
-	{0x3000, 0x16},
-	{0x3001, 0x00},
-	{0x3002, 0x6c},
-	{0x300d, 0x00},
-	{0x301f, 0x09},
-	{0x3010, 0x00},
-	{0x3018, 0x00},
-	{0x3300, 0x00},
-	{0x3500, 0x00},
-	{0x3503, 0x07},
-	{0x3509, 0x00},
-	{0x3602, 0x42},
-	{0x3603, 0x5c},
-	{0x3604, 0x98},
-	{0x3605, 0xf5},
-	{0x3609, 0xb4},
-	{0x360a, 0x7c},
-	{0x360b, 0xc9},
-	{0x360c, 0x0b},
-	{0x3612, 0x00},
-	{0x3613, 0x02},
-	{0x3614, 0x0f},
-	{0x3615, 0x00},
-	{0x3616, 0x03},
-	{0x3617, 0xa1},
-	{0x3618, 0x00},
-	{0x3619, 0x00},
-	{0x361a, 0xB0},
-	{0x361b, 0x04},
-	{0x361c, 0x07},
-	{0x3701, 0x44},
-	{0x370b, 0x01},
-	{0x370c, 0x50},
-	{0x370d, 0x00},
-	{0x3816, 0x02},
-	{0x3817, 0x40},
-	{0x3818, 0x00},
-	{0x3819, 0x40},
-	{0x3b1f, 0x00},
-	{0x3d00, 0x00},
-	{0x3d01, 0x00},
-	{0x3d02, 0x00},
-	{0x3d03, 0x00},
-	{0x3d04, 0x00},
-	{0x3d05, 0x00},
-	{0x3d06, 0x00},
-	{0x3d07, 0x00},
-	{0x3d08, 0x00},
-	{0x3d09, 0x00},
-	{0x3d0a, 0x00},
-	{0x3d0b, 0x00},
-	{0x3d0c, 0x00},
-	{0x3d0d, 0x00},
-	{0x3d0e, 0x00},
-	{0x3d0f, 0x00},
-	{0x3d10, 0x00},
-	{0x3d11, 0x00},
-	{0x3d12, 0x00},
-	{0x3d13, 0x00},
-	{0x3d14, 0x00},
-	{0x3d15, 0x00},
-	{0x3d16, 0x00},
-	{0x3d17, 0x00},
-	{0x3d18, 0x00},
-	{0x3d19, 0x00},
-	{0x3d1a, 0x00},
-	{0x3d1b, 0x00},
-	{0x3d1c, 0x00},
-	{0x3d1d, 0x00},
-	{0x3d1e, 0x00},
-	{0x3d1f, 0x00},
-	{0x3d80, 0x00},
-	{0x3d81, 0x00},
-	{0x3d84, 0x00},
-	{0x3f06, 0x00},
-	{0x3f07, 0x00},
-	{0x4000, 0x29},
-	{0x4001, 0x02},
-	{0x4002, 0x45},
-	{0x4003, 0x08},
-	{0x4004, 0x04},
-	{0x4005, 0x18},
-	{0x4300, 0xff},
-	{0x4303, 0x00},
-	{0x4304, 0x08},
-	{0x4307, 0x00},
-	{0x4800, 0x04},
-	{0x4801, 0x0f},
-	{0x4843, 0x02},
-	{0x5000, 0x06},
-	{0x5001, 0x00},
-	{0x5002, 0x00},
-	{0x501f, 0x00},
-	{0x5780, 0xfc},
-	{0x5c05, 0x00},
-	{0x5c06, 0x00},
-	{0x5c07, 0x80},
-	{0x6700, 0x05},
-	{0x6701, 0x19},
-	{0x6702, 0xfd},
-	{0x6703, 0xd7},
-	{0x6704, 0xff},
-	{0x6705, 0xff},
-	{0x6800, 0x10},
-	{0x6801, 0x02},
-	{0x6802, 0x90},
-	{0x6803, 0x10},
-	{0x6804, 0x59},
-	{0x6901, 0x04},
-	{0x5800, 0x0f},
-	{0x5801, 0x0d},
-	{0x5802, 0x09},
-	{0x5803, 0x0a},
-	{0x5804, 0x0d},
-	{0x5805, 0x14},
-	{0x5806, 0x0a},
-	{0x5807, 0x04},
-	{0x5808, 0x03},
-	{0x5809, 0x03},
-	{0x580a, 0x05},
-	{0x580b, 0x0a},
-	{0x580c, 0x05},
-	{0x580d, 0x02},
-	{0x580e, 0x00},
-	{0x580f, 0x00},
-	{0x5810, 0x03},
-	{0x5811, 0x05},
-	{0x5812, 0x09},
-	{0x5813, 0x03},
-	{0x5814, 0x01},
-	{0x5815, 0x01},
-	{0x5816, 0x04},
-	{0x5817, 0x09},
-	{0x5818, 0x09},
-	{0x5819, 0x08},
-	{0x581a, 0x06},
-	{0x581b, 0x06},
-	{0x581c, 0x08},
-	{0x581d, 0x06},
-	{0x581e, 0x33},
-	{0x581f, 0x11},
-	{0x5820, 0x0e},
-	{0x5821, 0x0f},
-	{0x5822, 0x11},
-	{0x5823, 0x3f},
-	{0x5824, 0x08},
-	{0x5825, 0x46},
-	{0x5826, 0x46},
-	{0x5827, 0x46},
-	{0x5828, 0x46},
-	{0x5829, 0x46},
-	{0x582a, 0x42},
-	{0x582b, 0x42},
-	{0x582c, 0x44},
-	{0x582d, 0x46},
-	{0x582e, 0x46},
-	{0x582f, 0x60},
-	{0x5830, 0x62},
-	{0x5831, 0x42},
-	{0x5832, 0x46},
-	{0x5833, 0x46},
-	{0x5834, 0x44},
-	{0x5835, 0x44},
-	{0x5836, 0x44},
-	{0x5837, 0x48},
-	{0x5838, 0x28},
-	{0x5839, 0x46},
-	{0x583a, 0x48},
-	{0x583b, 0x68},
-	{0x583c, 0x28},
-	{0x583d, 0xae},
-	{0x5842, 0x00},
-	{0x5843, 0xef},
-	{0x5844, 0x01},
-	{0x5845, 0x3f},
-	{0x5846, 0x01},
-	{0x5847, 0x3f},
-	{0x5848, 0x00},
-	{0x5849, 0xd5},
-	{0x3503, 0x07},
-	{0x3500, 0x00},
-	{0x3501, 0x27},
-	{0x3502, 0x00},
-	{0x350b, 0xff},
-	{0x3400, 0x04},
-	{0x3401, 0x00},
-	{0x3402, 0x04},
-	{0x3403, 0x00},
-	{0x3404, 0x04},
-	{0x3405, 0x00},
-	{0x3406, 0x01},
-	{0x5001, 0x01},
-	{0x5000, 0x86},/* enable lens compensation and dpc */
+  //OV8825 Camera Application Notes R1.19
+  //5.1.1 Settings for 2 Lane MIPI Interface
+  //5.1.1.1 Initialization (Global Setting)
+  // Slave_ID=0x6c;
+  //6c 0103 01 ; software reset
+  // delay(5ms)
+  {0x3000, 0x16}, // strobe disable, frex disable, vsync disable
+  {0x3001, 0x00},
+  {0x3002, 0x6c}, // SCCB ID = 0x6c
+  {0x300d, 0x00}, // PLL2
+  {0x301f, 0x09}, // frex_mask_mipi, frex_mask_mipi_phy
+  {0x3010, 0x00}, // strobe, sda, frex, vsync, shutter GPIO unselected
+  {0x3011, 0x01}, // MIPI_2_Lane
+  {0x3018, 0x00}, // clear PHY HS TX power down and PHY LP RX power down
+  {0x3104, 0x20}, // SCCB_PLL
+  {0x3300, 0x00},
+  {0x3500, 0x00}, // exposure[19:16] = 0
+  {0x3503, 0x07}, // Gain has no delay, VTS manual, AGC manual, AEC manual
+  {0x3509, 0x00}, // use sensor gain
+  {0x3603, 0x5c}, // analog control
+  {0x3604, 0x98}, // analog control
+  {0x3605, 0xf5}, // analog control
+  {0x3609, 0xb4}, // analog control
+  {0x360a, 0x7c}, // analog control
+  {0x360b, 0xc9}, // analog control
+  {0x360c, 0x0b}, // analog control
+  {0x3612, 0x00}, // pad drive 1x, analog control
+  {0x3613, 0x02}, // analog control
+  {0x3614, 0x0f}, // analog control
+  {0x3615, 0x00}, // analog control
+  {0x3616, 0x03}, // analog control
+  {0x3617, 0xa1}, // analog control
+  {0x3618, 0x00}, // VCM position & slew rate, slew rate = 0
+  {0x3619, 0x00}, // VCM position = 0
+  {0x361a, 0xB0}, // VCM clock divider, VCM clock = 24000000/0x4b0 = 20000
+  {0x361b, 0x04}, // VCM clock divider
+  {0x361c, 0x07}, // VCM output current control
+  {0x3701, 0x44}, // sensor control
+  {0x3707, 0x63}, // SENCTROL7 Sensor control
+  {0x370b, 0x01}, // sensor control
+  {0x370c, 0x50}, // sensor control
+  {0x370d, 0x00}, // sensor control
+  {0x3816, 0x02}, // Hsync start H
+  {0x3817, 0x40}, // Hsync start L
+  {0x3818, 0x00}, // Hsync end H
+  {0x3819, 0x40}, // Hsync end L
+  {0x3b1f, 0x00}, // Frex conrol
+  // clear OTP data buffer
+  {0x3d00, 0x00},
+  {0x3d01, 0x00},
+  {0x3d02, 0x00},
+  {0x3d03, 0x00},
+  {0x3d04, 0x00},
+  {0x3d05, 0x00},
+  {0x3d06, 0x00},
+  {0x3d07, 0x00},
+  {0x3d08, 0x00},
+  {0x3d09, 0x00},
+  {0x3d0a, 0x00},
+  {0x3d0b, 0x00},
+  {0x3d0c, 0x00},
+  {0x3d0d, 0x00},
+  {0x3d0e, 0x00},
+  {0x3d0f, 0x00},
+  {0x3d10, 0x00},
+  {0x3d11, 0x00},
+  {0x3d12, 0x00},
+  {0x3d13, 0x00},
+  {0x3d14, 0x00},
+  {0x3d15, 0x00},
+  {0x3d16, 0x00},
+  {0x3d17, 0x00},
+  {0x3d18, 0x00},
+  {0x3d19, 0x00},
+  {0x3d1a, 0x00},
+  {0x3d1b, 0x00},
+  {0x3d1c, 0x00},
+  {0x3d1d, 0x00},
+  {0x3d1e, 0x00},
+  {0x3d1f, 0x00},
+  {0x3d80, 0x00},
+  {0x3d81, 0x00},
+  {0x3d84, 0x00},
+  {0x3f01, 0xfc}, // PSRAM Ctrl1
+  {0x3f05, 0x10}, // PSRAM Ctrl5
+  {0x3f06, 0x00},
+  {0x3f07, 0x00},
+  // BLC
+  {0x4000, 0x29},
+  {0x4001, 0x02}, // BLC start line
+  {0x4002, 0x45}, // BLC auto, reset 5 frames
+  {0x4003, 0x08}, // BLC redo at 8 frames
+  {0x4004, 0x04}, // 4 black lines are used for BLC
+  {0x4005, 0x18}, // no black line output, apply one channel offset (0x400c, 0x400d) to all manual BLC channels
+  {0x4300, 0xff}, // max
+  {0x4303, 0x00}, // format control
+  {0x4304, 0x08}, // output {data[7:0], data[9:8]}
+  {0x4307, 0x00}, // embedded control
+  //MIPI
+  {0x4800, 0x04},
+  {0x4801, 0x0f}, // ECC configure
+  {0x4843, 0x02}, // manual set pclk divider
+  // ISP
+  {0x5000, 0x06}, // LENC off, BPC on, WPC on
+  {0x5001, 0x00}, // MWB off
+  {0x5002, 0x00},
+  {0x501f, 0x00}, // enable ISP
+  {0x5780, 0xfc}, // DPC control
+  {0x5c00, 0x80}, // PBLC CTRL00
+  {0x5c01, 0x00}, // PBLC CTRL01
+  {0x5c02, 0x00}, // PBLC CTRL02
+  {0x5c03, 0x00}, // PBLC CTRL03
+  {0x5c04, 0x00}, // PBLC CTRL04
+  {0x5c05, 0x00}, // pre BLC
+  {0x5c06, 0x00}, // pre BLC
+  {0x5c07, 0x80}, // pre BLC
+  {0x5c08, 0x10}, // PBLC CTRL08
+  // temperature sensor
+  {0x6700, 0x05},
+  {0x6701, 0x19},
+  {0x6702, 0xfd},
+  {0x6703, 0xd7},
+  {0x6704, 0xff},
+  {0x6705, 0xff},
+  {0x6800, 0x10},
+  {0x6801, 0x02},
+  {0x6802, 0x90},
+  {0x6803, 0x10},
+  {0x6804, 0x59},
+  {0x6900, 0x60}, // CADC CTRL00
+  {0x6901, 0x04}, // CADC control
+  // Default Lens Correction
+  {0x5800, 0x0f},
+  {0x5801, 0x0d},
+  {0x5802, 0x09},
+  {0x5803, 0x0a},
+  {0x5804, 0x0d},
+  {0x5805, 0x14},
+  {0x5806, 0x0a},
+  {0x5807, 0x04},
+  {0x5808, 0x03},
+  {0x5809, 0x03},
+  {0x580a, 0x05},
+  {0x580b, 0x0a},
+  {0x580c, 0x05},
+  {0x580d, 0x02},
+  {0x580e, 0x00},
+  {0x580f, 0x00},
+  {0x5810, 0x03},
+  {0x5811, 0x05},
+  {0x5812, 0x09},
+  {0x5813, 0x03},
+  {0x5814, 0x01},
+  {0x5815, 0x01},
+  {0x5816, 0x04},
+  {0x5817, 0x09},
+  {0x5818, 0x09},
+  {0x5819, 0x08},
+  {0x581a, 0x06},
+  {0x581b, 0x06},
+  {0x581c, 0x08},
+  {0x581d, 0x06},
+  {0x581e, 0x33},
+  {0x581f, 0x11},
+  {0x5820, 0x0e},
+  {0x5821, 0x0f},
+  {0x5822, 0x11},
+  {0x5823, 0x3f},
+  {0x5824, 0x08},
+  {0x5825, 0x46},
+  {0x5826, 0x46},
+  {0x5827, 0x46},
+  {0x5828, 0x46},
+  {0x5829, 0x46},
+  {0x582a, 0x42},
+  {0x582b, 0x42},
+  {0x582c, 0x44},
+  {0x582d, 0x46},
+  {0x582e, 0x46},
+  {0x582f, 0x60},
+  {0x5830, 0x62},
+  {0x5831, 0x42},
+  {0x5832, 0x46},
+  {0x5833, 0x46},
+  {0x5834, 0x44},
+  {0x5835, 0x44},
+  {0x5836, 0x44},
+  {0x5837, 0x48},
+  {0x5838, 0x28},
+  {0x5839, 0x46},
+  {0x583a, 0x48},
+  {0x583b, 0x68},
+  {0x583c, 0x28},
+  {0x583d, 0xae},
+  {0x5842, 0x00},
+  {0x5843, 0xef},
+  {0x5844, 0x01},
+  {0x5845, 0x3f},
+  {0x5846, 0x01},
+  {0x5847, 0x3f},
+  {0x5848, 0x00},
+  {0x5849, 0xd5},
+  // PLL setting of preview
+  {0x3003, 0xce}, // PLL_CTRL0
+  {0x3004, 0xd4}, // PLL_CTRL1
+  {0x3005, 0x00}, // PLL_CTRL2
+  {0x3006, 0x10}, // PLL_CTRL3
+  {0x3007, 0x3b}, // PLL_CTRL4
+  {0x3012, 0x81}, // SC_PLL CTRL_S0
+  {0x3013, 0x39}, // SC_PLL CTRL_S1
+  {0x3106, 0x11}, // SRB_CTRL
+  // Exposure
+  {0x3503, 0x07}, // Gain has no delay, VTS manual, AGC manual, AEC manual
+  {0x3500, 0x00}, // expo[19:16] = lines/16
+  {0x3501, 0x27}, // expo[15:8]
+  {0x3502, 0x00}, // expo[7:0]
+  {0x350b, 0xff}, // gain
+  // MWB
+  {0x3400, 0x04}, // red h
+  {0x3401, 0x00}, // red l
+  {0x3402, 0x04}, // green h
+  {0x3403, 0x00}, // green l
+  {0x3404, 0x04}, // blue h
+  {0x3405, 0x00}, // blue l
+  {0x3406, 0x01}, // MWB manual
+  // ISP
+  {0x5001, 0x01}, // MWB on
+  {0x5000, 0x86}, // LENC on, BPC on, WPC on
 	/* LENC setting 70% */
 	{0x5800, 0x21},
 	{0x5801, 0x10},
@@ -485,10 +507,10 @@ static struct msm_camera_i2c_reg_conf ov8825_recommend_settings[] = {
 
 static struct v4l2_subdev_info ov8825_subdev_info[] = {
 	{
-		.code   = V4L2_MBUS_FMT_SBGGR10_1X10,
-		.colorspace = V4L2_COLORSPACE_JPEG,
-		.fmt    = 1,
-		.order    = 0,
+	.code   = V4L2_MBUS_FMT_SBGGR10_1X10,
+	.colorspace = V4L2_COLORSPACE_JPEG,
+	.fmt    = 1,
+	.order    = 0,
 	},
 	/* more can be supported, to be added later */
 };
@@ -580,11 +602,53 @@ uint16_t ov8825_check_otp_wb(struct msm_sensor_ctrl_t *s_ctrl, uint16_t index)
 	/* load otp into buffer */
 	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x01,
 			MSM_CAMERA_I2C_BYTE_DATA);
-
+		
+        msleep(3);  	
+	//usleep_range(5000, 5100);
+	
 	/* read from group [index] */
 	address = 0x3d05 + index * 9;
 	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, address, &temp,
 			MSM_CAMERA_I2C_BYTE_DATA);
+	/* disable otp read */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x00,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+	/* clear otp buffer */
+	for (i = 0; i < 32; i++) {
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, (0x3d00+i),
+				0x00, MSM_CAMERA_I2C_BYTE_DATA);
+	}
+
+	if (!temp)
+		return 0;
+	else if ((!(temp & 0x80)) && (temp & 0x7f))
+		return 2;
+	else
+		return 1;
+}
+
+uint16_t ov8825_check_otp_lenc(struct msm_sensor_ctrl_t *s_ctrl, uint16_t index)
+{
+	uint16_t temp, i;
+	uint16_t address;
+
+	/* select bank: index*2+1 */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d84, 0x09+index*2,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+	/* load otp into buffer */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x01,
+			MSM_CAMERA_I2C_BYTE_DATA);
+			
+	msleep(3);
+  //usleep_range(5000, 5100);
+	
+	/* read flag */
+	address = 0x3d00;
+	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, address, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	temp = temp & 0xc0;
 
 	/* disable otp read */
 	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x00,
@@ -617,6 +681,9 @@ void ov8825_read_otp_wb(struct msm_sensor_ctrl_t *s_ctrl,
 	/* load otp data into buffer */
 	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x01,
 			MSM_CAMERA_I2C_BYTE_DATA);
+
+     msleep(3);
+	//usleep_range(5000, 5100);
 
 	/* read otp data from 0x3d00 - 0x3d1f*/
 	address = 0x3d05 + index * 9;
@@ -653,11 +720,11 @@ void ov8825_read_otp_wb(struct msm_sensor_ctrl_t *s_ctrl,
 
 	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+7), &temp,
 			MSM_CAMERA_I2C_BYTE_DATA);
-	potp->user_data[3] = temp;
+	potp->light_rg = temp;
 
 	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+8), &temp,
 			MSM_CAMERA_I2C_BYTE_DATA);
-	potp->user_data[4] = temp;
+	potp->light_bg = temp;
 
 	CDBG("%s customer_id  = 0x%02x\r\n", __func__, potp->customer_id);
 	CDBG("%s lens_id      = 0x%02x\r\n", __func__, potp->lens_id);
@@ -666,9 +733,82 @@ void ov8825_read_otp_wb(struct msm_sensor_ctrl_t *s_ctrl,
 	CDBG("%s user_data[0] = 0x%02x\r\n", __func__, potp->user_data[0]);
 	CDBG("%s user_data[1] = 0x%02x\r\n", __func__, potp->user_data[1]);
 	CDBG("%s user_data[2] = 0x%02x\r\n", __func__, potp->user_data[2]);
-	CDBG("%s user_data[3] = 0x%02x\r\n", __func__, potp->user_data[3]);
-	CDBG("%s user_data[4] = 0x%02x\r\n", __func__, potp->user_data[4]);
+	CDBG("%s light_rg = 0x%02x\r\n", __func__, potp->light_rg);
+	CDBG("%s light_bg = 0x%02x\r\n", __func__, potp->light_bg);
 
+	/* disable otp read */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x00,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+	/* clear otp buffer */
+	for (i = 0; i < 32; i++)
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, (0x3d00+i),
+				0x00, MSM_CAMERA_I2C_BYTE_DATA);
+}
+
+void ov8825_read_otp_lenc(struct msm_sensor_ctrl_t *s_ctrl,
+		uint16_t index, struct otp_struct *potp)
+{
+	uint16_t i;
+	uint16_t address;
+    uint16_t bank = 0,temp = 0;
+	/* select bank: index*2+1 */
+	bank = index*2 + 1;
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d84, bank + 0x08,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+	/* load otp data into buffer */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x01,
+			MSM_CAMERA_I2C_BYTE_DATA);
+  
+  msleep(3);
+	//usleep_range(5000, 5100);
+
+	address = 0x3d01;
+  for(i=0;i<31;i++){
+  	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, address, &temp,
+  			MSM_CAMERA_I2C_BYTE_DATA);
+  			potp->lenc[i] = temp;
+  			address++;
+  }
+	CDBG("%s lenc[0]  = 0x%02x\r\n", __func__, potp->lenc[0]);
+	CDBG("%s lenc[1]  = 0x%02x\r\n", __func__, potp->lenc[1]);
+	CDBG("%s lenc[2]  = 0x%02x\r\n", __func__, potp->lenc[2]);
+	CDBG("%s lenc[3]  = 0x%02x\r\n", __func__, potp->lenc[3]);	
+	CDBG("%s lenc[4]  = 0x%02x\r\n", __func__, potp->lenc[4]);
+	CDBG("%s lenc[5]  = 0x%02x\r\n", __func__, potp->lenc[5]);
+	
+	/* disable otp read */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x00,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+	/* clear otp buffer */
+	for (i = 0; i < 32; i++)
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, (0x3d00+i),
+				0x00, MSM_CAMERA_I2C_BYTE_DATA);
+				
+//=========================================
+	/* select next bank */
+	bank++;
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d84, bank + 0x08,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+	/* load otp data into buffer */
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x01,
+			MSM_CAMERA_I2C_BYTE_DATA);
+  
+  msleep(3);
+	//usleep_range(5000, 5100);
+
+	address = 0x3d00;
+   for(i=31;i<62;i++){
+  	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, address, &temp,
+  			MSM_CAMERA_I2C_BYTE_DATA);
+  			potp->lenc[i] = temp;
+  			address++;
+  }
+	CDBG("%s lenc[32]  = 0x%02x\r\n", __func__, potp->lenc[31]);
+	CDBG("%s lenc[32]  = 0x%02x\r\n", __func__, potp->lenc[32]);
 	/* disable otp read */
 	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d81, 0x00,
 			MSM_CAMERA_I2C_BYTE_DATA);
@@ -687,41 +827,79 @@ void ov8825_read_otp_wb(struct msm_sensor_ctrl_t *s_ctrl,
 void ov8825_update_awb_gain(struct msm_sensor_ctrl_t *s_ctrl,
 		uint16_t r_gain, uint16_t g_gain, uint16_t b_gain)
 {
+	static unsigned short temp;
 	CDBG("%s r_gain = 0x%04x\r\n", __func__, r_gain);
 	CDBG("%s g_gain = 0x%04x\r\n", __func__, g_gain);
 	CDBG("%s b_gain = 0x%04x\r\n", __func__, b_gain);
 	if (r_gain > 0x400) {
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5186,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3400,
 				(r_gain>>8), MSM_CAMERA_I2C_BYTE_DATA);
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5187,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3401,
 				(r_gain&0xff), MSM_CAMERA_I2C_BYTE_DATA);
 	}
 	if (g_gain > 0x400) {
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5188,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3402,
 				(g_gain>>8), MSM_CAMERA_I2C_BYTE_DATA);
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5189,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3403,
 				(g_gain&0xff), MSM_CAMERA_I2C_BYTE_DATA);
 	}
 	if (b_gain > 0x400) {
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x518a,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3404,
 				(b_gain>>8), MSM_CAMERA_I2C_BYTE_DATA);
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x518b,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3405,
 				(b_gain&0xff), MSM_CAMERA_I2C_BYTE_DATA);
 	}
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3400, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3400 = 0x%04x\r\n", __func__, temp);
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3401, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3401 = 0x%04x\r\n", __func__, temp); 
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3402, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3402 = 0x%04x\r\n", __func__, temp);
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3403, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3403 = 0x%04x\r\n", __func__, temp);  
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3404, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3404 = 0x%04x\r\n", __func__, temp);
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3405, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3405 = 0x%04x\r\n", __func__, temp);     
+		msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3406, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+	  CDBG("%s 0x3406 = 0x%04x\r\n", __func__, temp);               	
 }
 
+void ov8825_update_lenc(struct msm_sensor_ctrl_t *s_ctrl,struct otp_struct *potp)
+{
+	uint16_t i;
+	static unsigned short temp;
+        
+	
+	for(i=0;i<62;i++){
+      msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5800+i,
+  		potp->lenc[i], MSM_CAMERA_I2C_BYTE_DATA);
+  }
+
+	msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5000, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+       CDBG("%s 0x5000 = 0x%04x\r\n", __func__, temp);
+}
 /**************************************************
  * call this function after OV8825 initialization
  * return value:
  *     0, update success
  *     1, no OTP
  ***************************************************/
-uint16_t ov8825_update_otp(struct msm_sensor_ctrl_t *s_ctrl)
+uint16_t ov8825_update_otp_wb(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	uint16_t i;
 	uint16_t otp_index;
 	uint16_t temp;
-	uint16_t r_gain, g_gain, b_gain, g_gain_r, g_gain_b;
+	uint16_t R_gain, G_gain, B_gain, G_gain_R, G_gain_B;
+	uint16_t rg,bg;
 
 	/* R/G and B/G of current camera module is read out from sensor OTP */
 	/* check first OTP with valid data */
@@ -740,59 +918,134 @@ uint16_t ov8825_update_otp(struct msm_sensor_ctrl_t *s_ctrl)
 	ov8825_read_otp_wb(s_ctrl, otp_index, &st_ov8825_otp);
 	/* calculate g_gain */
 	/* 0x400 = 1x gain */
-	if (st_ov8825_otp.bg_ratio < OV8825_BG_RATIO_TYPICAL_VALUE) {
-		if (st_ov8825_otp.rg_ratio < OV8825_RG_RATIO_TYPICAL_VALUE) {
-			g_gain = 0x400;
-			b_gain = 0x400 *
-				OV8825_BG_RATIO_TYPICAL_VALUE /
-				st_ov8825_otp.bg_ratio;
-			r_gain = 0x400 *
-				OV8825_RG_RATIO_TYPICAL_VALUE /
-				st_ov8825_otp.rg_ratio;
-		} else {
-			r_gain = 0x400;
-			g_gain = 0x400 *
-				st_ov8825_otp.rg_ratio /
-				OV8825_RG_RATIO_TYPICAL_VALUE;
-			b_gain = g_gain *
-				OV8825_BG_RATIO_TYPICAL_VALUE /
-				st_ov8825_otp.bg_ratio;
-		}
-	} else {
-		if (st_ov8825_otp.rg_ratio < OV8825_RG_RATIO_TYPICAL_VALUE) {
-			b_gain = 0x400;
-			g_gain = 0x400 *
-				st_ov8825_otp.bg_ratio /
-				OV8825_BG_RATIO_TYPICAL_VALUE;
-			r_gain = g_gain *
-				OV8825_RG_RATIO_TYPICAL_VALUE /
-				st_ov8825_otp.rg_ratio;
-		} else {
-			g_gain_b = 0x400 *
-				st_ov8825_otp.bg_ratio /
-				OV8825_BG_RATIO_TYPICAL_VALUE;
-			g_gain_r = 0x400 *
-				st_ov8825_otp.rg_ratio /
-				OV8825_RG_RATIO_TYPICAL_VALUE;
-			if (g_gain_b > g_gain_r) {
-				b_gain = 0x400;
-				g_gain = g_gain_b;
-				r_gain = g_gain *
-					OV8825_RG_RATIO_TYPICAL_VALUE /
-					st_ov8825_otp.rg_ratio;
-			} else {
-				r_gain = 0x400;
-				g_gain = g_gain_r;
-				b_gain = g_gain *
-					OV8825_BG_RATIO_TYPICAL_VALUE /
-					st_ov8825_otp.bg_ratio;
-			}
-		}
-	}
-	ov8825_update_awb_gain(s_ctrl, r_gain, g_gain, b_gain);
-	return 0;
+	
+  if (st_ov8825_otp.light_rg==0) {
+    //no light source information in OTP, light factor = 1
+    rg = st_ov8825_otp.rg_ratio;
+  }
+  else {
+    rg = st_ov8825_otp.rg_ratio * (st_ov8825_otp.light_rg + 128) / 256;
+  } 
+  if (st_ov8825_otp.light_bg==0) {
+    // not light source information in OTP, light factor = 1
+    bg = st_ov8825_otp.bg_ratio;
+  }
+  else {
+    bg = st_ov8825_otp.bg_ratio * (st_ov8825_otp.light_bg + 128) / 256;
+  }   
+  
+  CDBG("%s st_ov8825_otp.light_rg = 0x%02x\r\n", __func__, st_ov8825_otp.light_rg);                            
+  CDBG("%s st_ov8825_otp.light_bg = 0x%02x\r\n", __func__, st_ov8825_otp.light_bg);
+  CDBG("%s rg = 0x%02x\r\n", __func__, rg);                            
+  CDBG("%s bg = 0x%02x\r\n", __func__, bg);
+	
+	//calculate G gain
+  //0x400 = 1x gain
+  if (bg < OV8825_BG_RATIO_TYPICAL_VALUE) {        
+           if (rg < OV8825_RG_RATIO_TYPICAL_VALUE) {
+                    // current_otp.bg_ratio < BG_Ratio_typical &&
+                    // current_otp.rg_ratio < RG_Ratio_typical
+                    G_gain = 0x400;                                                                
+                    B_gain = 0x400 *                                                               
+                          
+ OV8825_BG_RATIO_TYPICAL_VALUE /                           
+                           bg;                                   
+                    R_gain = 0x400 *                                                               
+                           OV8825_RG_RATIO_TYPICAL_VALUE /                           
+                           rg;                                   
+           } else {         
+                    // current_otp.bg_ratio < BG_Ratio_typical &&
+                    // current_otp.rg_ratio >= RG_Ratio_typical                                                                      
+                    R_gain = 0x400;                                                                
+                    G_gain = 0x400 *                                                               
+                           rg /                                  
+                           OV8825_RG_RATIO_TYPICAL_VALUE;                            
+                    B_gain = G_gain *                                                              
+                           OV8825_BG_RATIO_TYPICAL_VALUE /                           
+                           bg;                                   
+           }                                                                                      
+    } else {                                                                                       
+           if (rg < OV8825_RG_RATIO_TYPICAL_VALUE) {
+                    // current_otp.bg_ratio >= BG_Ratio_typical &&
+                    // current_otp.rg_ratio < RG_Ratio_typical
+                    B_gain = 0x400;                                                                
+                    G_gain = 0x400 *                                                               
+                           bg /                                  
+                           OV8825_BG_RATIO_TYPICAL_VALUE;                            
+                    R_gain = G_gain *                                                              
+                           OV8825_RG_RATIO_TYPICAL_VALUE /                           
+                           rg;                                   
+           } else {         
+                    // current_otp.bg_ratio >= BG_Ratio_typical &&
+                    // current_otp.rg_ratio >= RG_Ratio_typical                                                                      
+                    G_gain_B = 0x400 *                                                             
+                           bg /                                  
+                           OV8825_BG_RATIO_TYPICAL_VALUE;                            
+                    G_gain_R = 0x400 *                                                             
+                           rg /                                  
+                           OV8825_RG_RATIO_TYPICAL_VALUE;                            
+                    if (G_gain_B > G_gain_R) {                                                     
+                           B_gain = 0x400;                                                        
+                           G_gain = G_gain_B;                                                     
+                           R_gain = G_gain *                                                      
+                                   OV8825_RG_RATIO_TYPICAL_VALUE /                   
+                                   rg;                           
+                    } else {                                                                       
+                           R_gain = 0x400;                                                        
+                           G_gain = G_gain_R;                                                     
+                           B_gain = G_gain *                                                      
+                                   OV8825_BG_RATIO_TYPICAL_VALUE /                   
+                                   bg;                           
+                    }                                                                              
+            }                                                                                      
+    }      
+	 ov8825_update_awb_gain(s_ctrl, R_gain, G_gain, B_gain);
+	 return 0;
 }
 
+/**************************************************
+ * call this function after OV8825 initialization
+ * return value:
+ *     0, update success
+ *     1, no OTP
+ ***************************************************/
+uint16_t ov8825_update_otp_lenc(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	uint16_t i;
+	uint16_t otp_index;
+	uint16_t temp;
+
+  // check first lens correction OTP with valid data
+  for(i=0;i<3;i++) {
+    temp = ov8825_check_otp_lenc(s_ctrl,i);
+    if (temp == 2) {
+        otp_index = i;
+        break;
+    }
+  }
+  if (i==3) {
+    // no valid wb OTP data
+    return 1;
+  }
+  ov8825_read_otp_lenc(s_ctrl, otp_index, &st_ov8825_otp);
+  ov8825_update_lenc(s_ctrl,&st_ov8825_otp);
+  // success
+  return 0;
+
+}
+/*lilonghui add it for the test the temperature 2012-9-3*/
+void ov8825_test_temp(struct msm_sensor_ctrl_t *s_ctrl)
+{
+  uint16_t temp;
+  msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x670b, 0x80,
+			MSM_CAMERA_I2C_BYTE_DATA);
+
+  msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x670b, &temp,
+			MSM_CAMERA_I2C_BYTE_DATA);
+  CDBG("%s :lilonghui test the temperature 0x670b = 0x%04x\r\n", __func__, temp);
+
+ }
+/*end*/
 static int32_t ov8825_write_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 		uint16_t gain, uint32_t line)
 {
@@ -833,16 +1086,15 @@ int32_t ov8825_sensor_i2c_probe(struct i2c_client *client,
 	int32_t rc = 0;
 	//struct msm_sensor_ctrl_t *s_ctrl;
 
-	CDBG("\n in ov8825_sensor_i2c_probe\n");
+	pr_info("\n in ov8825_sensor_i2c_probe\n");
 	rc = msm_sensor_i2c_probe(client, id);
 	if (client->dev.platform_data == NULL) {
 		pr_err("%s: NULL sensor data\n", __func__);
 		return -EFAULT;
 	}
-	//move the powerdown operation to sensor_power_down function
 	//s_ctrl = client->dev.platform_data;
 	//if (s_ctrl->sensordata->pmic_gpio_enable)
-	//	lcd_camera_power_onoff(0);
+		//lcd_camera_power_onoff(0);
 	return rc;
 }
 
@@ -857,35 +1109,37 @@ int32_t ov8825_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	gpio_direction_output(info->sensor_pwd, 0);
 	gpio_direction_output(info->sensor_reset, 0);
 	usleep_range(5000, 6000);
-
 	if (info->pmic_gpio_enable) {
 		lcd_camera_power_onoff(1);
 	}
-
+		
 	rc = msm_sensor_power_up(s_ctrl);
 	if (rc < 0) {
 		CDBG("%s: msm_sensor_power_up failed\n", __func__);
 		return rc;
 	}
-	/* turn on ldo and vreg */
+		/* turn on ldo and vreg */
 	gpio_direction_output(info->sensor_pwd, 1);
 	msleep(20);
 	gpio_direction_output(info->sensor_reset, 1);
 	msleep(40);
 	return rc;
 }
-
+#if 0
 int32_t ov8825_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	struct msm_camera_sensor_info *info = s_ctrl->sensordata;
 	int rc = 0;
 	CDBG("%s IN\r\n", __func__);
 
+	
 	//Stop stream first
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
 	msleep(40);
-
-	gpio_direction_output(info->sensor_pwd, 0);
+    /*lilonghui modify it for the camera current is high 2012-8-14*/
+   gpio_direction_output(info->sensor_pwd, 1);
+        gpio_direction_output(30, 0);
+        /*end*/
 	usleep_range(5000, 5100);
 	msm_sensor_power_down(s_ctrl);
 	msleep(40);
@@ -894,7 +1148,44 @@ int32_t ov8825_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	}
 	return rc;
 }
+#endif
 
+#if 1
+int32_t ov8825_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	struct msm_camera_sensor_info *info = NULL;
+	unsigned short rdata;
+	int rc;
+	CDBG("%s IN\r\n", __func__);
+
+	info = s_ctrl->sensordata;
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		0x4202, 0xf,
+		MSM_CAMERA_I2C_BYTE_DATA);
+	msleep(40);
+	rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x3018,
+			&rdata, MSM_CAMERA_I2C_BYTE_DATA);
+	CDBG("ov8825_sensor_power_down: %d\n", rc);
+	rdata |= 0x18;
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		0x3018, rdata, MSM_CAMERA_I2C_BYTE_DATA);
+	msleep(40);
+		
+	#if 1
+	gpio_direction_output(info->sensor_pwd, 1);	
+	gpio_direction_output(30, 0);
+	#endif
+	usleep_range(5000, 5100);
+       
+	msm_sensor_power_down(s_ctrl);
+        msleep(40);
+/*lilonghui add it for the camera 2012-12-14*/
+	if (info->pmic_gpio_enable){
+		lcd_camera_power_onoff(0);
+	}
+	return 0;
+}
+#endif 
 static struct i2c_driver ov8825_i2c_driver = {
 	.id_table = ov8825_i2c_id,
 	.probe  = ov8825_sensor_i2c_probe,
@@ -907,10 +1198,8 @@ static struct msm_camera_i2c_client ov8825_sensor_i2c_client = {
 	.addr_type = MSM_CAMERA_I2C_WORD_ADDR,
 };
 
-
-
 static int __init msm_sensor_init_module(void)
-{
+{	pr_info("\n %s \n", __func__);
 	return i2c_add_driver(&ov8825_i2c_driver);
 }
 
@@ -929,11 +1218,13 @@ static struct v4l2_subdev_ops ov8825_subdev_ops = {
 };
 
 static int is_first_preview = 1;
+
 int32_t ov8825_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 			int update_type, int res)
 {
 	int32_t rc = 0;
 	static int csi_config;
+/*renwei add it for the ov8825 camera AF at 2012-8-13*/
 	static unsigned short af_reg_l;
 	static unsigned short af_reg_h;
 	int af_step_pos;
@@ -957,9 +1248,9 @@ int32_t ov8825_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 		msleep(2);
 		}
 	}
+/*add end*/
 
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
-
 	msleep(30);
 	if (update_type == MSM_SENSOR_REG_INIT) {
 		CDBG("Register INIT\n");
@@ -970,7 +1261,10 @@ int32_t ov8825_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x100, 0x1,
 				MSM_CAMERA_I2C_BYTE_DATA);
 		msleep(66);
-		ov8825_update_otp(s_ctrl);
+       /*lilonghui add it for test the tempareture 2012-9-3*/
+        ov8825_test_temp(s_ctrl);
+		ov8825_update_otp_wb(s_ctrl);
+		ov8825_update_otp_lenc(s_ctrl);		
 		usleep_range(10000, 11000);
 		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x100, 0x0,
 		  MSM_CAMERA_I2C_BYTE_DATA);
@@ -998,7 +1292,7 @@ int32_t ov8825_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 			&s_ctrl->sensordata->pdata->ioclk.vfe_clk_rate);
 
 		s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
-
+		/*renwei add it for the ov8825 camera AF at 2012-8-13*/
 		af_reg_l = af_reg_l & 0xf0;
 		af_reg_l = af_reg_l | 0x0e;
 		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3618, af_reg_l,
@@ -1019,7 +1313,7 @@ int32_t ov8825_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 			//msleep(10);
 			is_first_preview = 0;
 		}
-
+		/*add end*/
 		msleep(50);
 	}
 	return rc;

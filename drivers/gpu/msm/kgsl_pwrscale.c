@@ -11,10 +11,7 @@
  *
  */
 
-#include <linux/export.h>
 #include <linux/kernel.h>
-
-#include <asm/page.h>
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
@@ -39,6 +36,7 @@ container_of(a, struct kgsl_pwrscale_policy_attribute, attr)
 struct kgsl_pwrscale_attribute pwrscale_attr_##_name = \
 __ATTR(_name, _mode, _show, _store)
 
+/* Master list of available policies */
 
 static struct kgsl_pwrscale_policy *kgsl_pwrscale_policies[] = {
 #ifdef CONFIG_MSM_SCM
@@ -59,6 +57,8 @@ static ssize_t pwrscale_policy_store(struct kgsl_device *device,
 	int i;
 	struct kgsl_pwrscale_policy *policy = NULL;
 
+	/* The special keyword none allows the user to detach all
+	   policies */
 	if (!strncmp("none", buf, 4)) {
 		kgsl_pwrscale_detach_policy(device);
 		return count;
@@ -299,10 +299,8 @@ static void _kgsl_pwrscale_detach_policy(struct kgsl_device *device)
 {
 	if (device->pwrscale.policy != NULL) {
 		device->pwrscale.policy->close(device, &device->pwrscale);
-
-
 		kgsl_pwrctrl_pwrlevel_change(device,
-				device->pwrctrl.max_pwrlevel);
+				device->pwrctrl.thermal_pwrlevel);
 	}
 	device->pwrscale.policy = NULL;
 }
@@ -335,7 +333,7 @@ int kgsl_pwrscale_attach_policy(struct kgsl_device *device,
 
 	device->pwrscale.policy = policy;
 
-	
+	/* Pwrscale is enabled by default at attach time */
 	kgsl_pwrscale_enable(device);
 
 	if (policy) {

@@ -831,4 +831,14 @@ config TOUCHSCREEN_FT5X06
          To compile this driver as a module, choose M here: the
          module will be called ft5x06_ts.
 
+config TOUCHSCREEN_AW5306	
+       tristate "AWinic"
+       depends on I2C  
+       default n       
+         
+ #sym add
+config TOUCHSCREEN_GT868	
+       tristate "Goodix"
+       depends on I2C
+#end
 endif

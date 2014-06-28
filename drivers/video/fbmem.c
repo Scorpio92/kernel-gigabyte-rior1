@@ -1003,7 +1003,12 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 				}
 			}
 
-			fb_pan_display(info, &info->var);
+//modified by medea to throw flush screen error.[2012-08-21]
+			ret = fb_pan_display(info, &info->var);
+			if(ret) {
+				goto done;
+			}
+//end modified
 			fb_set_cmap(&info->cmap, info);
 			fb_var_to_videomode(&mode, &info->var);
 

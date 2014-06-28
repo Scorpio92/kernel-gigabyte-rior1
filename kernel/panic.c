@@ -60,7 +60,7 @@ EXPORT_SYMBOL(panic_blink);
 #ifdef CONFIG_ARCH_MSM
 #define __LOG_BUF_LEN   (1 << CONFIG_LOG_BUF_SHIFT)
 extern char __log_buf[];
-static void flush_log_buf(void *ignored)
+void flush_log_buf(void *ignored)
 {
 	dmac_clean_range(__log_buf, __log_buf + __LOG_BUF_LEN);
 }

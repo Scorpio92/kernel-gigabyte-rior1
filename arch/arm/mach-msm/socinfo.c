@@ -22,6 +22,9 @@
 
 #include "smd_private.h"
 #include "proc_comm.h"
+//Start=====Allen
+#include <linux/board-ragentek-cfg.h>
+//End=====Allen
 
 #define BUILD_ID_LENGTH 32
 
@@ -485,7 +488,7 @@ socinfo_show_platform_type(struct sys_device *dev,
 								   __func__);
 		hw_type = HW_PLATFORM_UNKNOWN;
 	}
-	
+
 	return snprintf(buf, PAGE_SIZE, "%-.32s\n", hw_platform[hw_type]);
 }
 
@@ -687,8 +690,93 @@ static void * __init setup_dummy_socinfo(void)
 	return (void *) &dummy_socinfo;
 }
 
+//Start=====Allen
+typedef struct {
+	unsigned rgt_prjt_id;
+	unsigned lcd_id_mv;
+	unsigned cta_flag;	
+} rgt_flag_type;
+
+rgt_flag_type *rgt_flag_ptr = NULL;
+
+
+extern int lcd_mv_to_id(unsigned lcd_id_mv);
+
+static ssize_t
+socinfo_show_cta_flag(struct sys_device *dev,
+		     struct sysdev_attribute *attr,
+		     char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%u\n", get_cta_flag());
+}
+
+static struct sysdev_attribute vender_info_files[] = {
+	_SYSDEV_ATTR(cta_flag, 0444,
+			socinfo_show_cta_flag, NULL),
+};
+
+static struct sysdev_class soc_vendor_info_class = {
+	.name = "vendor_info",
+};
+
+static struct sys_device soc_vendor_info_device = {
+	.id = 0,
+	.cls = &soc_vendor_info_class,
+};
+
+static int __init soc_vendor_info_init_sysdev(void)
+{	
+	int err = 0;	
+	err = sysdev_class_register(&soc_vendor_info_class);
+	if (err) {
+		pr_err("%s: sysdev_class_register fail (%d)\n",
+		       __func__, err);
+		return err;
+	}
+	err = sysdev_register(&soc_vendor_info_device);
+	if (err) {
+		pr_err("%s: sysdev_register fail (%d)\n",
+		       __func__, err);
+		return err;
+	}	
+	socinfo_create_files(&soc_vendor_info_device, vender_info_files,
+				ARRAY_SIZE(vender_info_files));
+	return 0;
+}
+
+arch_initcall(soc_vendor_info_init_sysdev);
+
+int socinfo_rgt_init(void)
+{
+	unsigned lcd_id_mv;
+	unsigned product_id;
+	int lcd_id;
+	
+	rgt_flag_ptr = smem_alloc(SMEM_ID_VENDOR0, sizeof(rgt_flag_type));
+	
+	if(rgt_flag_ptr){
+		product_id = rgt_flag_ptr->rgt_prjt_id;
+		set_rgtk_product(product_id);
+		lcd_id_mv = rgt_flag_ptr->lcd_id_mv;
+		lcd_id = lcd_mv_to_id(lcd_id_mv);
+		set_rgtk_lcd_id(lcd_id);
+		
+		set_cta_flag(rgt_flag_ptr->cta_flag);
+		pr_info("%s: product_id: 0x%x; lcd_id: 0x%x; cta_flag: 0x%x\n", __func__, product_id, lcd_id, get_cta_flag());
+	}else{
+		pr_info("%s: rgt_flag_ptr is null\n", __func__);
+	}
+	
+	return 0;
+}
+//End=====Allen
+
 int __init socinfo_init(void)
 {
+	//Start=====Allen
+	socinfo_rgt_init();
+	//End=====Allen
+
 	socinfo = smem_alloc(SMEM_HW_SW_BUILD_ID, sizeof(struct socinfo_v6));
 
 	if (!socinfo)

@@ -9,11 +9,18 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
+/*lilonghui open it for debug */
+#ifndef DEBUG
+#define DEBUG
+#endif
 #include "msm_sensor.h"
 #include "msm.h"
 #include "msm_ispif.h"
 #include "msm_camera_i2c_mux.h"
+/*lilonghui add it for the camera auto detect 2012-7-2*/
+static int camera_back_flag = 0;
+static int camera_front_flag = 0;
+
 
 /*=============================================================*/
 int32_t msm_sensor_adjust_frame_lines(struct msm_sensor_ctrl_t *s_ctrl,
@@ -155,9 +162,29 @@ void msm_sensor_group_hold_off(struct msm_sensor_ctrl_t *s_ctrl)
 int32_t msm_sensor_set_fps(struct msm_sensor_ctrl_t *s_ctrl,
 						struct fps_cfg *fps)
 {
+/*lilonghui delete it for the front camera also hung 2012-7-19*/
+#if 0
+	uint16_t total_lines_per_frame;
+	int32_t rc = 0;
+	s_ctrl->fps_divider = fps->fps_div;
+
+	if (s_ctrl->curr_res != MSM_SENSOR_INVALID_RES) {
+		total_lines_per_frame = (uint16_t)
+			((s_ctrl->curr_frame_length_lines) *
+			s_ctrl->fps_divider/Q10);
+
+		rc = msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+			s_ctrl->sensor_output_reg_addr->frame_length_lines,
+			total_lines_per_frame, MSM_CAMERA_I2C_WORD_DATA);
+	}
+	return rc;
+#endif
+/*end*/
 	s_ctrl->fps_divider = fps->fps_div;
 
 	return 0;
+
+
 }
 
 int32_t msm_sensor_write_exp_gain1(struct msm_sensor_ctrl_t *s_ctrl,
@@ -218,7 +245,8 @@ int32_t msm_sensor_setting1(struct msm_sensor_ctrl_t *s_ctrl,
 {
 	int32_t rc = 0;
 	static int csi_config;
-
+	
+	CDBG("renwei  %s\n", __func__);
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
 	msleep(30);
 	if (update_type == MSM_SENSOR_REG_INIT) {
@@ -262,6 +290,7 @@ int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 		NOTIFY_ISPIF_STREAM, (void *)ISPIF_STREAM(
 		PIX_0, ISPIF_OFF_IMMEDIATELY));
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
+	CDBG("renwei  %s\n", __func__);
 	msleep(30);
 	if (update_type == MSM_SENSOR_REG_INIT) {
 		s_ctrl->curr_csi_params = NULL;
@@ -306,6 +335,7 @@ int32_t msm_sensor_set_sensor_mode(struct msm_sensor_ctrl_t *s_ctrl,
 	int mode, int res)
 {
 	int32_t rc = 0;
+	CDBG("renwei  %s\n", __func__);
 	if (s_ctrl->curr_res != res) {
 		s_ctrl->curr_frame_length_lines =
 			s_ctrl->msm_sensor_reg->
@@ -338,6 +368,7 @@ int32_t msm_sensor_mode_init(struct msm_sensor_ctrl_t *s_ctrl,
 	s_ctrl->cam_mode = MSM_SENSOR_MODE_INVALID;
 
 	CDBG("%s: %d\n", __func__, __LINE__);
+	CDBG("renwei  %s\n", __func__);
 	if (mode != s_ctrl->cam_mode) {
 		s_ctrl->curr_res = MSM_SENSOR_INVALID_RES;
 		s_ctrl->cam_mode = mode;
@@ -358,6 +389,7 @@ int32_t msm_sensor_get_output_info(struct msm_sensor_ctrl_t *s_ctrl,
 {
 	int rc = 0;
 	sensor_output_info->num_info = s_ctrl->msm_sensor_reg->num_conf;
+	CDBG("renwei  %s\n", __func__);
 	if (copy_to_user((void *)sensor_output_info->output_info,
 		s_ctrl->msm_sensor_reg->output_settings,
 		sizeof(struct msm_sensor_output_info_t) *
@@ -409,6 +441,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 		sizeof(struct sensor_cfg_data)))
 		return -EFAULT;
 	mutex_lock(s_ctrl->msm_sensor_mutex);
+	CDBG("renwei  %s\n", __func__);
 	CDBG("msm_sensor_config: cfgtype = %d\n",
 	cdata.cfgtype);
 		switch (cdata.cfgtype) {
@@ -664,10 +697,14 @@ int32_t msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 	}
 
 	CDBG("msm_sensor id: 0x%x\n", chipid);
+	CDBG("s_ctrl->sensor_id_info->sensor_id : 0x%x\n", s_ctrl->sensor_id_info->sensor_id);
 	if (chipid != s_ctrl->sensor_id_info->sensor_id) {
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
 	}
+
+
+	CDBG("match successful\n");
 	return rc;
 }
 
@@ -707,20 +744,52 @@ int32_t msm_sensor_i2c_probe(struct i2c_client *client,
 		pr_err("%s %s NULL sensor data\n", __func__, client->name);
 		return -EFAULT;
 	}
-
-	rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
-	if (rc < 0) {
-		pr_err("%s %s power up failed\n", __func__, client->name);
-		return rc;
-	}
-
+ /*lilonghui add it for the camera auto detect 2012-6-5 */
+      if(s_ctrl->sensordata->camera_type ==BACK_CAMERA_2D)
+        {
+       if(camera_back_flag == 0){
+         CDBG("%s,lilonghui call the camera_back_flag\n", __func__);
+         rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
+         if(rc < 0)
+         goto probe_fail; 
+           }else{
+         CDBG("%s,lilonghui alreadycall the camera_back_flag\n", __func__);
+          return rc;
+              }
+          }else{
+          if(camera_front_flag == 0){
+         CDBG("%s,lilonghui call the camera_front_flag\n", __func__);
+         rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
+          if(rc < 0)
+          goto probe_fail;
+            }else{
+           CDBG("%s,lilonghui alreadycall the camera_front_flag\n", __func__);
+      return rc;
+          }
+      }
+	//rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
+	//if (rc < 0) {
+	//	pr_err("%s %s power up failed\n", __func__, client->name);
+	//	return rc;
+	//}
+  /*end*/
 	if (s_ctrl->func_tbl->sensor_match_id)
 		rc = s_ctrl->func_tbl->sensor_match_id(s_ctrl);
 	else
 		rc = msm_sensor_match_id(s_ctrl);
 	if (rc < 0)
 		goto probe_fail;
-
+    /*lilonghui add the code for the camera auto detect 2012-9-27*/
+        if(s_ctrl->sensordata->camera_type ==BACK_CAMERA_2D)
+         {
+         camera_back_flag=1;
+         CDBG("%s,lilonghui call the camera_back_flag\n", __func__);
+          }else{
+         CDBG("%s,lilonghui call the camera_front_flag\n", __func__);
+         camera_front_flag=1;
+        }
+    /*end*/
+        
 	snprintf(s_ctrl->sensor_v4l2_subdev.name,
 		sizeof(s_ctrl->sensor_v4l2_subdev.name), "%s", id->name);
 	v4l2_i2c_subdev_init(&s_ctrl->sensor_v4l2_subdev, client,
@@ -741,6 +810,7 @@ int32_t msm_sensor_power(struct v4l2_subdev *sd, int on)
 {
 	int rc = 0;
 	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(sd);
+	CDBG("renwei %s \n", __func__);
 	mutex_lock(s_ctrl->msm_sensor_mutex);
 	if (on) {
 		rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);

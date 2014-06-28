@@ -268,6 +268,11 @@
  * of the Gadget, USB Mass Storage, and SCSI protocols.
  */
 
+/****************************************
+History:
+1. chuiguo.zeng@ragentek.com 2012.12.31 BUG_ID:QELS-2641 
+   Description: Fix the problem that the transmission may be disconnected if copy some big files from computer to SD card in USB storage mode.
+ ****************************************/
 
 /* #define VERBOSE_DEBUG */
 /* #define DUMP_MSGS */
@@ -295,6 +300,9 @@
 #include <linux/usb/composite.h>
 
 #include "gadget_chips.h"
+//add by zhoulidong
+#include <../../../../build/buildplus/target/QRDExt_target.h>
+//add by zhoulidong
 
 
 /*------------------------------------------------------------------------*/
@@ -319,6 +327,11 @@ static int csw_hack_sent;
 
 struct fsg_dev;
 struct fsg_common;
+
+//add BUG_ID:QELS-2641  zengchuiguo 20121231 (start)
+unsigned int counter = 0;
+static void invalidate_sub(struct fsg_lun *curlun);
+//add BUG_ID:QELS-2641  zengchuiguo 20121231 (end)
 
 /* FSF callback functions */
 struct fsg_operations {
@@ -1089,6 +1102,18 @@ static int do_write(struct fsg_common *common)
 			file_offset += nwritten;
 			amount_left_to_write -= nwritten;
 			common->residue -= nwritten;
+			//add BUG_ID:QELS-2641  zengchuiguo 20121231 (start)		
+			 if (++counter == 64) { 
+			 	fsg_lun_fsync_sub(curlun); 
+			 if (signal_pending(current)) 
+			 	return -EINTR; 
+			 
+			 invalidate_sub(curlun); 
+			 if (signal_pending(current)) 
+			 	return -EINTR; 
+			 counter = 0; 
+			 } 			
+			//add BUG_ID:QELS-2641  zengchuiguo 20121231 (end)
 
 			/* If an error occurred, report it and its position */
 			if (nwritten < amount) {
@@ -2975,13 +3000,27 @@ buffhds_first_it:
 			i = 0x0399;
 		}
 	}
-	snprintf(common->inquiry_string, sizeof common->inquiry_string,
+//zhoulidong moidfy
+/*
+#if defined(RGTK_USB_FILECD_NAME)
+	if(strcmp(RGTK_USB_FILECD_NAME,""))
+#else
+	if (0)
+#endif
+	{
+		snprintf(common->inquiry_string, sizeof common->inquiry_string,
+			 "%-8s%-16s%04x", "",RGTK_USB_FILECD_NAME, i);
+
+	}else{
+		snprintf(common->inquiry_string, sizeof common->inquiry_string,
 		 "%-8s%-16s%04x", cfg->vendor_name ?: "Linux",
-		 /* Assume product name dependent on the first LUN */
 		 cfg->product_name ?: (common->luns->cdrom
 				     ? "File-Stor Gadget"
 				     : "File-CD Gadget"),
 		 i);
+	}
+*/
+//zhoulidong modify end
 
 	/*
 	 * Some peripheral controllers are known not to be able to

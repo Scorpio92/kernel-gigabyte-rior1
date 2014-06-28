@@ -313,10 +313,13 @@ void	mdp3_dsi_cmd_dma_busy_wait(struct msm_fb_data_type *mfd)
 	}
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
-	if (need_wait) {
-		/* wait until DMA finishes the current job */
-		wait_for_completion(&mfd->dma->comp);
+	if (need_wait) {/* wait until DMA finishes the current job */
+printk("luke : %s    %d\n",__func__, __LINE__); 
+		//wait_for_completion(&mfd->dma->comp);            //3            // if block,  block here
+                wait_for_completion_timeout(&mfd->dma->comp, HZ/200);
+printk("luke : %s    %d\n",__func__, __LINE__);
 	}
+              
 }
 #endif
 

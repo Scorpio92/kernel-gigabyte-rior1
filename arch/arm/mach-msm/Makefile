@@ -1,4 +1,4 @@
-obj-y += io.o dma.o memory.o hardware_self_adapt.o
+obj-y += io.o dma.o memory.o
 ifndef CONFIG_ARM_ARCH_TIMER
 obj-y += timer.o
 endif
@@ -249,7 +249,8 @@ obj-$(CONFIG_ARCH_MSM8625) += devices-msm7x27a.o clock-pcom-lookup.o mpm-8625.o
 obj-$(CONFIG_MACH_MSM8625_RUMI3) += board-msm7x27a.o
 obj-$(CONFIG_MACH_MSM8625_SURF) +=  board-msm7x27a.o board-7627a-all.o
 obj-$(CONFIG_MACH_MSM8625_EVB) +=  board-qrd7627a.o board-7627a-all.o
-obj-$(CONFIG_MACH_MSM8625_QRD5) +=  board-qrd7627a.o board-7627a-all.o
+obj-$(CONFIG_MACH_MSM8625_QRD5) +=  board-qrd7627a.o board-7627a-all.o 
+obj-$(CONFIG_MACH_MSM8625_QRD5) += board-ragentek-cfg.o
 obj-$(CONFIG_MACH_MSM8625_SKUA) +=  board-qrd7627a.o board-7627a-all.o
 obj-$(CONFIG_MACH_MSM8625_SKUB) +=  board-qrd7627a.o board-7627a-all.o
 obj-$(CONFIG_MACH_MSM8625_QRD7) += board-qrd7627a.o board-7627a-all.o

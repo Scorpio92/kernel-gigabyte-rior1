@@ -17,6 +17,7 @@
 #include <mach/gpio.h>
 #include <media/v4l2-subdev.h>
 #include <media/msm_camera.h>
+#include <linux/board-ragentek-cfg.h>
 #include "msm_camera_i2c.h"
 
 #ifdef LERROR

@@ -25,6 +25,9 @@
 
 static struct msm_rpc_endpoint *usb_ep;
 static struct msm_rpc_endpoint *chg_ep;
+//QELS-1791 pengjinlong del 20121122 (start) 
+static int is_chg_connected = 0; //Sym
+//QELS-1791 pengjinlong del 20121122 (end) 
 
 #define MSM_RPC_CHG_PROG 0x3000001a
 
@@ -52,6 +55,9 @@ struct msm_hsusb_rpc_ids {
 
 static struct msm_hsusb_rpc_ids usb_rpc_ids;
 static struct msm_chg_rpc_ids chg_rpc_ids;
+//QELS-1791 pengjinlong del 20121122 (start) 
+extern void ft5x06_does_when_chg_connected(int is_chg_connected);//sym
+//QELS-1791 pengjinlong del 20121122 (end) 
 
 static int msm_hsusb_init_rpc_ids(unsigned long vers)
 {
@@ -650,12 +656,38 @@ void hsusb_chg_connected(enum chg_type chgtype)
 	if (chgtype == USB_CHG_TYPE__INVALID) {
 		msm_chg_usb_i_is_not_available();
 		msm_chg_usb_charger_disconnected();
+//QELS-1791 pengjinlong del 20121122 (start) 
+		//add by sym
+		is_chg_connected = 0;   
+		#ifdef CONFIG_TOUCHSCREEN_FT5X06
+		ft5x06_does_when_chg_connected(0);
+		#endif
+//QELS-1791 pengjinlong del 20121122 (end) 
+
 		return;
 	}
+//QELS-1791 pengjinlong del 20121122 (start) 
+
+	is_chg_connected = 1;	
+	#ifdef CONFIG_TOUCHSCREEN_FT5X06
+	ft5x06_does_when_chg_connected(1);
+	#endif
+
+//QELS-1791 pengjinlong del 20121122 (end) 
 
 	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
 
 	msm_chg_usb_charger_connected(chgtype);
 }
 EXPORT_SYMBOL(hsusb_chg_connected);
+//QELS-1791 pengjinlong del 20121122 (start) 
+
+int  sym_chg_connected(void)   //add by sym
+{
+	return is_chg_connected;
+}
+EXPORT_SYMBOL(sym_chg_connected);
+
+//QELS-1791 pengjinlong del 20121122 (end) 
+
 #endif

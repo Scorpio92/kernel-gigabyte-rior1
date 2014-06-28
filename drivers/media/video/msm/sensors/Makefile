@@ -5,7 +5,6 @@ EXTRA_CFLAGS += -Idrivers/media/video/msm/eeprom
 EXTRA_CFLAGS += -Idrivers/media/video/msm/csi
 obj-$(CONFIG_MSM_CAMERA_SENSOR) += msm_sensor.o
 obj-$(CONFIG_OV5647) += ov5647_v4l2.o
-obj-$(CONFIG_OV8825) += ov8825_v4l2.o
 obj-$(CONFIG_IMX074) += imx074_v4l2.o
 obj-$(CONFIG_S5K3L1YX) += s5k3l1yx.o
 obj-$(CONFIG_IMX091) += imx091.o
@@ -16,8 +15,19 @@ obj-$(CONFIG_MT9E013) += mt9e013_v4l2.o
 obj-$(CONFIG_WEBCAM_OV9726) += ov9726_v4l2.o
 obj-$(CONFIG_OV5647_SUNNY_P5V02S) += ov5647_sunny_p5v02s_v4l2.o
 obj-$(CONFIG_OV5647_TRULY_CM6868) += ov5647_truly_cm6868_v4l2.o
+# lilonghui add it for the camera 2012-9-25
+
+obj-$(CONFIG_OV5647) += ov5647_v4l2.o
+# renwei add it for the main camera at 2012-5-30
+obj-$(CONFIG_OV8825) += ov8825_v4l2.o
 obj-$(CONFIG_OV5640) += ov5640_v4l2.o
 obj-$(CONFIG_WEBCAM_OV7692_QRD) += ov7692_qrd_v4l2.o
+# renwei add it for ov2655 camera at 2012-8-1
+obj-$(CONFIG_OV2655) += ov2655_v4l2.o
+obj-$(CONFIG_S5K5CA) += s5k5ca_v4l2.o
+obj-$(CONFIG_AR0543) += ar0543_v4l2.o
+# renwei add it for the front camera at 2012-6-12
 obj-$(CONFIG_GC0339) += gc0339_v4l2.o
 obj-$(CONFIG_MT9V113) += mt9v113_v4l2.o
 obj-$(CONFIG_VX6953) += vx6953.o
+

@@ -173,7 +173,43 @@ enum msm_camera_type {
 	BACK_CAMERA_3D,
 	BACK_CAMERA_INT_3D,
 };
+/*lilonghui add it for the camera prodcut 2012-7-2*/
+enum msm_camera_product {
+      CAMERA_PRODUCT_ID_NON = 0,
+      CAMERA_PRODUCT_ID_Q801,
+      CAMERA_PRODUCT_ID_Q802,
+      CAMERA_PRODUCT_ID_Q803,
+      CAMERA_PRODUCT_ID_Q203,
+};
+/*end*/
+/*lilonghui add it for the all the  project camera 2r012-8-11*/
+enum msm_camera_customer {
+      CAMERA_CUSTOMER_NON = 0,
+      CAMERA_CUSTOMER_QC,
+      CAMERA_CUSTOMER_35,
+      CAMERA_CUSTOMER_CY,
+      CAMERA_CUSTOMER_S21,
+      CAMERA_CUSTOMER_S22,
+      CAMERA_CUSTOMER_AMOI,
+      CAMERA_CUSTOMER_ALL,
+      };
+enum msm_camera_module_name {
+      CAMERA_MODULE_NON = 0,  	 
+      CAMERA_MODULE_TRULY,
+       
+};
+enum msm_camera_sensor_ic_name {
+      CAMERA_IC_NAME_NON = 0, 
+      CAMERA_IC_NAME_GC0339,  	 
+      CAMERA_IC_NAME_OV5647,
+      CAMERA_IC_NAME_OV8825,
+      CAMERA_IC_NAME_OV2655,
+      CAMERA_IC_NAME_S5K5CA,
+      CAMERA_IC_NAME_AR0543,
+      CAMERA_IC_NAME_GC2035,
 
+};
+/*end*/
 enum msm_sensor_type {
 	BAYER_SENSOR,
 	YUV_SENSOR,
@@ -288,6 +324,12 @@ struct msm_camera_sensor_info {
 	struct msm_camera_sensor_strobe_flash_data *strobe_flash_data;
 	char *eeprom_data;
 	enum msm_camera_type camera_type;
+	/*lilonghui add it for the camera 2012-8-11*/
+	enum msm_camera_sensor_ic_name  camera_sensor_ic_name; 
+	enum msm_camera_product camera_product_type;
+	enum msm_camera_customer  customer_name;
+	enum msm_camera_module_name  module_sensor_name; 
+	/*end*/
 	enum msm_sensor_type sensor_type;
 	struct msm_actuator_info *actuator_info;
 	int pmic_gpio_enable;
@@ -502,6 +544,9 @@ struct msm_i2c_platform_data {
 	int src_clk_rate;
 	int use_gsbi_shared_mode;
 	void (*msm_i2c_config_gpio)(int iface, int config_type);
+	//Start === Allen
+	void (*msm_i2c_config_gpi_for_recovery)(int iface, int config_type);
+	//End === Allen
 };
 
 struct msm_i2c_ssbi_platform_data {
@@ -559,12 +604,6 @@ void vic_handle_irq(struct pt_regs *regs);
 void msm_copper_reserve(void);
 void msm_copper_very_early(void);
 void msm_copper_init_gpiomux(void);
-
-#if defined(CONFIG_ARCH_MSM7X27)
-void msm_clk_dump_debug_info(void);
-#else
-static inline void msm_clk_dump_debug_info(void) {}
-#endif
 
 struct mmc_platform_data;
 int msm_add_sdcc(unsigned int controller,

@@ -28,6 +28,12 @@
  *
  */
 
+/************************************************************************
+History:
+1. chuiguo.zeng@ragentek.com 2012.12.03 BUG_ID:QELS-2349 
+   Description: Bluetooth may not be initialized successful, enable debug log which will be removed before MP.
+************************************************************************/
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 
@@ -69,6 +75,14 @@
 #define HCI_IBS_W4_ACL_HDR	2
 #define HCI_IBS_W4_SCO_HDR	3
 #define HCI_IBS_W4_DATA		4
+
+//add BUG_ID:QELS-2349 zengchuiguo 20121204 (start)
+//TODO: Remove these log before MP
+#ifdef BT_DBG
+#undef	BT_DBG
+#define BT_DBG(fmt, arg...)  printk("hci_ibs %s: " fmt "\n" , __func__ , ## arg)
+#endif
+//add BUG_ID:QELS-2349 zengchuiguo 20121204 (end)
 
 /* HCI_IBS transmit side sleep protocol states */
 enum tx_ibs_states_e {

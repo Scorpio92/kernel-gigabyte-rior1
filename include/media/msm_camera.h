@@ -1381,6 +1381,12 @@ struct msm_camera_info {
 	int num_cameras;
 	uint8_t has_3d_support[MSM_MAX_CAMERA_SENSORS];
 	uint8_t is_internal_cam[MSM_MAX_CAMERA_SENSORS];
+	/*lilonghui add it for the camera 2012-7-2*/
+	uint8_t s_customer_name[MSM_MAX_CAMERA_SENSORS];
+	uint8_t s_module_sensor_name[MSM_MAX_CAMERA_SENSORS];
+	uint8_t s_sensor_ic_name[MSM_MAX_CAMERA_SENSORS];
+	uint8_t s_product_id[MSM_MAX_CAMERA_SENSORS];
+	/*end*/
 	uint32_t s_mount_angle[MSM_MAX_CAMERA_SENSORS];
 	const char *video_dev_name[MSM_MAX_CAMERA_SENSORS];
 	enum sensor_type_t sensor_type[MSM_MAX_CAMERA_SENSORS];
@@ -1424,6 +1430,9 @@ struct msm_camsensor_info {
 	enum sensor_type_t sensor_type;
 	uint32_t pxlcode; /* enum v4l2_mbus_pixelcode */
 	uint32_t camera_type; /* msm_camera_type */
+	/*lilonghui add it for the camera 2012-7-4*/
+	uint32_t camera_product_t; /* msm_camera_type */
+	 /*end*/
 	int mount_angle;
 	uint32_t max_width;
 	uint32_t max_height;

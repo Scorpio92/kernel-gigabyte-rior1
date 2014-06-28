@@ -1142,7 +1142,9 @@ int mipi_dsi_cmds_tx(struct msm_fb_data_type *mfd,
 	for (i = 0; i < cnt; i++) {
 		mipi_dsi_buf_init(tp);
 		mipi_dsi_cmd_dma_add(tp, cm);
+//printk("luke: %s ----------------- %d\n", __func__,__LINE__);
 		mipi_dsi_cmd_dma_tx(tp);
+//printk("luke: %s ----------------- %d\n", __func__,__LINE__);
 		if (cm->wait)
 			msleep(cm->wait);
 		cm++;
@@ -1313,11 +1315,11 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 
 	bp = tp->data;
 
-	pr_debug("%s: ", __func__);
+	printk("%s: ", __func__);
 	for (i = 0; i < tp->len; i++)
-		pr_debug("%x ", *bp++);
+		printk("0x%x ", *bp++);
 
-	pr_debug("\n");
+	printk("\n");
 #endif
 
 	len = tp->len;
@@ -1335,8 +1337,10 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 	wmb();
 	MIPI_OUTP(MIPI_DSI_BASE + 0x08c, 0x01);	/* trigger */
 	wmb();
-
+//printk("luke: %s ----------------- %d\n", __func__,__LINE__);
 	wait_for_completion(&dsi_dma_comp);
+        //wait_for_completion_timeout(&dsi_dma_comp, HZ/3);                     //luke:  block here
+//printk("luke: %s ----------------- %d\n", __func__,__LINE__);
 
 	dma_unmap_single(&dsi_dev, tp->dmap, len, DMA_TO_DEVICE);
 	tp->dmap = 0;

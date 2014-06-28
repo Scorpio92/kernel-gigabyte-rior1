@@ -22,7 +22,9 @@
 #include <mach/msm_rpcrouter.h>
 
 #ifdef CONFIG_MSM_AMSS_ENHANCE_DEBUG
-#define NZI_ITEM_FILE_NAME_LENGTH 8
+#define NZI_ITEM_FILE_NAME_LENGTH	8
+#define TASK_STRUCT_TAG			0x7461736b
+#define MEM_INFO_TAG			0x6d657369
 typedef struct {
 	uint32_t len;
 	uint32_t data[3];

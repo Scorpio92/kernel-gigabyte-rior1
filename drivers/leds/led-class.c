@@ -183,6 +183,7 @@ static void led_set_software_blink(struct led_classdev *led_cdev,
  */
 void led_classdev_suspend(struct led_classdev *led_cdev)
 {
+	
 	led_cdev->flags |= LED_SUSPENDED;
 	led_cdev->brightness_set(led_cdev, 0);
 }
@@ -212,7 +213,7 @@ static int led_suspend(struct device *dev, pm_message_t state)
 static int led_resume(struct device *dev)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-
+	
 	if (led_cdev->flags & LED_CORE_SUSPENDRESUME)
 		led_classdev_resume(led_cdev);
 
@@ -297,7 +298,11 @@ void led_blink_set(struct led_classdev *led_cdev,
 
 	/* blink with 1 Hz as default if nothing specified */
 	if (!*delay_on && !*delay_off)
-		*delay_on = *delay_off = 500;
+	{
+		//*delay_on = 500;
+		*delay_on =  0;
+		*delay_off =  4500;
+	}
 
 	led_set_software_blink(led_cdev, *delay_on, *delay_off);
 }

@@ -81,7 +81,8 @@ int32_t msm_actuator_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = write_arr[i].reg_addr;
 				i2c_byte2 = value;
 				if (size != (i+1)) {
-					i2c_byte2 = value & 0xFF;
+					//i2c_byte2 = (i2c_byte2 & 0xFF00) >> 8;
+   					i2c_byte2 = value & 0xFF;//renwei add it for the ov8825 at 2012-8-11
 					CDBG("%s: byte1:0x%x, byte2:0x%x\n",
 					__func__, i2c_byte1, i2c_byte2);
 					rc = msm_camera_i2c_write(
@@ -96,7 +97,8 @@ int32_t msm_actuator_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
 
 					i++;
 					i2c_byte1 = write_arr[i].reg_addr;
-					i2c_byte2 = (value & 0xFF00) >> 8;
+					//i2c_byte2 = value & 0xFF;
+					i2c_byte2 = (value & 0xFF00) >> 8;//renwei add it for the ov8825 camera at 2012-8-11
 				}
 			} else {
 				i2c_byte1 = (value & 0xFF00) >> 8;
@@ -622,11 +624,21 @@ int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl)
 	CDBG("vcm info: %x %x\n", a_ctrl->vcm_pwd,
 		a_ctrl->vcm_enable);
 	if (a_ctrl->vcm_enable) {
+		/*renwei modify it for the main camera AF at 2012-7-21*/
 		rc = gpio_request(a_ctrl->vcm_pwd, "msm_actuator");
-		if (!rc) {
-			CDBG("Enable VCM PWD\n");
-			gpio_direction_output(a_ctrl->vcm_pwd, 1);
+		if (rc < 0) {
+			pr_err("%s: gpio_request---GPIO_SKU3_CAM_5MP_CAM_DRIVER_PWDN failed!", __func__);
 		}
+
+		rc = gpio_tlmm_config(gpio_cfg[GPIO_CAM_DRIVER_PWDN], GPIO_CFG_ENABLE);
+		if (rc < 0) {
+			pr_err("%s: unable to set camera driver power down gpio for front camera!\n", __func__);
+			gpio_free(a_ctrl->vcm_pwd);
+		}
+        	
+		gpio_direction_output(a_ctrl->vcm_pwd, 1);
+		printk("Enable VCM PWD\n");
+		/*add end */
 	}
 	return rc;
 }

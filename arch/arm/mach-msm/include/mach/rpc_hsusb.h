@@ -46,6 +46,7 @@ int msm_chg_rpc_close(void);
 int hsusb_chg_init(int connect);
 void hsusb_chg_vbus_draw(unsigned mA);
 void hsusb_chg_connected(enum chg_type chgtype);
+int  sym_chg_connected(void) ; //add by sym
 #endif
 
 

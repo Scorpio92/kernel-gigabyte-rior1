@@ -9,7 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
+//#define DEBUG
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -25,10 +25,12 @@
 #include <mach/gpio.h>
 #include <mach/oem_rapi_client.h>
 #include <mach/socinfo.h>
-
+//Start=====Allen
+#include <linux/board-ragentek-cfg.h>
+//End=====Allen
 #define DEBUG_TRICOLOR_LED 0
 
-static int qrd5_led_flash_en1 = 13;
+static int qrd5_led_flash_en1 = 107;
 static int qrd7_led_flash_en = 96;
 
 enum tri_color_led_color {
@@ -63,6 +65,7 @@ struct tricolor_led_data {
 	struct led_classdev leds[4];	/* blue, green, red, flashlight */
 };
 
+/* modified by hanxiaohui
 static void call_oem_rapi_client_streaming_function(struct msm_rpc_client *client,
 						    char *input)
 {
@@ -87,7 +90,7 @@ static void call_oem_rapi_client_streaming_function(struct msm_rpc_client *clien
 			"oem_rapi_client_streaming_function() error=%d\n", ret);
 }
 
-
+*/
 static ssize_t led_blink_solid_show(struct device *dev,
 				    struct device_attribute *attr, char *buf)
 {
@@ -151,12 +154,39 @@ static ssize_t led_blink_solid_store(struct device *dev,
 	}
 	tricolor_led->led_data[color] = blink;
 	spin_unlock_irqrestore(&tricolor_led->led_lock, flags);
-	call_oem_rapi_client_streaming_function(tricolor_led->rpc_client, (char*)&input);
+	//call_oem_rapi_client_streaming_function(tricolor_led->rpc_client, (char*)&input);
 	return size;
 }
 
+//modify BUG_ID:QELS-782 daizhiyi 20121206 (start)
+#if 0
+static DEVICE_ATTR(blink, 0666, led_blink_solid_show, led_blink_solid_store);
+#else
 static DEVICE_ATTR(blink, 0644, led_blink_solid_show, led_blink_solid_store);
-
+#endif
+//modify BUG_ID:QELS-782 daizhiyi 20121206 (end)
+//add by hanxiaohui
+static void blue_led_on(void)
+{	//masked by hxh for fix bug:VOBIS_239  2012.11.20 start
+	/*
+	gpio_tlmm_config(GPIO_CFG(109,
+				0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+				GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	gpio_direction_output(109, 1);
+	*/
+	//end 
+}
+static void blue_led_off(void)
+{	 //masked by hxh for fix bug:VOBIS_239  2012.11.20 start
+	/*
+	gpio_tlmm_config(GPIO_CFG(109,
+				0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+				GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	gpio_direction_output(109, 0);
+	*/
+	//end
+}
+//add by hanxiaohui
 static void led_brightness_set_tricolor(struct led_classdev *led_cdev,
 			       enum led_brightness brightness)
 {
@@ -183,18 +213,45 @@ static void led_brightness_set_tricolor(struct led_classdev *led_cdev,
 		if(color == LED_COLOR_GREEN)
 			input = GREEN_ON;
 		if(color == LED_COLOR_BLUE)
+		{
+			blue_led_on();
 			input = BLUE_ON;
+		}
+ 
 	} else {
 		if(color == LED_COLOR_RED)
 			input = RED_OFF;
 		if(color == LED_COLOR_GREEN)
 			input = GREEN_OFF;
 		if(color == LED_COLOR_BLUE)
+		{	
+			blue_led_off();
 			input = BLUE_OFF;
+		}
 	}
 	spin_unlock_irqrestore(&tricolor_led->led_lock, flags);
-	call_oem_rapi_client_streaming_function(tricolor_led->rpc_client, (char*)&input);
+	//call_oem_rapi_client_streaming_function(tricolor_led->rpc_client, (char*)&input);
 }
+
+/*lilonghui add it  for the camera 2012-6-26*/
+void camera_flashlight_set(struct led_classdev *led_cdev,
+		           enum led_brightness brightness)
+{
+	if(brightness==LED_FULL){
+		pr_debug("%s:lilonghui call theLED_FULL \n",__func__);
+		gpio_set_value_cansleep(gpio_num[GPIO_CAM_TRUE_FLASH_PWN_INDEX], 0);
+		gpio_set_value_cansleep(gpio_num[GPIO_CAM_TRUE_FLASH_PWM_INDEX], 1);
+	}else if(brightness==LED_HALF){
+		pr_debug("%s:lilonghui call the LED_HALF\n ",__func__);
+		gpio_set_value_cansleep(gpio_num[GPIO_CAM_TRUE_FLASH_PWN_INDEX], 1);
+		gpio_set_value_cansleep(gpio_num[GPIO_CAM_TRUE_FLASH_PWM_INDEX], 0);
+	}else{
+		pr_debug("%s:lilonghui call the LED_OFF \n ",__func__);
+		gpio_set_value_cansleep(gpio_num[GPIO_CAM_TRUE_FLASH_PWN_INDEX], 0);
+		gpio_set_value_cansleep(gpio_num[GPIO_CAM_TRUE_FLASH_PWM_INDEX], 0);
+	}
+}
+/*end*/
 
 static void led_brightness_set_flash(struct led_classdev *led_cdev,
 				     enum led_brightness brightness)
@@ -244,10 +301,25 @@ static int tricolor_led_probe(struct platform_device *pdev)
 
 	tricolor_led->leds[2].name = "blue";
 	tricolor_led->leds[2].brightness_set = led_brightness_set_tricolor;
-	
-	tricolor_led->leds[3].name = "flashlight";
-	tricolor_led->leds[3].brightness_set = led_brightness_set_flash;
+	//tricolor_led->leds[2].default_trigger = "timer";
+	//Start=====Allen
+	if(machine_is_msm8625_qrd5()){
+		if(is_rgtk_product(RGTK_PRODUCT_Q802)  \
+			|| is_rgtk_product(RGTK_PRODUCT_Q803)  \
+			||is_rgtk_product(RGTK_PRODUCT_Q203) \
+			||is_rgtk_product(RGTK_PRODUCT_DC205))
+			qrd5_led_flash_en1 = gpio_num[GPIO_CAM_FAKE_FLASH_EN_INDEX];
 
+	}	
+
+	tricolor_led->leds[3].name = "flashlight";
+	
+	if(is_rgtk_product(RGTK_PRODUCT_Q801)){
+		tricolor_led->leds[3].brightness_set = camera_flashlight_set;
+	}else{
+		tricolor_led->leds[3].brightness_set = led_brightness_set_flash;
+	}
+	//End=====Allen
 	for (i = 0; i < 4; i++) {	/* red, green, blue, flashlight */
 		ret = led_classdev_register(&pdev->dev, &tricolor_led->leds[i]);
 		if (ret) {
@@ -266,6 +338,7 @@ static int tricolor_led_probe(struct platform_device *pdev)
 		}
 	}
 	dev_set_drvdata(&pdev->dev, tricolor_led);
+	
 	return 0;
 
 err_out_attr_blink:

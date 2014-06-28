@@ -10,6 +10,18 @@
 */
 
 #include <linux/rtc.h>
+//delete from path of lijiawu by lishangyou 20130123 (start)
+/*
+//add by lihua BUG_ID:QELS-234 2012.10.18 (start)
+//modify by xianglong BUG_ID:QELS-3048 2012.12.24 (start)
+//#define DEFAULT_SYSTEM_YEAR		112		//year+1900 (e.g: 112+1900=2012)
+#define DEFAULT_SYSTEM_YEAR		113		//year+1900 (e.g: 113+1900=2013)
+//modify by xianglong BUG_ID:QELS-3048 2012.12.24 (end)
+#define DEFAULT_SYSTEM_MONTH	0		//month+1   (e.g: 0+1=1)
+#define DEFAULT_SYSTEM_DAY		1		//day       (e.g: 1=1)
+//add by lihua BUG_ID:QELS-234 2012.10.18 (end)
+*/
+//delete from path of lijiawu by lishangyou 20130123 (end)
 
 /* IMPORTANT: the RTC only stores whole seconds. It is arbitrary
  * whether it stores the most close value or the value with partial
@@ -53,7 +65,38 @@ int rtc_hctosys(void)
 			"hctosys: invalid date/time\n");
 		goto err_invalid;
 	}
-
+	//delete from path of lijiawu by lishangyou 20130123 (start)
+/*
+	//add by lihua BUG_ID:QELS-234 2012.10.18 (start)
+	if (tm.tm_year == 80) {
+		// set the new default rtc time
+		tm.tm_year = DEFAULT_SYSTEM_YEAR;
+		tm.tm_mon  = DEFAULT_SYSTEM_MONTH;
+		tm.tm_mday = DEFAULT_SYSTEM_DAY;
+		err = rtc_set_time(rtc, &tm);
+		if (err) {
+			dev_err(rtc->dev.parent,
+				"hctosys: unable to set the hardware clock\n");
+			goto err_read;
+		}
+		// read the rtc time again
+		err = rtc_read_time(rtc, &tm);
+		if (err) {
+			dev_err(rtc->dev.parent,
+				"hctosys: unable to read the hardware clock\n");
+			goto err_read;
+		}
+		// check if the readtime is valid
+		err = rtc_valid_tm(&tm);
+		if (err) {
+			dev_err(rtc->dev.parent,
+				"hctosys: invalid date/time\n");
+			goto err_invalid;
+		}
+	}
+	//add by lihua BUG_ID:QELS-234 2012.10.18 (end)
+*/
+	//delete from path of lijiawu by lishangyou 20130123 (end)
 	rtc_tm_to_time(&tm, &tv.tv_sec);
 
 	do_settimeofday(&tv);

@@ -22,6 +22,12 @@
 #include "pm.h"
 #include "board-msm7627a.h"
 
+//Start=====Allen
+#include <linux/board-ragentek-cfg.h>
+//End=====Allen
+
+#include <../../../../build/buildplus/target/QRDExt_target.h>
+
 #if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC3_SUPPORT)\
@@ -152,10 +158,11 @@ static void gpio_sdc1_config(void)
 {
 	if (machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb()
 					|| machine_is_msm8625_evb()
+					|| machine_is_msm8625_qrd5()
 					|| machine_is_msm7627a_qrd3()
 					|| machine_is_msm8625_skua()
 					|| machine_is_msm8625_qrd7())
-		gpio_sdc1_hw_det = 42;
+		gpio_sdc1_hw_det = gpio_num[GPIO_SDC1_HW_DET_INDEX];
 }
 
 static struct regulator *sdcc_vreg_data[MAX_SDCC_CONTROLLER];
@@ -209,11 +216,16 @@ static int msm_sdcc_setup_vreg(int dev_id, unsigned int enable)
 						__func__, rc);
 	} else {
 		clear_bit(dev_id, &vreg_sts);
-
+//disable it by fangxing for only Q801, Q802 and 803
+	#ifdef CONFIG_Q203_COMMON 
+	// restore to religion code for  fixing SD not avalible sometimes, but need to disable when need  hotplus SD 
+	// by anxiang.xiao 2012-12-05
 		rc = regulator_disable(curr);
 		if (rc)
 			pr_err("%s: could not disable regulator: %d\n",
-						__func__, rc);
+				__func__, rc);
+	#endif
+//fangxing end
 	}
 	return rc;
 }
@@ -230,6 +242,7 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
 		goto out;
 
 	rc = msm_sdcc_setup_vreg(pdev->id, !!vdd);
+
 out:
 	return rc;
 }
@@ -240,8 +253,7 @@ static unsigned int msm7627a_sdcc_slot_status(struct device *dev)
 {
 	int status;
 
-	status = gpio_tlmm_config(GPIO_CFG(gpio_sdc1_hw_det, 2, GPIO_CFG_INPUT,
-				GPIO_CFG_PULL_UP, GPIO_CFG_8MA),
+	status = gpio_tlmm_config(gpio_cfg[GPIO_SDC1_HW_DET_INDEX],
 				GPIO_CFG_ENABLE);
 	if (status)
 		pr_err("%s:Failed to configure tlmm for GPIO %d\n", __func__,
@@ -392,6 +404,8 @@ void __init msm7627a_init_mmc(void)
 		return;
 
 #ifdef CONFIG_MMC_MSM_CARD_HW_DETECTION
+//disable by fangxing for Q801,Q802,Q803 in 2012 0628
+#if 0 
 	/* 8x25 sku5 sdc don't use hw detector */
 	if (!machine_is_msm8625_qrd5() && !machine_is_msm7x27a_qrd5a())
 		sdc1_plat_data.status_irq = MSM_GPIO_TO_INT(gpio_sdc1_hw_det);
@@ -399,6 +413,9 @@ void __init msm7627a_init_mmc(void)
 	/* Don't detect sd card in 8x25 sku5*/
 	if (machine_is_msm8625_qrd5() || machine_is_msm8625_evt() || machine_is_msm7x27a_qrd5a())
 		sdc1_plat_data.status = NULL;
+#else
+	sdc1_plat_data.status_irq = MSM_GPIO_TO_INT(gpio_sdc1_hw_det);
+#endif//fangxing end
 #endif
 
 	msm_add_sdcc(1, &sdc1_plat_data);

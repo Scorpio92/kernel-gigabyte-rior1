@@ -60,7 +60,18 @@ config OV5647_TRULY_CM6868
 	depends on MSM_CAMERA
 	---help---
 	  OV 5M Bayer Sensor with AutoFocus
-
+config AR0543
+	bool "Sensor ar0543 (BAYER 5M)"
+	depends on MSM_CAMERA && MSM_CAMERA_V4L2
+	default y
+	---help---
+	  Aptina Bayer Sensor with FixFocus
+config OV2655
+	bool "Sensor ov2655 (BAYER 2M)"
+	depends on MSM_CAMERA 
+	default y
+	---help---
+	  ov 2M raw Sensor 
 config AD5046_ACT
 	bool "Lens actuator ad5046"
 	depends on MSM_CAMERA && OV5647

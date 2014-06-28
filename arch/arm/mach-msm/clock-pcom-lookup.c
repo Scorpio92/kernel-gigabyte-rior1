@@ -17,7 +17,7 @@
 
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
-
+#include <../../../../build/buildplus/target/QRDExt_target.h>
 #define PLLn_MODE(n)	(MSM_CLK_CTL_BASE + 0x300 + 28 * (n))
 #define PLL4_MODE	(MSM_CLK_CTL_BASE + 0x374)
 
@@ -79,6 +79,7 @@ static struct pcom_clk dsi_byte_clk = {
 	.id = P_DSI_BYTE_CLK,
 	.c = {
 		.ops = &clk_ops_pcom_ext_config,
+		//.flags =CLKFLAG_SKIP_AUTO_OFF,  //luke:
 		.dbg_name = "dsi_byte_clk",
 		CLK_INIT(dsi_byte_clk.c),
 	},
@@ -88,6 +89,7 @@ static struct pcom_clk dsi_clk = {
 	.id = P_DSI_CLK,
 	.c = {
 		.ops = &clk_ops_pcom_ext_config,
+		//.flags =CLKFLAG_SKIP_AUTO_OFF,  //luke:
 		.dbg_name = "dsi_clk",
 		CLK_INIT(dsi_clk.c),
 	},
@@ -97,6 +99,7 @@ static struct pcom_clk dsi_esc_clk = {
 	.id = P_DSI_ESC_CLK,
 	.c = {
 		.ops = &clk_ops_pcom_ext_config,
+		//.flags =CLKFLAG_SKIP_AUTO_OFF,  //luke:
 		.dbg_name = "dsi_esc_clk",
 		CLK_INIT(dsi_esc_clk.c),
 	},
@@ -106,12 +109,15 @@ static struct pcom_clk dsi_pixel_clk = {
 	.id = P_DSI_PIXEL_CLK,
 	.c = {
 		.ops = &clk_ops_pcom_ext_config,
+		//.flags =CLKFLAG_SKIP_AUTO_OFF,  //luke:
 		.dbg_name = "dsi_pixel_clk",
 		CLK_INIT(dsi_pixel_clk.c),
 	},
 };
 
-static DEFINE_CLK_PCOM(dsi_ref_clk,	DSI_REF_CLK,	0);
+static DEFINE_CLK_PCOM(dsi_ref_clk,	DSI_REF_CLK,	0);                                          //luke:
+//static DEFINE_CLK_PCOM(dsi_ref_clk,	DSI_REF_CLK, CLKFLAG_SKIP_AUTO_OFF);//CLKFLAG_SKIP_AUTO_OFF  //end
+
 static DEFINE_CLK_PCOM(ebi1_clk,	EBI1_CLK,
 		CLKFLAG_SKIP_AUTO_OFF | CLKFLAG_MIN);
 static DEFINE_CLK_PCOM(ebi2_clk,	EBI2_CLK,	CLKFLAG_SKIP_AUTO_OFF);
@@ -134,13 +140,18 @@ static DEFINE_CLK_PCOM(icodec_rx_clk,	ICODEC_RX_CLK,	CLKFLAG_SKIP_AUTO_OFF);
 static DEFINE_CLK_PCOM(icodec_tx_clk,	ICODEC_TX_CLK,	CLKFLAG_SKIP_AUTO_OFF);
 static DEFINE_CLK_PCOM(imem_clk,	IMEM_CLK,	0);
 static DEFINE_CLK_PCOM(mdc_clk,		MDC_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(mdp_clk,		MDP_CLK,	CLKFLAG_MIN);
+static DEFINE_CLK_PCOM(mdp_clk,		MDP_CLK,	CLKFLAG_MIN);                  // luke:
+//static DEFINE_CLK_PCOM(mdp_clk,		MDP_CLK,	CLKFLAG_SKIP_AUTO_OFF);//CLKFLAG_MIN); //end
+
 static DEFINE_CLK_PCOM(mdp_lcdc_pad_pclk_clk, MDP_LCDC_PAD_PCLK_CLK,
 		CLKFLAG_SKIP_AUTO_OFF);
 static DEFINE_CLK_PCOM(mdp_lcdc_pclk_clk, MDP_LCDC_PCLK_CLK,
 		CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(mdp_vsync_clk,	MDP_VSYNC_CLK,	0);
+static DEFINE_CLK_PCOM(mdp_vsync_clk,	MDP_VSYNC_CLK,	0); 		       //luke: 
 static DEFINE_CLK_PCOM(mdp_dsi_p_clk,	MDP_DSI_P_CLK,	0);
+//static DEFINE_CLK_PCOM(mdp_vsync_clk,	MDP_VSYNC_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+//static DEFINE_CLK_PCOM(mdp_dsi_p_clk,	MDP_DSI_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);//end
+
 static DEFINE_CLK_PCOM(pbus_clk,	PBUS_CLK,
 		CLKFLAG_SKIP_AUTO_OFF | CLKFLAG_MIN);
 static DEFINE_CLK_PCOM(pcm_clk,		PCM_CLK,	CLKFLAG_SKIP_AUTO_OFF);
@@ -323,19 +334,33 @@ static struct clk_lookup msm_cmn_clk_7625a_7627a[] __initdata = {
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0010"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-003c"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-003d"),
+//	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-005a"),//renwei add it for s5k5ca at 2012-9-26
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0076"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0078"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-007a"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-006c"),
-	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-000d"),
+		CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-006e"),//lilonghui add it for the camera 2012-9-24
+        CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0060"),//renwei add it for ov2655 camera at 2012-8-1
+        CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-000d"),//renwei add it for the main camera at 2012-5-31
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0042"),//renwei modify it for the front camera 
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov9726.0"),
 	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov9726.0"),
 	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov9726.0"),
-#ifdef CONFIG_GC0339
+#ifdef CONFIG_GC0339//renwei add it for the front camera at 2012-6-12
+//#if(CONFIG_DC205_YL)
+//#else
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_gc0339.0"),
 	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_gc0339.0"),
 	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_gc0339.0"),
+//#endif
 #endif
+/*renwei add it for the ov2655 camera at 2012-8-1*/
+#ifdef CONFIG_OV2655//renwei add it for the front camera at 2012-6-12
+	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov2655.0"),
+	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov2655.0"),
+	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov2655.0"),
+#endif
+/*add end*/
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov7692.0"),
 	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov7692.0"),
 	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov7692.0"),

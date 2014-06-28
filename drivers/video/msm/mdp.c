@@ -58,6 +58,7 @@ struct completion mdp_ppp_comp;
 struct semaphore mdp_ppp_mutex;
 struct semaphore mdp_pipe_ctrl_mutex;
 
+//boolean mdp_continues_display = TRUE;  //luke: 
 unsigned long mdp_timer_duration = (HZ/20);   /* 50 msecond */
 
 boolean mdp_ppp_waiting = FALSE;
@@ -1905,7 +1906,7 @@ static int mdp_off(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
-
+printk("luke: %s  %d\n",__func__,__LINE__);
 	mdp_histogram_ctrl_all(FALSE);
 
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
@@ -1921,7 +1922,8 @@ static int mdp_on(struct platform_device *pdev)
 {
 	int ret = 0;
 
-	MSM_FB_INFO("%s: %d\n",__func__,__LINE__);
+	MSM_FB_INFO("%s  %d\n",__func__,__LINE__);
+printk("luke: %s: %d\n",__func__,__LINE__);
 #ifdef CONFIG_FB_MSM_MDP40
 	struct msm_fb_data_type *mfd;
 	mdp4_overlay_ctrl_db_reset();
@@ -2257,11 +2259,11 @@ static int mdp_probe(struct platform_device *pdev)
 		if (mdp_pdata->cont_splash_enabled) {
 			mfd->cont_splash_done = 0;
 			if (!contSplash_update_done) {
-                if (mfd->panel.type == MIPI_VIDEO_PANEL
-                    || mfd->panel.type == LCDC_PANEL)
-                    mdp_pipe_ctrl(MDP_CMD_BLOCK,
-                            MDP_BLOCK_POWER_ON, FALSE);
-				contSplash_update_done = 1;
+                	if (mfd->panel.type == MIPI_VIDEO_PANEL
+                            || mfd->panel.type == LCDC_PANEL)
+                    		mdp_pipe_ctrl(MDP_CMD_BLOCK,
+                            		MDP_BLOCK_POWER_ON, FALSE);
+			contSplash_update_done = 1;
 			}
 		} else
 			mfd->cont_splash_done = 1;

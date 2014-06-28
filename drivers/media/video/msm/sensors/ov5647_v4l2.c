@@ -13,6 +13,10 @@
 
 #include "msm_sensor.h"
 #include "msm.h"
+//add by davis
+#include <linux/delay.h>
+#include <linux/i2c.h>
+
 #define SENSOR_NAME "ov5647"
 #define PLATFORM_DRIVER_NAME "msm_camera_ov5647"
 #define ov5647_obj ov5647_##obj
@@ -24,7 +28,7 @@
 #undef CDBG_HIGH
 #endif
 
-#define OV5647_VERBOSE_DGB
+//#define OV5647_VERBOSE_DGB
 
 #ifdef OV5647_VERBOSE_DGB
 #define CDBG(fmt, args...) printk(fmt, ##args)
@@ -34,9 +38,14 @@
 #define CDBG_HIGH(fmt, args...) printk(fmt, ##args)
 #endif
 
+//add by davis for OTP
+#define OV5647_OTP_FEATURE
+
 static struct msm_sensor_ctrl_t ov5647_s_ctrl;
 
 DEFINE_MUTEX(ov5647_mut);
+
+
 
 static struct msm_camera_i2c_reg_conf ov5647_start_settings[] = {
 	{0x4202, 0x00},  /* streaming on */
@@ -60,8 +69,9 @@ static struct msm_camera_i2c_reg_conf ov5647_prev_settings[] = {
 	for back to preview*/
 	{0x3035, 0x21},
 	{0x3036, 0x37},
-	{0x3821, 0x07},
-	{0x3820, 0x41},
+	/*lilonghui modify it for the camera 2012-9-12*/
+	{0x3821, 0x01},//07
+	{0x3820, 0x47},//41
 	{0x3612, 0x09},
 	{0x3618, 0x00},
 	{0x380c, 0x07},
@@ -90,8 +100,9 @@ static struct msm_camera_i2c_reg_conf ov5647_snap_settings[] = {
 	/*2608*1952 Reference Setting 24M MCLK 2lane 280Mbps/lane 30fps*/
 	{0x3035, 0x21},
 	{0x3036, 0x4f},
-	{0x3821, 0x06},
-	{0x3820, 0x00},
+	/*lilonghui modify it for the camera 2012-9-12*/
+	{0x3821, 0x00},//06
+	{0x3820, 0x06},//00
 	{0x3612, 0x0b},
 	{0x3618, 0x04},
 	{0x380c, 0x0a},
@@ -119,8 +130,9 @@ static struct msm_camera_i2c_reg_conf ov5647_snap_settings[] = {
 static struct msm_camera_i2c_reg_conf ov5647_video_60fps_settings[] = {
 	{0x3035, 0x21},
 	{0x3036, 0x38},
-	{0x3821, 0x07},
-	{0x3820, 0x41},
+	/*lilonghui modify it for the camera 2012-9-12*/
+	{0x3821, 0x01},//07
+	{0x3820, 0x47},//41
 	{0x3612, 0x49},
 	{0x3618, 0x00},
 	{0x380c, 0x07},
@@ -148,8 +160,8 @@ static struct msm_camera_i2c_reg_conf ov5647_video_60fps_settings[] = {
 static struct msm_camera_i2c_reg_conf ov5647_video_90fps_settings[] = {
 	{0x3035, 0x11},
 	{0x3036, 0x2a},
-	{0x3821, 0x07},
-	{0x3820, 0x41},
+	{0x3821, 0x01},//00
+	{0x3820, 0x47},//41
 	{0x3612, 0x49},
 	{0x3618, 0x00},
 	{0x380c, 0x07},
@@ -177,8 +189,9 @@ static struct msm_camera_i2c_reg_conf ov5647_video_90fps_settings[] = {
 static struct msm_camera_i2c_reg_conf ov5647_zsl_settings[] = {
 	{0x3035, 0x21},
 	{0x3036, 0x2f},
-	{0x3821, 0x06},
-	{0x3820, 0x00},
+	{0x3821, 0x00},
+
+	{0x3820, 0x06},
 	{0x3612, 0x0b},
 	{0x3618, 0x04},
 	{0x380c, 0x0a},
@@ -260,68 +273,68 @@ static struct msm_camera_i2c_reg_conf ov5647_recommend_settings[] = {
 	{0x301c, 0xf8},
 	/*lens setting*/
 	{0x5000, 0x86},
-	{0x5800, 0x11},
-	{0x5801, 0x0c},
-	{0x5802, 0x0a},
-	{0x5803, 0x0b},
-	{0x5804, 0x0d},
-	{0x5805, 0x13},
-	{0x5806, 0x09},
-	{0x5807, 0x05},
-	{0x5808, 0x03},
-	{0x5809, 0x03},
-	{0x580a, 0x06},
-	{0x580b, 0x08},
-	{0x580c, 0x05},
-	{0x580d, 0x01},
-	{0x580e, 0x00},
-	{0x580f, 0x00},
-	{0x5810, 0x02},
-	{0x5811, 0x06},
-	{0x5812, 0x05},
-	{0x5813, 0x01},
-	{0x5814, 0x00},
-	{0x5815, 0x00},
-	{0x5816, 0x02},
-	{0x5817, 0x06},
-	{0x5818, 0x09},
-	{0x5819, 0x05},
-	{0x581a, 0x04},
-	{0x581b, 0x04},
-	{0x581c, 0x06},
-	{0x581d, 0x09},
-	{0x581e, 0x11},
-	{0x581f, 0x0c},
-	{0x5820, 0x0b},
-	{0x5821, 0x0b},
-	{0x5822, 0x0d},
-	{0x5823, 0x13},
-	{0x5824, 0x22},
-	{0x5825, 0x26},
-	{0x5826, 0x26},
-	{0x5827, 0x24},
-	{0x5828, 0x24},
-	{0x5829, 0x24},
-	{0x582a, 0x22},
-	{0x582b, 0x20},
-	{0x582c, 0x22},
-	{0x582d, 0x26},
-	{0x582e, 0x22},
-	{0x582f, 0x22},
-	{0x5830, 0x42},
-	{0x5831, 0x22},
-	{0x5832, 0x02},
-	{0x5833, 0x24},
-	{0x5834, 0x22},
-	{0x5835, 0x22},
-	{0x5836, 0x22},
-	{0x5837, 0x26},
-	{0x5838, 0x42},
-	{0x5839, 0x26},
-	{0x583a, 0x06},
-	{0x583b, 0x26},
-	{0x583c, 0x24},
-	{0x583d, 0xce},
+  {0x5800, 0x12},
+  {0x5801, 0x0c},
+  {0x5802, 0x0a},
+  {0x5803, 0x0a},
+  {0x5804, 0x0b},
+  {0x5805, 0x0f},
+  {0x5806, 0x07},
+  {0x5807, 0x05},
+  {0x5808, 0x04},
+  {0x5809, 0x04},
+  {0x580a, 0x05},
+  {0x580b, 0x07},
+  {0x580c, 0x05},
+  {0x580d, 0x02},
+  {0x580e, 0x00},
+  {0x580f, 0x00},
+  {0x5810, 0x02},
+  {0x5811, 0x05},
+  {0x5812, 0x05},
+  {0x5813, 0x02},
+  {0x5814, 0x00},
+  {0x5815, 0x00},
+  {0x5816, 0x02},
+  {0x5817, 0x05},
+  {0x5818, 0x07},
+  {0x5819, 0x05},
+  {0x581a, 0x03},
+  {0x581b, 0x03},
+  {0x581c, 0x05},
+  {0x581d, 0x07},
+  {0x581e, 0x10},
+  {0x581f, 0x0b},
+  {0x5820, 0x0a},
+  {0x5821, 0x0a},
+  {0x5822, 0x0b},
+  {0x5823, 0x10},
+  {0x5824, 0x2a},
+  {0x5825, 0x2a},
+  {0x5826, 0x2a},
+  {0x5827, 0x28},
+  {0x5828, 0x28},
+  {0x5829, 0x2c},
+  {0x582a, 0x46},
+  {0x582b, 0x44},
+  {0x582c, 0x46},
+  {0x582d, 0x2a},
+  {0x582e, 0x0a},
+  {0x582f, 0x62},
+  {0x5830, 0x60},
+  {0x5831, 0x62},
+  {0x5832, 0x2a},
+  {0x5833, 0x2c},
+  {0x5834, 0x46},
+  {0x5835, 0x44},
+  {0x5836, 0x46},
+  {0x5837, 0x0a},
+  {0x5838, 0x26},
+  {0x5839, 0x28},
+  {0x583a, 0x2a},
+  {0x583b, 0x28},
+  {0x583c, 0x44},
+  {0x583d, 0xae},
 	/* manual AWB,manual AE,close Lenc,open WBC*/
 	{0x3503, 0x03}, /*manual AE*/
 	{0x3501, 0x10},
@@ -337,7 +350,7 @@ static struct msm_camera_i2c_reg_conf ov5647_recommend_settings[] = {
 	{0x518a, 0x04},
 	{0x518b, 0x00},
 	{0x5000, 0x06}, /*No lenc,WBC on*/
-	{0x4005, 0x18},
+	{0x4005, 0x1a},//18
 	{0x4051, 0x8f},
 };
 
@@ -461,6 +474,292 @@ void ov5647_sensor_reset_stream(struct msm_sensor_ctrl_t *s_ctrl)
 		MSM_CAMERA_I2C_BYTE_DATA);
 }
 
+//add by davis for OTP
+ #ifdef OV5647_OTP_FEATURE                                                                 
+ /*******************************************************************************                       
+ *                                                                                                      
+ *******************************************************************************/                       
+ struct otp_struct {                                                                                    
+         uint8_t customer_id;                                                                           
+         uint8_t module_integrator_id;                                                                  
+         uint8_t lens_id;                                                                               
+         uint8_t rg_ratio;                                                                              
+         uint8_t bg_ratio;                                                                              
+         uint8_t user_data[3];  
+         uint8_t light_rg;   
+         uint8_t light_bg;                                                                     
+ } st_OV5647_otp;                                                                          
+                                                                                                        
+ /*******************************************************************************                       
+ * index: index of otp group. (0, 1, 2)                                                                 
+ * return value:                                                                                        
+ *     0, group index is empty                                                                          
+ *     1, group index has invalid data                                                                  
+ *     2, group index has valid data                                                                    
+ *******************************************************************************/                       
+ uint16_t OV5647_check_otp(struct msm_sensor_ctrl_t *s_ctrl, uint16_t index)               
+ {                                                                                                      
+         uint16_t temp, i;                                                                              
+         uint16_t address;                                                                              
+         /* read otp into buffer */                                                                     
+         msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d21, 0x01,                                  
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+                                                                                                        
+         usleep_range(2000, 2500);                                                                      
+         address = 0x3d05 + index*9;                                                                    
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, address, &temp,                                 
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+                                                                                                        
+         /* disable otp read */                                                                         
+         msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d21, 0x00,                                  
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+                                                                                                        
+         /* clear otp buffer */                                                                         
+         for (i = 0; i < 32; i++) {                                                                     
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, (0x3d00+i),                            
+                                 0x00, MSM_CAMERA_I2C_BYTE_DATA);                                       
+         }                                                                                              
+                                                                                                        
+         if (!temp)                                                                                     
+                 return 0;                                                                              
+         else if ((!(temp & 0x80)) && (temp&0x7f))                                                      
+                 return 2;                                                                              
+         else                                                                                           
+                 return 1;                                                                              
+ }                                                                                                      
+ /*******************************************************************************                       
+ *                                                                                                      
+ *******************************************************************************/                       
+ void OV5647_read_otp(struct msm_sensor_ctrl_t *s_ctrl,                                    
+                 uint16_t index, struct otp_struct *potp)                                               
+ {                                                                                                      
+         uint16_t temp, i;                                                                              
+         uint16_t address;  
+                                                                                    
+         /* read otp into buffer */                                                                     
+         msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d21, 0x01,                                  
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+                                                                                                        
+         usleep_range(2000, 2500);                                                                      
+         address = 0x3d05 + index*9;                                                                    
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, address, &temp,                                 
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+                                                                                                        
+         potp->module_integrator_id = temp;                                                             
+         potp->customer_id = temp & 0x7f;                                                               
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+1), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->lens_id = temp;                                                                          
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+2), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->rg_ratio = temp;                                                                         
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+3), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->bg_ratio = temp;                                                                         
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+4), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->user_data[0] = temp;                                                                     
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+5), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->user_data[1] = temp;                                                                     
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+6), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->user_data[2] = temp;                                                                     
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+7), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->light_rg = temp;                                                                     
+                                                                                                        
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, (address+8), &temp,                             
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         potp->light_bg = temp;    
+	  
+                                                                                                        
+         CDBG("%s customer_id  = 0x%02x\r\n", __func__, potp->customer_id);                             
+         CDBG("%s lens_id      = 0x%02x\r\n", __func__, potp->lens_id);                                 
+         CDBG("%s rg_ratio     = 0x%02x\r\n", __func__, potp->rg_ratio);                                
+         CDBG("%s bg_ratio     = 0x%02x\r\n", __func__, potp->bg_ratio);                                
+         CDBG("%s user_data[0] = 0x%02x\r\n", __func__, potp->user_data[0]);                            
+         CDBG("%s user_data[1] = 0x%02x\r\n", __func__, potp->user_data[1]);                            
+         CDBG("%s user_data[2] = 0x%02x\r\n", __func__, potp->user_data[2]);                            
+         CDBG("%s light_rg = 0x%02x\r\n", __func__, potp->light_rg);                            
+         CDBG("%s light_bg = 0x%02x\r\n", __func__, potp->light_bg);         
+         if((0==potp->light_bg) ||(0==potp->light_rg)){		    
+		  potp->light_bg = 0x4f;        
+		  potp->light_rg = 0x96;
+		  CDBG("%s light rg/bg not enabled ,force to light_rg = 0x%02x,light_bg = 0x%02x\r\n", __func__, potp->light_rg, potp->light_bg);    
+	  }
+         
+         
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5800, &temp,                                 
+         MSM_CAMERA_I2C_BYTE_DATA); 
+         CDBG("%s 0x5800 = 0x%02x\r\n", __func__, temp);          
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5801, &temp,                                 
+         MSM_CAMERA_I2C_BYTE_DATA); 
+         CDBG("%s 0x5801 = 0x%02x\r\n", __func__, temp);  
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5802, &temp,                                 
+         MSM_CAMERA_I2C_BYTE_DATA); 
+         CDBG("%s 0x5802 = 0x%02x\r\n", __func__, temp);  
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5803, &temp,                                 
+         MSM_CAMERA_I2C_BYTE_DATA); 
+         CDBG("%s 0x5803 = 0x%02x\r\n", __func__, temp);  
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5804, &temp,                                 
+         MSM_CAMERA_I2C_BYTE_DATA); 
+         CDBG("%s 0x5804 = 0x%02x\r\n", __func__, temp);  
+         msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x5805, &temp,                                 
+         MSM_CAMERA_I2C_BYTE_DATA); 
+         CDBG("%s 0x5805 = 0x%02x\r\n", __func__, temp);                                           
+                                                                                                        
+         /* disable otp read */                                                                         
+         msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x3d21, 0x00,                                  
+                 MSM_CAMERA_I2C_BYTE_DATA);                                                             
+         /* clear otp buffer */                                                                         
+         for (i = 0; i < 32; i++) {                                                                     
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, (0x3d00+i),                            
+                                 0x00, MSM_CAMERA_I2C_BYTE_DATA);                                       
+         }                                                                                              
+ }                                                                                                      
+                                                                                                        
+ /*******************************************************************************                       
+ * R_gain, sensor red gain of AWB, 0x400 =1                                                             
+ * G_gain, sensor green gain of AWB, 0x400 =1                                                           
+ * B_gain, sensor blue gain of AWB, 0x400 =1                                                            
+ *******************************************************************************/                       
+ void OV5647_update_awb_gain(struct msm_sensor_ctrl_t *s_ctrl,                             
+                 uint16_t R_gain, uint16_t G_gain, uint16_t B_gain)                                     
+ {                                                                                                      
+         CDBG("%s R_gain = 0x%04x\r\n", __func__, R_gain);                                              
+         CDBG("%s G_gain = 0x%04x\r\n", __func__, G_gain);                                              
+         CDBG("%s B_gain = 0x%04x\r\n", __func__, B_gain);                                              
+         if (R_gain > 0x400) {                                                                          
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5186,                                
+                                 (R_gain>>8), MSM_CAMERA_I2C_BYTE_DATA);                                
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5187,                                
+                                 (R_gain&0xff), MSM_CAMERA_I2C_BYTE_DATA);                              
+         }                                                                                              
+         if (G_gain > 0x400) {                                                                          
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5188,                                
+                                 (G_gain>>8), MSM_CAMERA_I2C_BYTE_DATA);                                
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x5189,                                
+                                 (G_gain&0xff), MSM_CAMERA_I2C_BYTE_DATA);                              
+         }                                                                                              
+         if (B_gain > 0x400) {                                                                          
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x518a,                                
+                                 (B_gain>>8), MSM_CAMERA_I2C_BYTE_DATA);                                
+                 msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x518b,                                
+                                 (B_gain&0xff), MSM_CAMERA_I2C_BYTE_DATA);                              
+         }                                                                                              
+ }                                                                                                      
+                                                                                                        
+ /*******************************************************************************                       
+ * R/G and B/G of typical camera module is defined here                                                 
+ *******************************************************************************/                       
+ #define OV5647_RG_RATIO_TYPICAL_VALUE 0x54                                                  
+ #define OV5647_BG_RATIO_TYPICAL_VALUE 0x55                                                 
+ /*******************************************************************************                       
+ * call this function after OV5647 initialization                                          
+ * return value:                                                                                        
+ *     0, update success                                                                                
+ *     1, no OTP                                                                                        
+ *******************************************************************************/                       
+ uint16_t OV5647_update_otp(struct msm_sensor_ctrl_t *s_ctrl)                              
+ {                                                                                                      
+         uint16_t i;                                                                                    
+         uint16_t otp_index;                                                                            
+         uint16_t temp;                                                                                 
+         uint16_t R_gain, G_gain, B_gain, G_gain_R, G_gain_B;   
+         uint16_t rg,bg;                                        
+         /* R/G and B/G of current camera module is read out from sensor OTP */                         
+         /* check first OTP with valid data */                                                          
+         for (i = 0; i < 3; i++) {                                                                      
+                 temp = OV5647_check_otp(s_ctrl, i);                                       
+                 if (temp == 2) {                                                                       
+                         otp_index = i;                                                                 
+                         break;                                                                         
+                 }                                                                                      
+         }                                                                                              
+         if (i == 3) {                                                                                  
+                 /* no valid wb OTP data */                                                             
+                 CDBG("no valid wb OTP data\r\n");                                                      
+                 return 1;                                                                              
+         }                                                                                              
+         OV5647_read_otp(s_ctrl, otp_index, &st_OV5647_otp);   
+        if (st_OV5647_otp.rg_ratio==0) {
+        rg = st_OV5647_otp.rg_ratio;
+        }
+        else {
+        rg = st_OV5647_otp.rg_ratio * (st_OV5647_otp.light_rg +128) / 256;
+        }
+        if (st_OV5647_otp.bg_ratio==0) {
+        bg = st_OV5647_otp.bg_ratio;
+        }
+        else {
+        bg = st_OV5647_otp.bg_ratio * (st_OV5647_otp.light_bg +128) / 256;
+        }               
+         /* calculate G_gain */                                                                         
+         /* 0x400 = 1x gain */                                                                          
+         if (bg < OV5647_BG_RATIO_TYPICAL_VALUE) {        
+                 if (rg < OV5647_RG_RATIO_TYPICAL_VALUE) {
+                         G_gain = 0x400;                                                                
+                         B_gain = 0x400 *                                                               
+                                 OV5647_BG_RATIO_TYPICAL_VALUE /                           
+                                 bg;                                   
+                         R_gain = 0x400 *                                                               
+                                 OV5647_RG_RATIO_TYPICAL_VALUE /                           
+                                 rg;                                   
+                 } else {                                                                               
+                         R_gain = 0x400;                                                                
+                         G_gain = 0x400 *                                                               
+                                 rg /                                  
+                                 OV5647_RG_RATIO_TYPICAL_VALUE;                            
+                         B_gain = G_gain *                                                              
+                                 OV5647_BG_RATIO_TYPICAL_VALUE /                           
+                                 bg;                                   
+                 }                                                                                      
+         } else {                                                                                       
+                 if (rg < OV5647_RG_RATIO_TYPICAL_VALUE) {
+                         B_gain = 0x400;                                                                
+                         G_gain = 0x400 *                                                               
+                                 bg /                                  
+                                 OV5647_BG_RATIO_TYPICAL_VALUE;                            
+                         R_gain = G_gain *                                                              
+                                 OV5647_RG_RATIO_TYPICAL_VALUE /                           
+                                 rg;                                   
+                 } else {                                                                               
+                         G_gain_B = 0x400 *                                                             
+                                 bg /                                  
+                                 OV5647_BG_RATIO_TYPICAL_VALUE;                            
+                         G_gain_R = 0x400 *                                                             
+                                 rg /                                  
+                                 OV5647_RG_RATIO_TYPICAL_VALUE;                            
+                         if (G_gain_B > G_gain_R) {                                                     
+                                 B_gain = 0x400;                                                        
+                                 G_gain = G_gain_B;                                                     
+                                 R_gain = G_gain *                                                      
+                                         OV5647_RG_RATIO_TYPICAL_VALUE /                   
+                                         rg;                           
+                         } else {                                                                       
+                                 R_gain = 0x400;                                                        
+                                 G_gain = G_gain_R;                                                     
+                                 B_gain = G_gain *                                                      
+                                         OV5647_BG_RATIO_TYPICAL_VALUE /                   
+                                         bg;                           
+                         }                                                                              
+                 }                                                                                      
+         }                                                                                              
+         OV5647_update_awb_gain(s_ctrl, R_gain, G_gain, B_gain);                           
+         return 0;                                                                                      
+ }                                                                                                      
+ #endif                                                                                                 
+//endif  for OTP
+
 static int32_t ov5647_write_pict_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 		uint16_t gain, uint32_t line)
 {
@@ -471,6 +770,7 @@ static int32_t ov5647_write_pict_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 
 	gain_lsb = (uint8_t) (gain);
 	gain_hsb = (uint8_t)((gain & 0x300)>>8);
+	CDBG("renwei   %s\n", __func__);
 
 	CDBG(KERN_ERR "snapshot exposure seting 0x%x, 0x%x, %d"
 		, gain, line, line);
@@ -485,6 +785,8 @@ static int32_t ov5647_write_pict_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 			s_ctrl->sensor_output_reg_addr->frame_length_lines + 1,
 			(uint8_t)((line+4) & 0x00FF),
 			MSM_CAMERA_I2C_BYTE_DATA);
+		s_ctrl->func_tbl->sensor_group_hold_off(s_ctrl);
+
 		max_line = line + 4;
 	} else if (max_line > 1968) {
 		msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
@@ -580,6 +882,7 @@ static int32_t ov5647_write_prev_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 
 	CDBG(KERN_ERR "preview exposure setting 0x%x, 0x%x, %d",
 		 gain, line, line);
+	CDBG("renwei   %s\n", __func__);
 
 	gain_lsb = (uint8_t) (gain);
 	gain_hsb = (uint8_t)((gain & 0x300)>>8);
@@ -592,7 +895,7 @@ static int32_t ov5647_write_prev_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 	if (line > (fl_lines - offset))
 		fl_lines = line + offset;
 
-	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+		msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
 		s_ctrl->sensor_output_reg_addr->frame_length_lines,
 		(uint8_t)(fl_lines >> 8),
 		MSM_CAMERA_I2C_BYTE_DATA);
@@ -651,6 +954,7 @@ int32_t ov5647_sensor_i2c_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
 	int32_t rc = 0;
+
 	struct msm_sensor_ctrl_t *s_ctrl;
 
 	CDBG("%s IN\r\n", __func__);
@@ -681,6 +985,8 @@ static struct i2c_driver ov5647_i2c_driver = {
 		.name = SENSOR_NAME,
 	},
 };
+
+
 
 static struct msm_camera_i2c_client ov5647_sensor_i2c_client = {
 	.addr_type = MSM_CAMERA_I2C_WORD_ADDR,
@@ -722,13 +1028,14 @@ int32_t ov5647_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 	CDBG("ov5647_sensor_power_down: %d\n", rc);
 	rdata |= 0x18;
 	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
-		0x3018, rdata,
-		MSM_CAMERA_I2C_BYTE_DATA);
+		0x3018, rdata, MSM_CAMERA_I2C_BYTE_DATA);
 	msleep(40);
-	gpio_direction_output(info->sensor_pwd, 1);
+		
+	gpio_direction_output(info->sensor_pwd, 1);	
+	
 	usleep_range(5000, 5100);
 	msm_sensor_power_down(s_ctrl);
-	msleep(40);
+        msleep(40);
 	if (s_ctrl->sensordata->pmic_gpio_enable){
 		lcd_camera_power_onoff(0);
 	}
@@ -746,7 +1053,6 @@ int32_t ov5647_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	gpio_direction_output(info->sensor_pwd, 1);
 	gpio_direction_output(info->sensor_reset, 0);
 	usleep_range(10000, 11000);
-
 	if (info->pmic_gpio_enable) {
 		lcd_camera_power_onoff(1);
 	}
@@ -775,12 +1081,13 @@ int32_t ov5647_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 {
 	int32_t rc = 0;
 	static int csi_config;
+	CDBG("renwei   %s\n", __func__);
+
 	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
 	if (csi_config == 0 || res == 0)
-		msleep(66);
+		msleep(66);//66
 	else
-		msleep(266);
-
+		msleep(266);//266
 	msm_camera_i2c_write(
 			s_ctrl->sensor_i2c_client,
 			0x4800, 0x25,
@@ -794,6 +1101,15 @@ int32_t ov5647_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 				MSM_CAMERA_I2C_BYTE_DATA);
 		msm_sensor_enable_debugfs(s_ctrl);
 		msm_sensor_write_init_settings(s_ctrl);
+    #ifdef OV5647_OTP_FEATURE
+    CDBG("Update OTP\n");
+    msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x100, 0x1,
+    MSM_CAMERA_I2C_BYTE_DATA);
+    OV5647_update_otp(s_ctrl);
+    usleep_range(5000, 6000);
+    msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x100, 0x0,
+    MSM_CAMERA_I2C_BYTE_DATA);
+    #endif
 		csi_config = 0;
 	} else if (update_type == MSM_SENSOR_UPDATE_PERIODIC) {
 		CDBG("PERIODIC : %d\n", res);

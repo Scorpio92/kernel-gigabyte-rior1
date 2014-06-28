@@ -44,7 +44,7 @@ static int clock_debug_rate_set(void *data, u64 val)
 	return ret;
 }
 
-int clock_debug_rate_get(void *data, u64 *val)
+static int clock_debug_rate_get(void *data, u64 *val)
 {
 	struct clk *clock = data;
 	*val = clk_get_rate(clock);

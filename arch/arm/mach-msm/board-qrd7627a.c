@@ -61,7 +61,17 @@
 #include "pm-boot.h"
 #include "board-msm7627a.h"
 #include "board-msm7627a-sensor.h"
-#include <linux/ion.h>
+
+#include <linux/fs.h>
+#include <linux/proc_fs.h>
+
+//Start=====Allen
+#include <mach/msm_smsm.h>
+#include <linux/board-ragentek-cfg.h>
+#include <linux/string.h>
+#include <mach/msm_smsm.h>
+#include <../../../../build/buildplus/target/QRDExt_target.h>
+//End=====Allen
 
 #define PMEM_KERNEL_EBI1_SIZE	0x3A000
 #define MSM_PMEM_AUDIO_SIZE	0x1F4000
@@ -78,7 +88,6 @@
 #define I2C_NORMAL        0x40
 
 uint8_t current_qcomm_mode = MSM_BOOT_NORMAL;
-
 static struct msm_gpio qup_i2c_gpios_io[] = {
 	{ GPIO_CFG(60, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 		"qup_scl" },
@@ -117,28 +126,52 @@ static void gsbi_qup_i2c_gpio_config(int adap_id, int config_type)
 		pr_err("QUP GPIO request/enable failed: %d\n", rc);
 }
 
+//Start === Allen
+static void gsbi_qup_i2c_gpio_config_for_recovery(int adap_id, int config_type)
+{
+	int rc;
+
+	if (adap_id < 0 || adap_id > 1)
+		return;
+
+	/* Each adapter gets 2 lines from the table */
+	if (config_type){
+		rc = gpio_tlmm_config(qup_i2c_gpios_hw[adap_id*2].gpio_cfg, GPIO_CFG_ENABLE);
+		rc = gpio_tlmm_config(qup_i2c_gpios_hw[adap_id*2+1].gpio_cfg, GPIO_CFG_ENABLE);
+
+	}else{
+		rc = gpio_tlmm_config(qup_i2c_gpios_io[adap_id*2].gpio_cfg, GPIO_CFG_ENABLE);
+		rc = gpio_tlmm_config(qup_i2c_gpios_io[adap_id*2+1].gpio_cfg, GPIO_CFG_ENABLE);
+	}
+
+	if (rc < 0)
+		pr_err("QUP GPIO request/enable failed: %d\n", rc);
+}
+//End === Allen
+
 static struct msm_i2c_platform_data msm_gsbi0_qup_i2c_pdata = {
-	.clk_freq		= 100000,
+	.clk_freq		= 400000,
 	.msm_i2c_config_gpio	= gsbi_qup_i2c_gpio_config,
+	//Start===Allen
+	.msm_i2c_config_gpi_for_recovery = gsbi_qup_i2c_gpio_config_for_recovery,	
+	.pri_clk = 60,
+	.pri_dat = 61,
+	//End===Allen
 };
 
 static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
-	.clk_freq		= 100000,
+	.clk_freq		= 400000,
 	.msm_i2c_config_gpio	= gsbi_qup_i2c_gpio_config,
+	//Start===Allen
+	.msm_i2c_config_gpi_for_recovery = gsbi_qup_i2c_gpio_config_for_recovery,
+	.pri_clk = 131,
+	.pri_dat = 132,
+	//End===Allen
 };
-
+/*lilonghui modify it for the camera out of memory 2012-10-16*/
 #ifdef CONFIG_ARCH_MSM7X27A
 #define MSM_PMEM_MDP_SIZE       0x2300000
-#define MSM_PMEM_ADSP_SIZE      0x1200000   //18MB
-#define MSM7x25A_MSM_PMEM_ADSP_SIZE      0xB91000
-
-#ifdef CONFIG_ION_MSM
-#define MSM_ION_HEAP_NUM	4
-static struct platform_device ion_dev;
-static int msm_ion_camera_size;
-static int msm_ion_audio_size;
-static int msm_ion_sf_size;
-#endif
+#define MSM_PMEM_ADSP_SIZE      0x3700000 // 50M //0x1200000   //18MB
 #endif
 
 #if 0
@@ -530,7 +563,9 @@ static struct snd_endpoint snd_endpoints_list[] = {
 	SND(CURRENT, 0x7FFFFFFE),
 	SND(FM_ANALOG_STEREO_HEADSET, 35),
 	SND(FM_ANALOG_STEREO_HEADSET_CODEC, 36),
-    SND(NO_MIC_HEADSET, 37),
+	SND(NO_MIC_HEADSET, 40),//add by fangxing for headphone with main mic input
+    SND(HANDSET_LOOP,41),//add by fangxing for cit loop
+    SND(HEADSET_LOOP,42),//add by fangxing for cit loop
 };
 #undef SND
 
@@ -694,7 +729,12 @@ static u32 msm_calculate_batt_capacity(u32 current_voltage)
 	u32 low_voltage	 = msm_psy_batt_data.voltage_min_design;
 	u32 high_voltage = msm_psy_batt_data.voltage_max_design;
 
-	return (current_voltage - low_voltage) * 100
+	if (current_voltage <= low_voltage)
+		return 0;
+	else if (current_voltage >= high_voltage)
+		return 100;
+	else
+		return (current_voltage - low_voltage) * 100
 			/ (high_voltage - low_voltage);
 }
 
@@ -749,9 +789,6 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_adc_device,
 	&fmem_device,
 	&msm_fastboot_device,
-#ifdef CONFIG_ION_MSM
-	&ion_dev,
-#endif
 };
 
 
@@ -806,82 +843,6 @@ static int __init pmem_audio_size_setup(char *p)
 }
 early_param("pmem_audio_size", pmem_audio_size_setup);
 
-static void fix_sizes(void)
-{
-	if (machine_is_msm7625a_surf() || machine_is_msm7625a_ffa()) {
-		//pmem_mdp_size = MSM7x25A_MSM_PMEM_MDP_SIZE;
-		pmem_adsp_size = MSM7x25A_MSM_PMEM_ADSP_SIZE;
-	} else {
-		//pmem_mdp_size = MSM_PMEM_MDP_SIZE;
-		pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
-	}
-/*delete qcom code */
-/*
-	if (get_ddr_size() > SZ_512M)
-		pmem_adsp_size = CAMERA_ZSL_SIZE;*/
-#ifdef CONFIG_ION_MSM
-	msm_ion_camera_size = pmem_adsp_size;
-	msm_ion_audio_size = (MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE);
-	msm_ion_sf_size = pmem_mdp_size;
-#endif
-}
-
-#ifdef CONFIG_ION_MSM
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-static struct ion_co_heap_pdata co_ion_pdata = {
-	.adjacent_mem_id = INVALID_HEAP_ID,
-	.align = PAGE_SIZE,
-};
-#endif
-
-struct ion_platform_heap msm7x27a_heaps2[] = {
-		{
-			.id	= ION_SYSTEM_HEAP_ID,
-			.type	= ION_HEAP_TYPE_SYSTEM,
-			.name	= ION_VMALLOC_HEAP_NAME,
-		},
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-		
-		{
-			.id	= ION_CAMERA_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_CAMERA_HEAP_NAME,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *)&co_ion_pdata,
-		},
-		
-		{
-			.id	= ION_AUDIO_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_AUDIO_HEAP_NAME,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *)&co_ion_pdata,
-		},
-		
-		{
-			.id	= ION_SF_HEAP_ID,
-			.type	= ION_HEAP_TYPE_CARVEOUT,
-			.name	= ION_SF_HEAP_NAME,
-			.memory_type = ION_EBI_TYPE,
-			.extra_data = (void *)&co_ion_pdata,
-		},
-#endif
-};
-
-static struct ion_platform_data ion_pdata = {
-	.nr = MSM_ION_HEAP_NUM,
-	.has_outer_cache = 1,
-	.heaps = msm7x27a_heaps2,
-};
-
-
-static struct platform_device ion_dev = {
-	.name = "ion-msm",
-	.id = 1,
-	.dev = { .platform_data = &ion_pdata },
-};
-#endif
-
 static struct memtype_reserve msm7627a_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
 	},
@@ -894,19 +855,16 @@ static struct memtype_reserve msm7627a_reserve_table[] __initdata = {
 };
 
 #ifdef CONFIG_ANDROID_PMEM
-#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
 static struct android_pmem_platform_data *pmem_pdata_array[] __initdata = {
 		&android_pmem_adsp_pdata,
 		&android_pmem_audio_pdata,
 		&android_pmem_pdata,
 };
 #endif
-#endif
 
 static void __init size_pmem_devices(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
-#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
 	unsigned int i;
 	unsigned int reusable_count = 0;
 
@@ -933,57 +891,30 @@ static void __init size_pmem_devices(void)
 			pdata->reusable = 0;
 		}
 	}
-#endif
+
 #endif
 }
 
-#ifdef CONFIG_ANDROID_PMEM
-#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
 static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 {
 	msm7627a_reserve_table[p->memory_type].size += p->size;
 }
-#endif
-#endif
 
 static void __init reserve_pmem_memory(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
-#ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
 	unsigned int i;
 	for (i = 0; i < ARRAY_SIZE(pmem_pdata_array); ++i)
 		reserve_memory_for(pmem_pdata_array[i]);
 
 	msm7627a_reserve_table[MEMTYPE_EBI1].size += pmem_kernel_ebi1_size;
 #endif
-#endif
-}
-
-static void __init size_ion_devices(void)
-{
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	ion_pdata.heaps[1].size = msm_ion_camera_size;
-	ion_pdata.heaps[2].size = msm_ion_audio_size;
-	ion_pdata.heaps[3].size = msm_ion_sf_size;
-#endif
-}
-
-static void __init reserve_ion_memory(void)
-{
-#if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_camera_size;
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_audio_size;
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_sf_size;
-#endif
 }
 
 static void __init msm7627a_calculate_reserve_sizes(void)
 {
-	fix_sizes();
 	size_pmem_devices();
 	reserve_pmem_memory();
-	size_ion_devices();
-	reserve_ion_memory();
 }
 
 static int msm7627a_paddr_to_memtype(unsigned int paddr)
@@ -1064,7 +995,7 @@ static struct platform_device evb_device_ext_2v8_vreg = {
 			&msm7x27a_evb_gpio_regulator_pdata[MSM7X27A_GPIO_VREG_ID_EXT_2V8],
 	},
 };
-
+#if 0 //add by fangxing for sd hot plug in 20120628
 static struct platform_device evb_device_ext_1v8_vreg = {
 	.name			= GPIO_REGULATOR_DEV_NAME,
 	.id				= 40,
@@ -1073,7 +1004,7 @@ static struct platform_device evb_device_ext_1v8_vreg = {
 			&msm7x27a_evb_gpio_regulator_pdata[MSM7X27A_GPIO_VREG_ID_EXT_1V8],
 	},
 };
-
+#endif //fangxing end
 static struct platform_device sku3_device_ext_2v8_vreg = {
 	.name			= GPIO_REGULATOR_DEV_NAME,
 	.id				= 35,
@@ -1113,7 +1044,8 @@ static struct platform_device sku7_device_ext_1v8_vreg = {
 static void __init msm7627a_init_regulators(void)
 {
 	int rc = 0;
-	printk("%s\n", __func__); 
+
+	printk("%s\n", __func__);
 
 	rc = platform_device_register(&msm_proccomm_regulator_dev);
 	if (rc)
@@ -1125,11 +1057,12 @@ static void __init msm7627a_init_regulators(void)
 		if (rc)
 			pr_err("%s: could not register evb_device_ext_2v8_vreg: %d\n",
 					__func__, rc);
-
+#if 0 //add by fangxing for sd hot plug in 20120628
 		rc = platform_device_register(&evb_device_ext_1v8_vreg);
 		if (rc)
 			pr_err("%s: could not register evb_device_ext_1v8_vreg: %d\n",
 					__func__, rc);
+#endif //fangxing end
 	} else if (machine_is_msm8625_qrd7()) {
 		rc = platform_device_register(&sku7_device_ext_2v8_vreg);
 		if (rc)
@@ -1521,6 +1454,27 @@ static int __init msm_qrd_init_ar6000pm(void)
 	return platform_device_register(&msm_wlan_ar6000_pm_device);
 }
 
+/*ATH6KL_USES_PREALLOCATE_MEM*/
+/*
+void *wlan_mem_ptr = NULL;
+#define HIF_DMA_BUFFER_SIZE                     (32 * 1024)
+static void __init wlan_init_memory(void)
+{
+	wlan_mem_ptr =  kmalloc(HIF_DMA_BUFFER_SIZE, GFP_KERNEL);
+	if (!wlan_mem_ptr) 
+		panic("Faile to allocate memory for wlan in boot stage!!!\n");
+	else
+		pr_info("ath6kl: Allocate wlan ram sucessfully\n");
+}
+
+void * ath6kl_fetch_memory(void)
+{
+	return wlan_mem_ptr;
+}
+EXPORT_SYMBOL(ath6kl_fetch_memory);
+*/
+/*ATH6KL_USES_PREALLOCATE_MEM*/
+
 static void __init msm_add_footswitch_devices(void)
 {
 	platform_add_devices(msm_footswitch_devices,
@@ -1532,11 +1486,8 @@ static void __init add_platform_devices(void)
 	if (machine_is_msm8625_evb() || machine_is_msm8625_qrd5() || 
 		machine_is_msm8625_skua() || machine_is_msm8625_qrd7() || 
 		machine_is_msm8625_skub() || machine_is_msm8625_evt())
-
 		platform_add_devices(msm8625_evb_devices,
 				ARRAY_SIZE(msm8625_evb_devices));
-
-
 	else {
 		platform_add_devices(qrd7627a_devices,
 				ARRAY_SIZE(qrd7627a_devices));
@@ -1596,8 +1547,156 @@ static void __init msm_pm_init(void)
 	}
 }
 
+//luke: add
+static char ragentek_mmc_product_name[7] = {0};
+static unsigned int ragentek_manufacturer_id = 0;
+static unsigned int ragentek_oem_id = 0;
+int __init ragentek_get_mmc_product_name(char *s)
+{
+	strcpy(ragentek_mmc_product_name, s);
+	//printk("luke: ragentek_mmc_product_name = %s\n", ragentek_mmc_product_name);
+	return 1;
+}
+__setup("ragentek.mmcproductname=", ragentek_get_mmc_product_name);
+
+int __init ragentek_get_mmc_manufacturer_id(char *s)
+{
+	ragentek_manufacturer_id = simple_strtoul(s, NULL, 0);
+	//printk("luke: ragentek_manufacturer_id = %d\n", ragentek_manufacturer_id);
+	return 1;
+}
+__setup("ragentek.mmcmanufacturerid=", ragentek_get_mmc_manufacturer_id);
+
+int __init ragentek_get_mmc_oem_id(char *s)
+{
+	ragentek_oem_id = simple_strtoul(s, NULL, 0);
+	//printk("luke: ragentek_oem_id = %d\n", ragentek_oem_id);
+	return 1;
+}
+__setup("ragentek.mmcoemid=", ragentek_get_mmc_oem_id);
+
+
+typedef struct {
+	unsigned int mid;	/* 8 bit manufacturer id */
+	unsigned int oid;	/* 16 bits 2 character ASCII - OEM ID */
+	unsigned char pnm[7];	/* 6 character ASCII -  product name */
+	unsigned char flash_type[255]; /* nand flash type information */
+}msm_nand_info;
+
+static msm_nand_info msm_nand_info_table[] = {                                    //table 
+
+          {0x15, 0x100, "JJS00M", "KMJJSOOOWA-B409"}, //Q801
+	  {0x15, 0x100, "SJS00M", "KMSJS000KM-B308"}, //Q802
+	  {0, 0, {0}, {0}},
+};
+static struct proc_dir_entry *msm_nand_dir;
+static struct proc_dir_entry *msm_nand_info_file;
+static int ragentek_msm_nand_info_read(char *page, char **start, off_t off, int count,
+		int *eof, void *data)
+{
+	ssize_t len = 0;
+	msm_nand_info *nand_info_ptr = msm_nand_info_table;
+	char *nand_info = NULL;
+
+	if(off > 0)
+	{
+		*eof = 1;
+		return 0;
+	}	
+	//to find nand information
+	while(strlen(nand_info_ptr->flash_type) > 0) {
+		if(nand_info_ptr->mid == ragentek_manufacturer_id
+			&& nand_info_ptr->oid == ragentek_oem_id
+				&& !strcmp(ragentek_mmc_product_name, nand_info_ptr->pnm)) {
+				nand_info = nand_info_ptr->flash_type;
+				break;
+		}
+		nand_info_ptr++;	
+	}
+	
+	if(!nand_info)
+	{
+		#if defined( CONFIG_Q203 )
+			nand_info = "KMS5U000KM-B308";
+		#else
+			nand_info = "UNKNOWN";
+		#endif
+	}
+
+	len = (ssize_t)sprintf(page, "%s\n", nand_info);
+	
+	return len;
+}
+
+static int ragentek_msm_nand_info_write(struct file * filp, const char __user *buff, unsigned long len,
+		void *data)
+{
+	//nothing to do
+	return 0;
+}
+
+static void ragentek_create_proc_file_for_nand_info(void)
+{
+	msm_nand_dir = proc_mkdir("msm_mtd_nand", NULL);
+	if( NULL == msm_nand_dir) {
+		pr_err("can't create msm_mtd_nand dir for ragentek factory test\n");
+		return;	
+	}
+
+	msm_nand_info_file = create_proc_entry("msm_nand_info", 0444, msm_nand_dir);
+	if( NULL == msm_nand_info_file ) {
+		pr_err("can't create msm_nand_info file for ragentek factory test\n");
+		return;	
+	}
+	
+	msm_nand_info_file->read_proc = ragentek_msm_nand_info_read;
+	msm_nand_info_file->write_proc = ragentek_msm_nand_info_write;
+}
+//end
+
+//Start=====Allen
+static void diag_getversion(void)
+{
+	char *apver;	
+
+	apver = (char*)smem_alloc(SMEM_OSS_RRCASN1_BUF1, 32);	
+
+	if(apver == NULL)
+	
+	{ 
+		printk(" smem_alloc failed !!!\n");
+		return;
+	}
+
+	//strcpy(apver, RAGENTEK_BUILD_VERSION);
+
+	printk(" Ragentek build version = %s\n",apver);
+	
+}
+//End=====Allen
+
 static void __init msm_qrd_init(void)
 {
+	//Start=====Allen
+	if(is_rgtk_product(RGTK_PRODUCT_Q801)) {
+		q801_setup_gpio();
+	}else if(is_rgtk_product(RGTK_PRODUCT_Q802)) {
+		q802_setup_gpio();
+	}else if(is_rgtk_product(RGTK_PRODUCT_Q803)) {
+		q803_setup_gpio();
+	}else if(is_rgtk_product(RGTK_PRODUCT_Q203)) {
+		q203_setup_gpio();
+	}else if(is_rgtk_product(RGTK_PRODUCT_Q203_NAND)) {
+		q203_nand_setup_gpio();
+	}else if(is_rgtk_product(RGTK_PRODUCT_DC205)) {
+		dc205_setup_gpio();
+	}
+	//End=====Allen
+	
+        ragentek_create_proc_file_for_nand_info();          //luke: add
+        if(creat_lcd_info_proc_file() < 0)
+        	pr_err("creat_lcd_info_proc_file failed!"); //end
+
 	msm7x2x_misc_init();
 	msm7627a_init_regulators();
 	msmqrd_adsp_add_pdev();
@@ -1607,6 +1706,9 @@ static void __init msm_qrd_init(void)
 	else
 		msm7627a_device_i2c_init();
 
+	/*ATH6KL_USES_PREALLOCATE_MEM*/
+	//wlan_init_memory();
+
 	/* uart1dm*/
 	qrd7627a_uart1dm_config();
 	/*OTG gadget*/
@@ -1614,6 +1716,10 @@ static void __init msm_qrd_init(void)
 
 	msm_add_footswitch_devices();
 	add_platform_devices();
+	
+	//Start=====Allen
+	diag_getversion();
+	//End ===Allen
 
 	/* Ensure ar6000pm device is registered before MMC/SDC */
 	msm_qrd_init_ar6000pm();
@@ -1643,17 +1749,63 @@ static void __init qrd7627a_init_early(void)
 }
 
 #ifdef CONFIG_MSM_AMSS_ENHANCE_DEBUG
+#define TASK_OFFSET_SEND(member, name)		\
+	do {					\
+		input.extension.len = 2;	\
+		input.extension.data[0] = (uint32_t)TASK_STRUCT_TAG; \
+		input.extension.data[1] = offsetof(struct task_struct, member); \
+		input.address = (uint32_t)__virt_to_phys((unsigned long)&init_task); \
+		input.size = sizeof(struct task_struct); \
+		strncpy(input.file_name, name, NZI_ITEM_FILE_NAME_LENGTH); \
+		input.file_name[NZI_ITEM_FILE_NAME_LENGTH - 1] = 0; \
+		send_modem_logaddr(&input); \
+	} while (0)
+
 static int __init qrd7627a_logbuf_init(void)
 {
 	nzi_buf_item_type input;
 	extern char __log_buf[];
+	extern unsigned long totalram_pages;
+	extern atomic_long_t vm_stat[];
 
+#ifdef CONFIG_PRINTK
+	/* send the kernel log address */
 	input.extension.len = 0;
 	input.address = (uint32_t)__virt_to_phys((unsigned long)__log_buf);
 	input.size = (1 << CONFIG_LOG_BUF_SHIFT);
 	strncpy(input.file_name, "dmesg", NZI_ITEM_FILE_NAME_LENGTH);
 	input.file_name[NZI_ITEM_FILE_NAME_LENGTH - 1] = 0;
-	return send_modem_logaddr(&input);
+	send_modem_logaddr(&input);
+#endif
+
+	/* ******struct task_struct part ******/
+	TASK_OFFSET_SEND(tasks, "tasks_of");
+	TASK_OFFSET_SEND(thread_group, "tg_of");
+	TASK_OFFSET_SEND(mm, "mm_of");
+	TASK_OFFSET_SEND(comm, "comm_of");
+	TASK_OFFSET_SEND(pid, "pid_of");
+	TASK_OFFSET_SEND(tgid, "tgid_of");
+	/* ******struct task_struct end ******/
+
+	/* totalram_pages */
+	input.extension.len = 1;
+	input.extension.data[0] = (uint32_t)MEM_INFO_TAG;
+	input.address = (uint32_t)__virt_to_phys((unsigned long)&totalram_pages);
+	input.size = sizeof(totalram_pages);
+	strncpy(input.file_name, "totalram", NZI_ITEM_FILE_NAME_LENGTH);
+	input.file_name[NZI_ITEM_FILE_NAME_LENGTH - 1] = 0;
+	send_modem_logaddr(&input);
+
+	/* vm_stat[vm_stat[NR_VM_ZONE_STAT_ITEMS]; */
+	input.extension.len = 1;
+	input.extension.data[0] = (uint32_t)MEM_INFO_TAG;
+	input.address = (uint32_t)__virt_to_phys((unsigned long)vm_stat);
+	input.size = sizeof(vm_stat);
+	strncpy(input.file_name, "vm_stat", NZI_ITEM_FILE_NAME_LENGTH);
+	input.file_name[NZI_ITEM_FILE_NAME_LENGTH - 1] = 0;
+	send_modem_logaddr(&input);
+
+	return 0;
 }
 late_initcall(qrd7627a_logbuf_init);
 #endif

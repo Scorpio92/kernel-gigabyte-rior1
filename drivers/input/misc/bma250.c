@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/earlysuspend.h>
+#include <linux/input/bma250.h>
 
 #define SENSOR_NAME 			"bma250"
 #define GRAVITY_EARTH                   9806550
@@ -42,8 +43,13 @@
 #define SLOPE_X_INDEX 			5
 #define SLOPE_Y_INDEX 			6
 #define SLOPE_Z_INDEX 			7
-#define BMA250_MAX_DELAY		200
+#define BMA250_MAX_DELAY		100
 #define BMA250_CHIP_ID			3
+#define BMA250E_CHIP_ID		0xf9
+#define BMA222E_CHIP_ID		0xf8
+#define BMA255_CHIP_ID			0xfa
+#define BMA280_CHIP_ID			0xfb
+
 #define BMA250_RANGE_SET		0
 #define BMA250_BW_SET			4
 
@@ -210,6 +216,7 @@ struct bma250_data {
 	struct work_struct irq_work;
 	struct early_suspend early_suspend;
 };
+static int project_id = 201;
 
 static void bma250_early_suspend(struct early_suspend *h);
 static void bma250_late_resume(struct early_suspend *h);
@@ -515,11 +522,25 @@ static void bma250_work_func(struct work_struct *work)
 	unsigned long delay = msecs_to_jiffies(atomic_read(&bma250->delay));
 
 	bma250_read_accel_xyz(bma250->bma250_client, &acc);
+//	printk("sym %s x=%d,y=%d,z=%d\n",__func__,acc.x,acc.y,acc.z);
 	/*adjust the data output for sku1 compatible */
-	input_report_rel(bma250->input, REL_RX, acc.y * 4);
-	input_report_rel(bma250->input, REL_RY, -acc.x * 4);
-	input_report_rel(bma250->input, REL_RZ, acc.z * 4);
-	input_sync(bma250->input);
+	
+	if(project_id == 201 || project_id == 803 || project_id == 801)
+	{
+		input_report_rel(bma250->input, REL_RX, acc.y * 4);
+		input_report_rel(bma250->input, REL_RY, acc.x * (4));
+		input_report_rel(bma250->input, REL_RZ, acc.z * (-4));
+			input_sync(bma250->input);
+	}
+	else if(project_id == 202 || project_id == 802)
+	{
+		input_report_rel(bma250->input, REL_RX, acc.x * 4);
+		input_report_rel(bma250->input, REL_RY, acc.y * (-4));
+		input_report_rel(bma250->input, REL_RZ, acc.z * (-4));
+			input_sync(bma250->input);
+	}
+	else
+		;
 	mutex_lock(&bma250->value_mutex);
 	bma250->value = acc;
 	mutex_unlock(&bma250->value_mutex);
@@ -729,7 +750,7 @@ static DEVICE_ATTR(bandwidth, S_IRUGO | S_IWUSR | S_IWGRP,
 static DEVICE_ATTR(mode, S_IRUGO | S_IWUSR | S_IWGRP,
 		   bma250_mode_show, bma250_mode_store);
 static DEVICE_ATTR(value, S_IRUGO, bma250_value_show, NULL);
-static DEVICE_ATTR(poll_delay, S_IRUGO | S_IWUSR | S_IWGRP,
+static DEVICE_ATTR(poll, S_IRUGO | S_IWUSR | S_IWGRP,
 		   bma250_delay_show, bma250_delay_store);
 static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR | S_IWGRP,
 		   bma250_enable_show, bma250_enable_store);
@@ -739,7 +760,7 @@ static struct attribute *bma250_attributes[] = {
 	&dev_attr_bandwidth.attr,
 	&dev_attr_mode.attr,
 	&dev_attr_value.attr,
-	&dev_attr_poll_delay.attr,
+	&dev_attr_poll.attr,
 	&dev_attr_enable.attr,
 	NULL
 };
@@ -794,7 +815,11 @@ static int bma250_probe(struct i2c_client *client,
 	int err = 0;
 	int tempvalue;
 	struct bma250_data *data;
+	struct bma250_platform_data *pdata;
+	unsigned char bma_mode=7;
+	
 
+	printk("%s start\n",__func__);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		printk(KERN_INFO "i2c_check_functionality error\n");
 		goto exit;
@@ -811,12 +836,35 @@ static int bma250_probe(struct i2c_client *client,
 	if ((tempvalue & 0x00FF) == BMA250_CHIP_ID) {
 		printk(KERN_INFO "Bosch Sensortec Device detected!\n"
 		       "BMA250 registered I2C driver!\n");
-	} else {
+	} else if((tempvalue & 0x00FF) == BMA250E_CHIP_ID) {
+		printk(KERN_INFO "Bosch Sensortec Device detected!\n"
+		       "BMA250E registered I2C driver!\n");
+	}else if((tempvalue & 0x00FF) == BMA222E_CHIP_ID) {
+		printk(KERN_INFO "Bosch Sensortec Device detected!\n"
+		       "BMA222E_ registered I2C driver!\n");
+	}else if((tempvalue & 0x00FF) == BMA280_CHIP_ID) {
+		printk(KERN_INFO "Bosch Sensortec Device detected!\n"
+		       "BMA280 registered I2C driver!\n");
+	}else if((tempvalue & 0x00FF) == BMA255_CHIP_ID) {
+		printk(KERN_INFO "Bosch Sensortec Device detected!\n"
+		       "BMA255 registered I2C driver!\n");
+	}
+	
+	else{
 		printk(KERN_INFO "Bosch Sensortec Device not found, \
 				i2c error %d \n", tempvalue);
 		err = -1;
 		goto kfree_exit;
 	}
+
+	/* Check platform data*/
+	if (client->dev.platform_data == NULL) {
+		printk(KERN_ERR "bma250 bma250_probe: platform data is NULL\n");
+		goto kfree_exit;
+	}
+	/* Copy to global variable */
+	pdata = client->dev.platform_data;
+	project_id = pdata->project_id;
 	i2c_set_clientdata(client, data);
 	data->bma250_client = client;
 	mutex_init(&data->value_mutex);
@@ -842,8 +890,9 @@ static int bma250_probe(struct i2c_client *client,
 	data->early_suspend.resume = bma250_late_resume;
 	register_early_suspend(&data->early_suspend);
 	/* try to reduce the power comsuption */
-	bma250_set_mode(data->bma250_client, BMA250_MODE_SUSPEND);
-
+	bma250_get_mode(data->bma250_client, &bma_mode); 
+//	bma250_set_mode(data->bma250_client, BMA250_MODE_SUSPEND); //sym del for debug
+	printk("%s end\n",__func__);
 	return 0;
 
 error_sysfs:

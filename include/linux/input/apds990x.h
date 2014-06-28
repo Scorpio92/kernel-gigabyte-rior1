@@ -1,33 +1,74 @@
-/*
- *  apds990x.h - Linux kernel modules for ambient light + proximity sensor
- *
- *  Copyright (c) 2012, Code Aurora Forum. All rights reserved.
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 and
- *  only version 2 as published by the Free Software Foundation.
+#include <linux/earlysuspend.h>
 
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
+struct apds990x_data {
+	struct i2c_client *client;
+	struct mutex update_lock;
+	struct delayed_work	dwork;	/* for PS interrupt */
+	struct delayed_work    als_dwork; /* for ALS polling */
+	struct input_dev *input_dev_als;
+	struct input_dev *input_dev_ps;
+	struct early_suspend early_suspend;
 
-#ifndef __LINUX_APDS990X_H
-#define __LINUX_APDS990X_H
+	unsigned int enable;
+	unsigned int atime;
+	unsigned int ptime;
+	unsigned int wtime;
+	unsigned int ailt;
+	unsigned int aiht;
+	unsigned int pilt;
+	unsigned int piht;
+	unsigned int pers;
+	unsigned int config;
+	unsigned int ppcount;
+	unsigned int control;
 
-#include <linux/types.h>
+	/* control flag from HAL */
+	unsigned int enable_ps_sensor;
+	unsigned int enable_als_sensor;
 
-struct apds990x_platform_data {
-	int (*power_onoff)(int onoff);
-	int irq;  /* proximity/light-sensor- external irq*/
-	unsigned int ps_det_thld;
-	unsigned int ps_hsyt_thld;
-	unsigned int als_hsyt_thld;
+	/* PS parameters */
+	unsigned int ps_threshold;
+	unsigned int ps_hysteresis_threshold; /* always lower than ps_threshold */
+	unsigned int ps_detection;		/* 0 = near-to-far; 1 = far-to-near */
+	unsigned int ps_data;			/* to store PS data */
+
+	/* ALS parameters */
+	unsigned int als_threshold_l;	/* low threshold */
+	unsigned int als_threshold_h;	/* high threshold */
+	unsigned int als_data;			/* to store ALS data */
+
+	unsigned int als_gain;			/* needed for Lux calculation */
+	unsigned int als_poll_delay;	/* needed for light sensor polling : micro-second (us) */
+	unsigned int als_atime;			/* storage for als integratiion time */
+
+//	int (*power_on)(void);
+	
 };
 
+	
+struct apds990x_platform_data 
+	{	
+		int (*power_onoff)(int onoff);	
+		int irq;  /* proximity/light-sensor- external irq*/	
+		unsigned int ps_det_thld;	
+		unsigned int ps_hsyt_thld;	
+		unsigned int als_hsyt_thld;
+	};
+
+#define ERROR_CHECK(x)                                                  \
+	do {								\
+		if (0 != x) {					\
+			printk(KERN_ERR "[APDS990X][sym]%s|%s|%d returning %d\n",		\
+				__FILE__, __func__, __LINE__, x);	\
+			return x;					\
+		}							\
+	} while (0)
+
+#define DEBUG_APDS990X		
+#if defined(DEBUG_APDS990X)
+#define sym_dbg(format, arg...)		\
+	printk("[Sensor_APDS990X][sym] [%-16s]\n "format , __func__,  ## arg)
+#else
+#define sym_dbg(format, arg...)
 #endif
+

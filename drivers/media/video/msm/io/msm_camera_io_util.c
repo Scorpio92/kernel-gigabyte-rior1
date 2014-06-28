@@ -168,12 +168,13 @@ int msm_camera_config_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 	int i = 0;
 	int rc = 0;
 	struct camera_vreg_t *curr_vreg;
-
+	/*renwei add it by the patch at 2012-9-4*/
 	if (NULL == reg_ptr) {
 		pr_err("%s: %s null regulator\n",
 			__func__, cam_vreg[i].reg_name);
 		return rc;
 	}
+	/*add end*/
 	if (config) {
 		for (i = 0; i < num_vreg; i++) {
 			curr_vreg = &cam_vreg[i];
@@ -257,11 +258,13 @@ int msm_camera_enable_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 {
 	int i = 0, rc = 0;
 
+	/*renwei add it by the patch at 2012-9-4*/
 	if (NULL == reg_ptr) {
 		pr_err("%s: %s null regulator\n",
 			__func__, cam_vreg[i].reg_name);
 		return rc;
-	}
+	}	
+	/*add end*/
 	if (enable) {
 		for (i = 0; i < num_vreg; i++) {
 			if (IS_ERR(reg_ptr[i])) {
@@ -277,6 +280,7 @@ int msm_camera_enable_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 			}
 		}
 	} else {
+		/*renwei modify it by the patch at 2012-9-4*/
 		for (i = num_vreg-1; i >= 0; i--) {
 			if (NULL == reg_ptr[i]) {
 				pr_err("%s: NULL regulator %s\n",
@@ -284,7 +288,8 @@ int msm_camera_enable_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 				continue;
 			}
 			rc = regulator_disable(reg_ptr[i]);
-          }
+          	}
+		/*add end*/
 	}
 	return rc;
 disable_vreg:

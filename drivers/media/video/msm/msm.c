@@ -10,7 +10,9 @@
  * GNU General Public License for more details.
  *
  */
-
+#ifndef DEBUG
+#define DEBUG
+#endif
 #include <linux/workqueue.h>
 #include <linux/delay.h>
 #include <linux/types.h>
@@ -30,6 +32,7 @@
 
 #define MSM_MAX_CAMERA_SENSORS 5
 
+#define  CONFIG_MSM_CAMERA_DEBUG
 #ifdef CONFIG_MSM_CAMERA_DEBUG
 #define D(fmt, args...) pr_debug("msm: " fmt, ##args)
 #else
@@ -48,6 +51,40 @@ MODULE_PARM_DESC(msm_camera_v4l2_nr, "videoX start number, -1 is autodetect");
 static long msm_server_send_v4l2_evt(void *evt);
 static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 	unsigned int notification, void *arg);
+/*lilonghui add it for the we can read the camera information from the proc 2012-12-25*/
+static char camera_back[30]= "NoBackCamera";
+static char camera_front[30] = "NoFrontCamera";
+static struct proc_dir_entry *camera_infor_file;
+static int read_camera_info(char *page, char **start, off_t off,int count,
+			  int *eof, void *data){
+	ssize_t len = 0;
+	if(off > 0)
+	{
+		*eof = 1;
+		return 0;
+	}
+	len = (ssize_t)sprintf(page, "BackCamera:%s,FrontCamera:%s\n", camera_back,camera_front);
+	
+	return len;
+
+}
+static int write_camera_info(struct file * filp, const char __user *buff, unsigned long len,
+		void *data){
+	/*nothing to do now*/
+	return 0;
+}
+static int creat_camera_info_proc_file(void){
+
+	camera_infor_file = create_proc_entry("cameraInfo",0444,NULL);
+		if(NULL == camera_infor_file ){
+			pr_err("creat camerainfo failed!");
+			return -1;
+		}
+        camera_infor_file->read_proc  = read_camera_info;
+	camera_infor_file->write_proc = write_camera_info;
+	return 0;
+}
+/*end*/
 
 static void msm_queue_init(struct msm_device_queue *queue, const char *name)
 {
@@ -1685,20 +1722,16 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 
 	struct v4l2_event v4l2_evt;
 	struct msm_isp_event_ctrl *isp_event;
-	void *ctrlcmd_data;
-
-	event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_KERNEL);
-	if (!event_qcmd) {
-		pr_err("%s Insufficient memory. return", __func__);
-		rc = -ENOMEM;
-		goto event_qcmd_alloc_fail;
-	}
-
 	isp_event = kzalloc(sizeof(struct msm_isp_event_ctrl), GFP_KERNEL);
 	if (!isp_event) {
 		pr_err("%s Insufficient memory. return", __func__);
-		rc = -ENOMEM;
-		goto isp_event_alloc_fail;
+		return -ENOMEM;
+	}
+	event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_KERNEL);
+	if (!event_qcmd) {
+		pr_err("%s Insufficient memory. return", __func__);
+		kfree(isp_event);
+		return -ENOMEM;
 	}
 
 	D("%s\n", __func__);
@@ -1716,16 +1749,6 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 	isp_event->resptype = MSM_CAM_RESP_V4L2;
 	isp_event->isp_data.ctrl = *out;
 	isp_event->isp_data.ctrl.evt_id = server_dev->server_evt_id;
-
-	if (out->value != NULL && out->length != 0) {
-		ctrlcmd_data = kzalloc(out->length, GFP_KERNEL);
-		if (!ctrlcmd_data) {
-			rc = -ENOMEM;
-			goto ctrlcmd_alloc_fail;
-		}
-		memcpy(ctrlcmd_data, out->value, out->length);
-		isp_event->isp_data.ctrl.value = ctrlcmd_data;
-	}
 
 	atomic_set(&event_qcmd->on_heap, 1);
 	event_qcmd->command = isp_event;
@@ -1750,8 +1773,7 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 		if (!rc)
 			rc = -ETIMEDOUT;
 		if (rc < 0) {
-			if (++server_dev->server_evt_id == 0)
-				server_dev->server_evt_id++;
+			kfree(isp_event);
 			pr_err("%s: wait_event error %d\n", __func__, rc);
 			return rc;
 		}
@@ -1763,8 +1785,7 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 
 	ctrlcmd = (struct msm_ctrl_cmd *)(rcmd->command);
 	value = out->value;
-	if (ctrlcmd->length > 0 && value != NULL &&
-	    ctrlcmd->length <= out->length)
+	if (ctrlcmd->length > 0)
 		memcpy(value, ctrlcmd->value, ctrlcmd->length);
 
 	memcpy(out, ctrlcmd, sizeof(struct msm_ctrl_cmd));
@@ -1772,6 +1793,7 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 
 	kfree(ctrlcmd);
 	free_qcmd(rcmd);
+	kfree(isp_event);
 	D("%s: rc %d\n", __func__, rc);
 	/* rc is the time elapsed. */
 	if (rc >= 0) {
@@ -1783,13 +1805,6 @@ int msm_server_send_ctrl(struct msm_ctrl_cmd *out,
 		else
 			rc = -EINVAL;
 	}
-	return rc;
-
-ctrlcmd_alloc_fail:
-	kfree(isp_event);
-isp_event_alloc_fail:
-	kfree(event_qcmd);
-event_qcmd_alloc_fail:
 	return rc;
 }
 
@@ -2036,12 +2051,8 @@ int msm_cam_server_open_mctl_session(struct msm_cam_v4l2_device *pcam,
 
 	if (rc < 0) {
 		pr_err("%s: HW open failed rc = 0x%x\n",  __func__, rc);
-		/*if open fail, will pmctl->pcam_ptr be null.*/
-		*p_active = 0;
-		msm_cam_server_close_session(&g_server_dev, pcam);
 		return rc;
 	}
-
 	pmctl->pcam_ptr = pcam;
 	*p_active = 1;
 	return rc;
@@ -2882,7 +2893,7 @@ int msm_setup_v4l2_event_queue(struct v4l2_fh *eventHandle,
 	}
 
 	/* queue of max size 30 */
-	rc = v4l2_event_alloc(eventHandle, 500);
+	rc = v4l2_event_alloc(eventHandle, 30);
 	if (rc < 0)
 		return rc;
 
@@ -3339,7 +3350,6 @@ static struct v4l2_subdev *msm_eeprom_probe(
 	void *eeprom_client = NULL;
 
 	D("%s called\n", __func__);
-
 	if (!eeprom_info)
 		goto probe_fail;
 
@@ -3425,7 +3435,7 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	= video_device_node_name(pcam->pvdev);
 	D("%s Connected video device %s\n", __func__,
 		g_server_dev.camera_info.video_dev_name
-		[g_server_dev.camera_info.num_cameras]);
+	[g_server_dev.camera_info.num_cameras]);
 
 	g_server_dev.camera_info.s_mount_angle
 	[g_server_dev.camera_info.num_cameras]
@@ -3434,7 +3444,20 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	g_server_dev.camera_info.is_internal_cam
 	[g_server_dev.camera_info.num_cameras]
 	= sdata->camera_type;
-
+/*lilonghui add it for all the  project camera 2012-8-11*/
+	g_server_dev.camera_info.s_customer_name
+	[g_server_dev.camera_info.num_cameras]
+	= sdata->customer_name;
+	g_server_dev.camera_info.s_module_sensor_name
+	[g_server_dev.camera_info.num_cameras]
+	= sdata->module_sensor_name;
+	g_server_dev.camera_info.s_product_id
+	[g_server_dev.camera_info.num_cameras]
+	= sdata->camera_product_type;
+         g_server_dev.camera_info.s_sensor_ic_name
+	[g_server_dev.camera_info.num_cameras]
+	= sdata->camera_sensor_ic_name;
+/*end*/
 	g_server_dev.mctl_node_info.mctl_node_name
 	[g_server_dev.mctl_node_info.num_mctl_nodes]
 	= video_device_node_name(pcam->mctl_node.pvdev);
@@ -3447,11 +3470,13 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	/*Temporary solution to store info in media device structure
 	  until we can expand media device structure to support more
 	  device info*/
+	 pr_err("%s :lilonghui call sdata->customer_name =%d,sdata->module_sensor_name=%d, sdata->camera_sensor_ic_name =%d,sdata->camera_product_type =%d sdata->camera_type = %d\n",__func__, sdata->customer_name,sdata->module_sensor_name, sdata->camera_sensor_ic_name,sdata->camera_product_type,sdata->camera_type);
 	snprintf(pcam->media_dev.serial,
 			sizeof(pcam->media_dev.serial),
-			"%s-%d-%d", QCAMERA_NAME,
+			"%s-%d-%d-%d-%d-%d-%d",QCAMERA_NAME,
+			sdata->module_sensor_name,sdata->customer_name,sdata->camera_product_type,
 			sdata->sensor_platform_info->mount_angle,
-			sdata->camera_type);
+			sdata->camera_type,sdata->camera_sensor_ic_name);
 
 	g_server_dev.camera_info.num_cameras++;
 	g_server_dev.mctl_node_info.num_mctl_nodes++;
@@ -3459,7 +3484,21 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	D("%s done, rc = %d\n", __func__, rc);
 	D("%s number of sensors connected is %d\n", __func__,
 		g_server_dev.camera_info.num_cameras);
+        /*lilonghui add it for the camera infor 2012-12-25*/
+        if(sdata->camera_type == BACK_CAMERA_2D  )
+	 	{
+                
+                strncpy(camera_back,sdata->sensor_name,sizeof(camera_back)-1);
+                D("%s call back camera_back = %s \n", __func__,camera_back);
 
+	 	}else if(sdata->camera_type == FRONT_CAMERA_2D){
+                        
+	 	        strncpy(camera_front,sdata->sensor_name,sizeof(camera_front)-1);
+                        D("%scall front camera_front %s \n", __func__,camera_front);
+	 		}else{
+        D("%s:we will not creat the node for camerainfor \n", __func__); 
+	 			}
+        /*end*/
 	/* register the subdevice, must be done for callbacks */
 	rc = msm_cam_register_subdev_node(sensor_sd, SENSOR_DEV, vnode_count);
 	if (rc < 0) {
@@ -3499,10 +3538,10 @@ EXPORT_SYMBOL(msm_sensor_register);
 static int __devinit msm_camera_probe(struct platform_device *pdev)
 {
 	int rc = 0, i;
-	/*for now just create a config 0 node
+	/*for now just create a config 0 nodemsm_camera_probe
 	  put logic here later to know how many configs to create*/
 	g_server_dev.config_info.num_config_nodes = 1;
-
+        D("%s:lilonghui call start ",__func__);
 	rc = msm_isp_init_module(g_server_dev.config_info.num_config_nodes);
 	if (rc < 0) {
 		pr_err("Failed to initialize isp\n");
@@ -3545,6 +3584,8 @@ static int __devinit msm_camera_probe(struct platform_device *pdev)
 	}
 
 	msm_isp_register(&g_server_dev);
+
+    D("%s:lilonghui call end ",__func__);
 	return rc;
 }
 
@@ -3565,8 +3606,13 @@ static struct platform_driver msm_cam_server_driver = {
 };
 
 static int __init msm_camera_init(void)
-{
-	return platform_driver_register(&msm_cam_server_driver);
+{  
+  int ret = 0;
+      ret = platform_driver_register(&msm_cam_server_driver);
+    /*lilonghui add it for the camera infor node 2012-12-25*/
+     creat_camera_info_proc_file();
+      D("%s:lilonghui call the init ",__func__); 
+     return ret ; 
 }
 
 static void __exit msm_cam_server_exit(void)

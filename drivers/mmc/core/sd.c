@@ -785,6 +785,12 @@ int mmc_sd_get_csd(struct mmc_host *host, struct mmc_card *card)
 	err = mmc_decode_csd(card);
 	if (err)
 		return err;
+	/* Fix for some buggy card with CSD tacc == 0*/
+	if(!card->csd.tacc_ns)
+	{
+		printk(KERN_INFO "This SDCARD CSD tacc is zero! Fix it for 100ms\n");
+		card->csd.tacc_ns = 100000 * 1000;
+	}
 
 	return 0;
 }

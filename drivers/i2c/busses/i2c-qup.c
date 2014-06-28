@@ -130,11 +130,15 @@ enum {
 
 static char const * const i2c_rsrcs[] = {"i2c_clk", "i2c_sda"};
 
+//Start === Allen
+#if 0
 static struct gpiomux_setting recovery_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
+#endif
+//End ===Allen
 
 struct qup_i2c_dev {
 	struct device                *dev;
@@ -670,28 +674,41 @@ qup_set_wr_mode(struct qup_i2c_dev *dev, int rem)
 static void qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 {
 	int i;
-	int gpio_clk;
-	int gpio_dat;
+	//Start ===Allen
+	int gpio_clk = dev->pdata->pri_clk;
+	int gpio_dat = dev->pdata->pri_dat;
+	//End===Allen
 	bool gpio_clk_status = false;
 	uint32_t status = readl_relaxed(dev->base + QUP_I2C_STATUS);
-	struct gpiomux_setting old_gpio_setting;
 
-	if (dev->pdata->msm_i2c_config_gpio)
+	//Start ===Allen
+	//struct gpiomux_setting old_gpio_setting;
+	dev_err(dev->dev, "%s---Start\n", __func__);
+	
+	if (!dev->pdata->msm_i2c_config_gpi_for_recovery)
 		return;
-
+	//End ===Allen
+	
 	if (!(status & (I2C_STATUS_BUS_ACTIVE)) ||
 		(status & (I2C_STATUS_BUS_MASTER)))
 		return;
-
+		
+	//Start ===Allen
+	#if 0
 	gpio_clk = dev->i2c_gpios[0];
 	gpio_dat = dev->i2c_gpios[1];
-
+	#endif
+	//End ===Allen
+	
 	if ((gpio_clk == -1) && (gpio_dat == -1)) {
 		dev_err(dev->dev, "Recovery failed due to undefined GPIO's\n");
 		return;
 	}
 
 	disable_irq(dev->err_irq);
+
+	//Start ===Allen
+	#if 0
 	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
 		if (msm_gpiomux_write(dev->i2c_gpios[i], GPIOMUX_ACTIVE,
 				&recovery_config, &old_gpio_setting)) {
@@ -699,9 +716,16 @@ static void qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 			goto recovery_end;
 		}
 	}
+	#endif
 
-	dev_warn(dev->dev, "i2c_scl: %d, i2c_sda: %d\n",
-		 gpio_get_value(gpio_clk), gpio_get_value(gpio_dat));
+	if (dev->pdata->msm_i2c_config_gpi_for_recovery)
+               dev->pdata->msm_i2c_config_gpi_for_recovery(dev->adapter.nr, 0);
+       	else
+               return;
+	//End ===Allen
+
+       	dev_err(dev->dev, "i2c_scl: %d, i2c_sda: %d\n",
+                gpio_get_value(gpio_clk), gpio_get_value(gpio_dat));
 
 	for (i = 0; i < 9; i++) {
 		if (gpio_get_value(gpio_dat) && gpio_clk_status)
@@ -721,11 +745,19 @@ static void qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 		udelay(5);
 	}
 
+	//Start ===Allen
+	#if 0
 	/* Configure ALT funciton to QUP I2C*/
 	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
 		msm_gpiomux_write(dev->i2c_gpios[i], GPIOMUX_ACTIVE,
 				&old_gpio_setting, NULL);
 	}
+	#endif
+
+	/* *configure ALT funciton to QUP I2C*/
+	if (dev->pdata->msm_i2c_config_gpi_for_recovery)
+               dev->pdata->msm_i2c_config_gpi_for_recovery(dev->adapter.nr, 1);
+	//End ===Allen
 
 	udelay(10);
 
@@ -740,6 +772,7 @@ static void qup_i2c_recover_bus_busy(struct qup_i2c_dev *dev)
 	dev_warn(dev->dev, "Bus still busy, status %x\n", status);
 
 recovery_end:
+	dev_err(dev->dev, "%s---End\n", __func__);
 	enable_irq(dev->err_irq);
 }
 

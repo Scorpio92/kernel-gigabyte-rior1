@@ -151,12 +151,15 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		       mfd->panel_info.bpp);
 		return -ENODEV;
 	}
-
+printk("luke:%s  mfd->cont_splash_done =%d,%d \n ",__func__,mfd->cont_splash_done,__LINE__);
+#if 1
+//hxh: add for continue
 	if (!(mfd->cont_splash_done)) {
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 		MDP_OUTP(MDP_BASE + timer_base, 0);
 	}
-
+//hxh: add end
+#endif
 	/* DMA register config */
 
 	dma_base = DMA_P_BASE;
@@ -281,15 +284,15 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		MDP_OUTP(MDP_BASE + timer_base + 0x38, active_v_end);
 	}
 
-	ret = panel_next_on(pdev);
-	if (ret == 0) {
+	//ret = panel_next_on(pdev); // luke: modify
+	//if (ret == 0) {
 		/* enable LCDC block */
 		MDP_OUTP(MDP_BASE + timer_base, 1);
 		mdp_pipe_ctrl(block, MDP_BLOCK_POWER_ON, FALSE);
-	}
+	//}
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-
+        ret = panel_next_on(pdev);   //luke:  
 	return ret;
 }
 
@@ -311,6 +314,7 @@ int mdp_lcdc_off(struct platform_device *pdev)
 
 	down(&mfd->dma->mutex);
 	/* MDP cmd block enable */
+        ret = panel_next_off(pdev); // add by luke
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	MDP_OUTP(MDP_BASE + timer_base, 0);
 	/* MDP cmd block disable */
@@ -318,9 +322,8 @@ int mdp_lcdc_off(struct platform_device *pdev)
 	mdp_pipe_ctrl(block, MDP_BLOCK_POWER_OFF, FALSE);
 
 	/* delay to make sure the last frame finishes */
-	mdelay(16);
-
-	ret = panel_next_off(pdev);
+	msleep(16);
+	//ret = panel_next_off(pdev); //del by luke
 	up(&mfd->dma->mutex);
 
 	return ret;

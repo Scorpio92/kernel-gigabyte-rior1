@@ -10,7 +10,6 @@
  * GNU General Public License for more details.
  *
  */
-#define DEBUG
 
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -28,33 +27,46 @@
 #include <mach/rpc_pmapp.h>
 #include "devices.h"
 #include "board-msm7627a.h"
+#include <linux/board-ragentek-cfg.h>//luke:
+#include <linux/fs.h>
+#include <linux/proc_fs.h>	     //end
+
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
-#define MSM_FB_SIZE		0x4BF000
+//#define MSM_FB_SIZE		0x4BF000
+#define MSM_FB_SIZE		0x7E9000
 #define MSM7x25A_MSM_FB_SIZE    0x1C2000
-#define MSM8x25_MSM_FB_SIZE	0x5FA000
+//#define MSM8x25_MSM_FB_SIZE	0x5FA000
+#define MSM8x25_MSM_FB_SIZE	0x7E9000
 #else
-#define MSM_FB_SIZE		0x32A000
+//#define MSM_FB_SIZE		0x32A000
+#define MSM_FB_SIZE		0x7E9000
 #define MSM7x25A_MSM_FB_SIZE	0x12C000
-#define MSM8x25_MSM_FB_SIZE	0x3FC000
+//#define MSM8x25_MSM_FB_SIZE	0x3FC000
+#define MSM8x25_MSM_FB_SIZE	0x7E9000
 #endif
 
+//modified by luke for otm8009a lcd [2012-04-24]
 #define GPIO_QRD3_LCD_BRDG_RESET_N	85
 #define GPIO_QRD3_LCD_BACKLIGHT_EN	96
+//end
 
 #define GPIO_SKUA_LCD_BRDG_RESET_N 129
 #define GPIO_SKUA_LCD_BACKLIGHT_EN 28
 #define GPIO_SKUA_LCD_ID 11
 
-/* LK splash flag, 0 - off, 1 - command, 2 - video */
+#if 1
+//hxh: add for continue
 static int cont_splash_enabled = 0;
 static int __init lk_splash_setup(char *str)
 {
 	cont_splash_enabled = simple_strtol(str, NULL, 0);
-	printk("cont_splash_enabled = %d\n", cont_splash_enabled);
+	printk("luke: cont_splash_enabled = %d\n", cont_splash_enabled);
 	return 1;
 }
 __setup("splash=", lk_splash_setup);
+//hxh: add end
+#endif
 
 /*
  * Reserve enough v4l2 space for a double buffered full screen
@@ -78,7 +90,6 @@ static struct regulator *reg_ext_1v8;
 static int qrd_lcd_ext_power_control(int on)
 {
 	int rc = 0;
-
 	/* ext_2v8 and ext_1v8 control */
 	if (!reg_ext_2v8) {
 		reg_ext_2v8 = regulator_get(NULL, "ext_2v8");
@@ -132,7 +143,8 @@ static int qrd_lcd_ext_power_control(int on)
 	}
 	return rc;
 }
-
+#if 1
+//hxh: add for continue
 static int cont_splash_done = 0;
 static void qrd_lcd_splash_power_vote(int on)
 {
@@ -140,10 +152,12 @@ static void qrd_lcd_splash_power_vote(int on)
 		qrd_lcd_ext_power_control(1);
 	} else if (!cont_splash_done) {
 		qrd_lcd_ext_power_control(0);
+		cont_splash_done = 1;
 	}
-
 	return;
 }
+//hxh: add end
+#endif
 
 static uint32_t lcdc_truly_gpio_initialized;
 
@@ -155,12 +169,12 @@ static uint32_t lcdc_truly_gpio_initialized;
 #define SKU3_LCDC_LCD_CAMERA_LDO_1V8	34  /*LCD_CAMERA_LDO_1V8*/
 #define SKU3_1_LCDC_LCD_CAMERA_LDO_1V8	58  /*LCD_CAMERA_LDO_1V8*/
 
-static uint32_t lcdc_truly_gpio_table[] = {
-	19,
-	20,
-	21,
-	89,
-	90,
+static uint32_t lcdc_panel_gpio_table[] = {
+	32,
+	33,
+	82,
+	96,
+	85,
 };
 
 static char *lcdc_gpio_name_table[5] = {
@@ -175,10 +189,39 @@ static int lcdc_truly_gpio_init(void)
 {
 	int i;
 	int rc = 0;
-
+//hxh: modified  for continue
+printk("hxh %s  %d \n",__func__,__LINE__);
+#if 0
+	if (!lcdc_truly_gpio_initialized) {
+		for (i = 0; i < ARRAY_SIZE(lcdc_panel_gpio_table); i++) {
+			rc = gpio_request(lcdc_panel_gpio_table[i],
+				lcdc_gpio_name_table[i]);
+			if (rc < 0) {
+				pr_err("Error request gpio %s\n",
+					lcdc_gpio_name_table[i]);
+				goto truly_gpio_fail;
+			}
+			rc = gpio_tlmm_config(GPIO_CFG(lcdc_panel_gpio_table[i],
+				0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+				GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+			if (rc < 0) {
+				pr_err("Error config lcdc gpio:%d\n",
+					lcdc_panel_gpio_table[i]);
+				goto truly_gpio_fail;
+			}
+			rc = gpio_direction_output(lcdc_panel_gpio_table[i], 0);
+			if (rc < 0) {
+				pr_err("Error direct lcdc gpio:%d\n",
+					lcdc_panel_gpio_table[i]);
+				goto truly_gpio_fail;
+			}
+		}
+		lcdc_truly_gpio_initialized = 1;
+#endif
+#if 1
     if (!lcdc_truly_gpio_initialized) {
-        for (i = 0; i < ARRAY_SIZE(lcdc_truly_gpio_table); i++) {
-            rc = gpio_request(lcdc_truly_gpio_table[i],
+        for (i = 0; i < ARRAY_SIZE(lcdc_panel_gpio_table); i++) {
+            rc = gpio_request(lcdc_panel_gpio_table[i],
                     lcdc_gpio_name_table[i]);
             if (rc < 0) {
                 pr_err("Error request gpio %s\n",
@@ -187,36 +230,36 @@ static int lcdc_truly_gpio_init(void)
             }
 
             /* Skip control GPIO config if continuous splash */
-            rc = gpio_tlmm_config(GPIO_CFG(lcdc_truly_gpio_table[i],
+            rc = gpio_tlmm_config(GPIO_CFG(lcdc_panel_gpio_table[i],
                         0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
                         GPIO_CFG_2MA), GPIO_CFG_ENABLE);
             if (rc < 0) {
                 pr_err("Error config lcdc gpio:%d\n",
-                        lcdc_truly_gpio_table[i]);
+                        lcdc_panel_gpio_table[i]);
                 goto truly_gpio_fail;
             }
 
             if (!cont_splash_enabled)
-                rc = gpio_direction_output(lcdc_truly_gpio_table[i], 0);
+                rc = gpio_direction_output(lcdc_panel_gpio_table[i], 0);
             else
-                rc = gpio_direction_output(lcdc_truly_gpio_table[i], 1);
+                rc = gpio_direction_output(lcdc_panel_gpio_table[i], 1);
 
             if (rc < 0) {
                 pr_err("Error direct lcdc gpio:%d\n",
-                        lcdc_truly_gpio_table[i]);
+                        lcdc_panel_gpio_table[i]);
                 goto truly_gpio_fail;
             }
         }
-
-		lcdc_truly_gpio_initialized = 1;
+	lcdc_truly_gpio_initialized = 1;
+//hxh: modified end
+#endif
 	}
-
 	return rc;
 
 truly_gpio_fail:
 	for (; i >= 0; i--) {
-		pr_err("Freeing GPIO: %d", lcdc_truly_gpio_table[i]);
-		gpio_free(lcdc_truly_gpio_table[i]);
+		pr_err("Freeing GPIO: %d", lcdc_panel_gpio_table[i]);
+		gpio_free(lcdc_panel_gpio_table[i]);
 	}
 
 	lcdc_truly_gpio_initialized = 0;
@@ -226,54 +269,108 @@ truly_gpio_fail:
 static int sku3_lcdc_power_save(int on)
 {
 	int rc = 0;
-
-	pr_debug("%s: on = %d\n", __func__, on);
+#if 1
+//hxh: add  for continue
+	/* reduce ref count of ext power */
+	if (cont_splash_enabled) {
+		qrd_lcd_splash_power_vote(0);
+	}
+//hxh: add end
+#endif
 
 	rc = qrd_lcd_ext_power_control(on);
 
-        if (on) {
-                rc = lcdc_truly_gpio_init();
-                if (rc < 0) {
-                        pr_err("%s(): Truly GPIO initializations failed",
-                                        __func__);
-                        return rc;
-                }
+	if (on) {
+		rc = lcdc_truly_gpio_init();
+		if (rc < 0) {
+			pr_err("%s(): Truly GPIO initializations failed",
+				__func__);
+			return rc;
+		}
 
-                if (!cont_splash_enabled || cont_splash_done) {
-                        if (lcdc_truly_gpio_initialized) {
-                                /*LCD reset*/
-                                gpio_set_value(SKU3_LCDC_GPIO_DISPLAY_RESET, 0);
-                                msleep(5);
-                                gpio_set_value(SKU3_LCDC_GPIO_DISPLAY_RESET, 1);
-                        }
-                }
-        } else {
-                /* pull down LCD IO to avoid current leakage */
-                gpio_set_value(SKU3_LCDC_GPIO_SPI_MOSI, 0);
-                gpio_set_value(SKU3_LCDC_GPIO_SPI_CLK, 0);
-                gpio_set_value(SKU3_LCDC_GPIO_SPI_CS0_N, 0);
-                gpio_set_value(SKU3_LCDC_GPIO_DISPLAY_RESET, 0);
-        }
-
-        /* reduce ref count of ext power */
-	if (cont_splash_enabled && !cont_splash_done) {
-		qrd_lcd_splash_power_vote(0);
-                cont_splash_done = 1;
+		if (lcdc_truly_gpio_initialized) {
+			/*LCD reset*/
+			gpio_set_value(SKU3_LCDC_GPIO_DISPLAY_RESET, 0);
+			msleep(5);
+			gpio_set_value(SKU3_LCDC_GPIO_DISPLAY_RESET, 1);
+		}
+	} else {
+		/* pull down LCD IO to avoid current leakage */
+		gpio_set_value(SKU3_LCDC_GPIO_SPI_MOSI, 0);
+		gpio_set_value(SKU3_LCDC_GPIO_SPI_CLK, 0);
+		gpio_set_value(SKU3_LCDC_GPIO_SPI_CS0_N, 0);
+		gpio_set_value(SKU3_LCDC_GPIO_DISPLAY_RESET, 0);
 	}
-
 	return rc;
 }
 
-static struct msm_panel_common_pdata lcdc_truly_panel_data = {
+static struct msm_panel_common_pdata lcdc_panel_pdata = {
 	.panel_config_gpio = NULL,
-	.gpio_num	  = lcdc_truly_gpio_table,
+	.gpio_num	  = lcdc_panel_gpio_table,
 };
 
 static struct platform_device lcdc_truly_panel_device = {
 	.name   = "lcdc_truly_hvga_ips3p2335_pt",
 	.id     = 0,
 	.dev    = {
-		.platform_data = &lcdc_truly_panel_data,
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+
+static struct platform_device lcdc_truly_hx8369_panel_device = {                
+	.name	= "lcdc_truly_wvga_hx8369a_pt",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+
+static struct platform_device lcdc_ts_nt35512_panel_device = {                
+	.name	= "lcdc_ts_ips_nt35512_pt",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+
+static struct platform_device lcdc_truly_dnj_panel_device = {                
+	.name	= "lcdc_dnj_wvga_hx8369a_pt",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+
+static struct platform_device lcdc_dnj_otm8018b_panel_device = {                
+	.name	= "lcdc_dnj_otm8018b_wvga_pt",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+//add by zhoulidong (start)
+static struct platform_device lcdc_azet_nt35510_panel_device = {                
+	.name	= "lcdc_azet_nt35510_wvga_pt",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+//add by zhoulidong (end)
+static struct platform_device lcdc_dnj_otm8018b_panel_ips_device = {                
+	.name	= "lcdc_dnj_otm8018b_wvga_ips",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
+	}
+};
+
+
+static struct platform_device lcdc_djn_otm8018b_panel_ips_2_device = {                
+	.name	= "lcdc_dnj_otm8018b_wvga_ips_2",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &lcdc_panel_pdata,
 	}
 };
 
@@ -499,6 +596,41 @@ done:
 	return is_himax;
 }
 
+//luke: add for /proc/lcdinfo
+static char *lcdname = "UNKNOW";
+static struct proc_dir_entry *lcdInforFile;
+
+static int read_lcd_info(char *page, char **start, off_t off,int count,
+			  int *eof, void *data){
+	ssize_t len = 0;
+	if(off > 0)
+	{
+		*eof = 1;
+		return 0;
+	}
+	len = (ssize_t)sprintf(page, "%s\n", lcdname);
+	
+	return len;
+
+}
+static int write_lcd_info(struct file * filp, const char __user *buff, unsigned long len,
+		void *data){
+	/*nothing to do now*/
+	return 0;
+}
+
+int creat_lcd_info_proc_file(void){
+
+	lcdInforFile = create_proc_entry("lcdInfor",0444,NULL);
+		if(NULL == lcdInforFile ){
+			pr_err("creat lcdinfo failed!");
+			return -1;
+		}
+        lcdInforFile->read_proc  = read_lcd_info;
+	lcdInforFile->write_proc = write_lcd_info;
+	return 0;
+}
+
 static int msm_fb_detect_panel(const char *name)
 {
 	int ret = -ENODEV;
@@ -515,20 +647,141 @@ static int msm_fb_detect_panel(const char *name)
 	} else if (machine_is_msm7627a_qrd1()) {
 		if (!strncmp(name, "mipi_video_truly_wvga", 21))
 			ret = 0;
-	} else if (machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7()) {
+	} else if (machine_is_msm7627a_qrd3()) {
 		if (!strncmp(name, "lcdc_truly_hvga_ips3p2335_pt", 28))
+			ret = 0;                                                                              
+
+
+		if (!strncmp(name, "mipi_djn_otm8018b", 17))
+                  		ret = 0;
+                        lcdname = "mipi_djn_otm8018b";
+	
+//modified by luke for otm8009a lcd [2012-04-24]                                                                                                             
+       /*
+	} else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() || machine_is_msm8625_qrd5()) {
+		if (!strncmp(name, "mipi_video_nt35510_wvga", 23))
+                 ret = 0;
+       */
+       } else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() ) {            
+		if (!strncmp(name, "mipi_cmd_nt35510_wvga", 21))
 			ret = 0;
-	} else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() || machine_is_msm8625_qrd5() || machine_is_msm7x27a_qrd5a()) {
-        if (cont_splash_enabled == 1) {
-            if (!strncmp(name, "mipi_cmd_nt35510_wvga", 21))
-                ret = 0;
-        } else if (cont_splash_enabled == 2) {
-            if (!strncmp(name, "mipi_video_nt35510_wvga", 21))
-                ret = 0;
-        } else {
-            if (!strncmp(name, "mipi_cmd_nt35510_wvga", 21))
-                ret = 0;
-        }
+       } else if (machine_is_msm8625_qrd5() || machine_is_msm8625_qrd7()){	
+
+		 if (is_rgtk_lcd_id(MIPI_DJN_LCD_OTM8018B)){
+			//printk(" luke : MIPI_DJN_LCD_OTM8018B!\n");
+			if (!strncmp(name, "mipi_djn_otm8018b", 17))
+		          	 ret = 0;
+		         lcdname = "MIPI_DJN_LCD_OTM8018";
+		 }
+//  azet otm8018b add by zhoulidong   (start)
+		if (is_rgtk_lcd_id(MIPI_AZET_LCD_OTM8018B)){
+			//printk(" luke : MIPI_DJN_LCD_OTM8018B!\n");
+			if (!strncmp(name, "mipi_azet_otm8018b", 18))
+		          	 ret = 0;
+		         lcdname = "MIPI_AZET_LCD_OTM8018";
+		 }
+//add (end)
+		if (is_rgtk_lcd_id(MIPI_TRULY_LCD_OTM8018B)){
+			if (!strncmp(name, "mipi_truly_otm8018b", 19))
+		          	 ret = 0;
+		         lcdname = "MIPI_TRULY_LCD_OTM8018B";
+		 }
+
+		if (is_rgtk_lcd_id(MIPI_AZET_LCD_NT35510)){
+			//printk(" luke : MIPI_AZET_LCD_NT35510!\n");
+			if (!strncmp(name, "mipi_azet_nt35510", 17))
+		          	 ret = 0;
+		         lcdname = "MIPI_AZET_LCD_NT35510";
+		 }
+            
+                if (is_rgtk_lcd_id(RGB_TRULY_LCD_HX8369)){
+                      //  printk(" luke : RGB_TRULY_LCD_HX8369  panel detected!\n");
+			if (!strncmp(name, "lcdc_truly_wvga_hx8369a_pt", 26))
+                  		ret = 0;
+                        lcdname = "RGB_TRULY_LCD_HX8369";
+                 }
+                  if (is_rgtk_lcd_id(RGB_TS_LCD_NT35512_IPS)){
+                    //    printk(" luke : RGB_TS_IPS_NT35512  panel detected!\n");
+			if (!strncmp(name, "lcdc_ts_ips_nt35512_pt",22 ))
+                  		ret = 0;
+                        lcdname = "RGB_TS_LCD_NT35512_IPS";
+                 }
+                 if (is_rgtk_lcd_id(RGB_DJN_LCD_HX8369)){
+                      //  printk(" luke : RGB_DNJ_LCD_HX8369 panel detected!\n");
+			if (!strncmp(name, "lcdc_dnj_wvga_hx8369a_pt", 24))
+                  		ret = 0;
+			lcdname = "RGB_DJN_LCD_HX8369";
+                 }
+                 if (is_rgtk_lcd_id(RGB_DNJ_LCD_OTM8018B)){
+                      //  printk(" luke : RGB_DNJ_LCD_OTM8018B panel detected!\n");
+			if (!strncmp(name, "lcdc_dnj_otm8018b_wvga_pt", 25))
+                  		ret = 0;
+			lcdname = "RGB_DNJ_LCD_OTM8018B";
+                 }
+                 if (is_rgtk_lcd_id(RGB_AZET_LCD_NT35510)){
+                      //  printk("luke: RGB_AZET_LCD_NT35510 panel detected!\n");
+			if (!strncmp(name, "lcdc_azet_nt35510_wvga_pt", 25))
+                  		ret = 0;
+			lcdname = "RGB_AZET_LCD_NT35510";
+                 }
+		 if (is_rgtk_lcd_id(MIPI_ORISE_LCD_OTM8009A)){
+                     //	printk("luke : MIPI_ORISE_LCD_OTM8009A panel detected!\n");    
+		 	if (!strncmp(name, "mipi_orise_otm8009a_wvga_pt", 27))	
+                 		ret = 0;
+			lcdname = "MIPI_ORISE_LCD_OTM8009A";
+                 }
+		 if (is_rgtk_lcd_id(MIPI_TCL_LCD_NT35510)){
+                     //	printk("luke : MIPI_TCL_LCD_NT35510 panel detected!\n");    
+		 	if (!strncmp(name, "mipi_nt35510_tcl_cmd_wvga_pt", 28))	
+                 		ret = 0;
+			lcdname = "MIPI_TCL_LCD_NT35510";
+                 }
+		 if (is_rgtk_lcd_id(MIPI_QHD_LCD_OTM9608A)){
+                     //	printk(" luke : MIPI_QHD_LCD_OTM9608A  panel detected!\n");    
+		 	if (!strncmp(name, "mipi_orise_otm9608a_qhd_pt", 26))	
+                 		ret = 0;
+			lcdname = "MIPI_QHD_LCD_OTM9608A";
+                 }
+		if (is_rgtk_lcd_id(MIPI_QHD_LCD_TRULY_NT35516)){
+                     //	printk(" hxh : MIPI_QHD_LCD_TRULY_NT35516  panel detected!\n");    
+		 	if (!strncmp(name, "mipi_truly_nt35516_qhd_pt", 25))	
+                 		ret = 0;
+			lcdname = "MIPI_QHD_LCD_TRULY_NT35516";
+                 }
+		if (is_rgtk_lcd_id(MIPI_QHD_LCD_DIJING_NT35516)){
+                     //	printk(" hxh : MIPI_QHD_LCD_DIJING_NT35516  panel detected!\n");    
+		 	if (!strncmp(name, "mipi_dijing_nt35516_qhd_pt", 26))	
+                 		ret = 0;
+			lcdname = "MIPI_QHD_LCD_DIJING_NT35516";
+                 }
+		 if (is_rgtk_lcd_id(MIPI_QHD_LCD_DNJ_OTM9608A)){
+                     //	printk("luke : MIPI_QHD_LCD_DNJ_OTM9608A  panel detected!\n");    
+		 	if (!strncmp(name, "mipi_dnj_orise_otm9608a_qhd_pt", 30))	
+                 		ret = 0;
+			lcdname = "MIPI_QHD_LCD_DNJ_OTM9608A";
+                 }
+//if (cont_splash_enabled == 1) { //luke: modified for continue
+		 if (is_rgtk_lcd_id(MIPI_QHD_LCD_TRULY_OTM9608A)){
+                    // 	printk("luke : MIPI_QHD_LCD_TRULY_OTM9608A  panel detected!\n");    
+		 	if (!strncmp(name, "mipi_truly_orise_otm9608a_qhd_pt", 32))	
+                 		ret = 0;
+			lcdname ="MIPI_QHD_LCD_TRULY_OTM9608A";
+                 }
+//}
+ 		if (is_rgtk_lcd_id(RGB_DNJ_LCD_OTM8018B_IPS)){
+                   //     printk("luke: RGB_DNJ_LCD_OTM8018B_IPS panel detected!\n");
+			if (!strncmp(name, "lcdc_dnj_otm8018b_wvga_ips", 26))
+                  	  ret = 0;
+			lcdname = "RGB_DNJ_LCD_OTM8018B_IPS";	  
+                 }	
+
+ 		if (is_rgtk_lcd_id(RGB_DNJ_LCD_OTM8018B_IPS_2)){
+
+			if (!strncmp(name, "lcdc_dnj_otm8018b_wvga_ips_2", 28))
+                  	  ret = 0;
+			lcdname = "RGB_DNJ_LCD_OTM8018B_IPS_2";	  
+                 }		
+//end
 	} else if (machine_is_msm8625_skua()) {
 		if (!strncmp(name, "mipi_video_himax_wvga", 21) && skua_panel_is_himax())
 			ret = 0;
@@ -626,7 +879,8 @@ static struct platform_device mipi_dsi_truly_panel_device = {
 };
 
 /* EVB, SKU5 */
-static struct msm_panel_common_pdata mipi_NT35510_pdata = {
+//---------------------------------------------------------------------
+static struct msm_panel_common_pdata mipi_panel_pdata = {
 	.backlight_level = NULL, //set in tps61161 driver
 	.gpio = GPIO_QRD3_LCD_BACKLIGHT_EN,
 };
@@ -635,7 +889,95 @@ static struct platform_device mipi_dsi_NT35510_panel_device = {
 	.name = "mipi_NT35510",
 	.id   = 0,
 	.dev  = {
-		.platform_data = &mipi_NT35510_pdata,
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_otm8009a_panel_device = {                   
+	.name = "mipi_orise_otm8009a_wvga_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_tcl_nt35510_panel_device = {                   
+	.name = "mipi_nt35510_tcl_cmd_wvga_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_otm9608a_panel_device = {                   
+	.name = "mipi_orise_otm9608a_qhd_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_dnj_otm9608a_panel_device = {                   
+	.name = "mipi_dnj_orise_otm9608a_qhd_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_truly_nt35516_panel_device = {                   
+	.name = "mipi_truly_nt35516_qhd_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_dijing_nt35516_panel_device = {                   
+	.name = "mipi_dijing_nt35516_qhd_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_dsi_truly_otm9608a_panel_device = {                   
+	.name = "mipi_truly_orise_otm9608a_qhd_pt",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_djn_otm8018b_panel_device = {
+	.name   = "mipi_djn_otm8018b",
+	.id     = 0,
+	.dev    = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_azet_otm8018b_panel_device = {
+	.name   = "mipi_azet_otm8018b",
+	.id     = 0,
+	.dev    = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_truly_otm8018b_panel_device = {
+	.name   = "mipi_truly_otm8018b",
+	.id     = 0,
+	.dev    = {
+		.platform_data = &mipi_panel_pdata,
+	}
+};
+
+static struct platform_device mipi_azet_nt35510_panel_device = {
+	.name   = "mipi_azet_nt35510",
+	.id     = 0,
+	.dev    = {
+		.platform_data = &mipi_panel_pdata,
 	}
 };
 
@@ -643,7 +985,7 @@ static struct platform_device evb_backlight_device = {
 	.name = "tps6116_backlight",
 	.id   = 0,
 	.dev  = {
-		.platform_data = &mipi_NT35510_pdata,
+		.platform_data = &mipi_panel_pdata,
 	}
 };
 
@@ -713,13 +1055,35 @@ static struct platform_device *qrd_fb_devices[] __initdata = {
 static struct platform_device *qrd3_fb_devices[] __initdata = {
 	&msm_fb_device,
 	&lcdc_truly_panel_device,
+	&mipi_djn_otm8018b_panel_device,
+	&mipi_azet_nt35510_panel_device,
 };
+
 
 static struct platform_device *evb_fb_devices[] __initdata = {
 	&msm_fb_device,
-	&mipi_dsi_NT35510_panel_device,
+        &mipi_dsi_NT35510_panel_device,	
 	&mipi_dsi_NT35516_panel_device,
-	&evb_backlight_device,
+	&mipi_djn_otm8018b_panel_device,
+	&mipi_azet_otm8018b_panel_device, //add by zhoulidong
+	&mipi_truly_otm8018b_panel_device,
+	&mipi_azet_nt35510_panel_device,
+	&lcdc_truly_hx8369_panel_device,          //hx8369  
+        &lcdc_ts_nt35512_panel_device,            
+	&lcdc_truly_dnj_panel_device,             //dnj
+        &lcdc_dnj_otm8018b_panel_device,  
+	&lcdc_azet_nt35510_panel_device,    
+	&mipi_dsi_otm8009a_panel_device,          //orise_otm8009a 
+        &mipi_dsi_tcl_nt35510_panel_device,
+        &mipi_dsi_otm9608a_panel_device,
+        &mipi_dsi_dnj_otm9608a_panel_device,
+	&mipi_dsi_truly_nt35516_panel_device,
+	&mipi_dsi_dijing_nt35516_panel_device,
+        &mipi_dsi_truly_otm9608a_panel_device,        
+		&lcdc_dnj_otm8018b_panel_ips_device,
+		&lcdc_djn_otm8018b_panel_ips_2_device,
+	&evb_backlight_device,	
+
 };
 
 static struct platform_device *skua_fb_devices[] __initdata = {
@@ -762,7 +1126,7 @@ void __init msm_msm7627a_allocate_memory_regions(void)
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = 97,
 	.mdp_rev = MDP_REV_303,
-	.cont_splash_enabled = 0,
+	.cont_splash_enabled = 0, //hxh: add for continue
 };
 
 #define GPIO_LCDC_BRDG_PD	128
@@ -985,10 +1349,50 @@ static int msm_fb_dsi_client_skua_reset(void)
 static int msm_fb_dsi_client_qrd3_reset(void)
 {
 	int rc = 0;
+//hxh: modified for continue
+#if 0
+	rc = gpio_request(GPIO_QRD3_LCD_BRDG_RESET_N, "qrd3_lcd_brdg_reset_n");
+	if (rc < 0) {
+		pr_err("Failed to request qrd3_lcd_brdg_reset_n\n");
+		return rc;
+	}
 
-    pr_debug("%s: cont_splash_enabled = %d\n", __func__, cont_splash_enabled);
+	rc = gpio_tlmm_config(qrd3_mipi_dsi_gpio[0], GPIO_CFG_ENABLE);
+	if (rc < 0) {
+		pr_err("Failed to config qrd3_gpio_bkl_en\n");
+		goto gpio_fail1;
+	}
 
-    rc = gpio_request(GPIO_QRD3_LCD_BRDG_RESET_N, "qrd3_lcd_brdg_reset_n");
+	rc = gpio_direction_output(GPIO_QRD3_LCD_BRDG_RESET_N, 0);
+	if (rc < 0) {
+		pr_err("Failed to direction qrd3_gpio_bkl_en\n");
+		goto gpio_fail1;
+	}
+
+	rc = gpio_request(GPIO_QRD3_LCD_BACKLIGHT_EN,
+			"qrd3_gpio_bkl_en");
+	if (rc < 0) {
+		pr_err("Failed to request qrd3_gpio_bkl_en\n");
+		goto gpio_fail1;
+	}
+
+	rc = gpio_tlmm_config(qrd3_mipi_dsi_gpio[1], GPIO_CFG_ENABLE);
+	if (rc < 0) {
+		pr_err("Failed to config qrd3_gpio_bkl_en\n");
+		goto gpio_fail2;
+	}
+	rc = gpio_direction_output(GPIO_QRD3_LCD_BACKLIGHT_EN, 0);
+	if (rc < 0) {
+		pr_err("Failed to direction qrd3_gpio_bkl_en\n");
+		goto gpio_fail2;
+	}
+
+	return rc;
+#endif
+#if 1
+ pr_debug("%s: cont_splash_enabled = %d\n", __func__, cont_splash_enabled);
+
+    rc = gpio_request(gpio_num[GPIO_LCD_RESET_INDEX], "qrd3_lcd_brdg_reset_n");
     if (rc < 0) {
         pr_err("Failed to request qrd3_lcd_brdg_reset_n\n");
         return rc;
@@ -1001,29 +1405,36 @@ static int msm_fb_dsi_client_qrd3_reset(void)
     }
 
     if (!cont_splash_enabled)
-        rc = gpio_direction_output(GPIO_QRD3_LCD_BRDG_RESET_N, 0);
+        rc = gpio_direction_output(gpio_num[GPIO_LCD_RESET_INDEX], 0);
     else
-        rc = gpio_direction_output(GPIO_QRD3_LCD_BRDG_RESET_N, 1);
+        rc = gpio_direction_output(gpio_num[GPIO_LCD_RESET_INDEX], 1);
 
     if (rc < 0) {
         pr_err("Failed to direction qrd3_gpio_bkl_en\n");
         goto gpio_fail1;
     }
 
-    rc = gpio_request(GPIO_QRD3_LCD_BACKLIGHT_EN,
+    rc = gpio_request(gpio_num[GPIO_LCD_LED_EN_INDEX],
             "qrd3_gpio_bkl_en");
     if (rc < 0) {
         pr_err("Failed to request qrd3_gpio_bkl_en\n");
         goto gpio_fail1;
     }
 
-    if((machine_is_msm8625_qrd5() && hw_version_is(3, 0)) || (machine_is_msm7x27a_qrd5a() && hw_version_is(3, 0))) {
-        rc = gpio_tlmm_config(qrd3_mipi_dsi_gpio[2], GPIO_CFG_ENABLE);
+    if((machine_is_msm8625_qrd5()/* && hw_version_is(3, 0)*/) || (machine_is_msm7x27a_qrd5a() /*&& hw_version_is(3, 0)*/) \
+		|| machine_is_msm8625_qrd7()) {
+        rc = gpio_tlmm_config(qrd3_mipi_dsi_gpio[1], GPIO_CFG_ENABLE);
         if (rc < 0) {
             pr_err("Failed to config qrd3_gpio_bkl_en\n");
             goto gpio_fail2;
         }
+	//Start ===Allen	
+	#if 1
+	rc = gpio_direction_output(gpio_num[GPIO_LCD_LED_EN_INDEX], 1);
+	#else
         rc = gpio_direction_input(GPIO_QRD3_LCD_BACKLIGHT_EN);
+	#endif
+	//End ===Allen
         if (rc < 0) {
             pr_err("Failed to direction qrd3_gpio_bkl_en\n");
             goto gpio_fail2;
@@ -1047,11 +1458,12 @@ static int msm_fb_dsi_client_qrd3_reset(void)
     }
 
     return rc;
-
+//hxh: modified end
+#endif
 gpio_fail2:
-	gpio_free(GPIO_QRD3_LCD_BACKLIGHT_EN);
+	gpio_free(gpio_num[GPIO_LCD_LED_EN_INDEX]);
 gpio_fail1:
-	gpio_free(GPIO_QRD3_LCD_BRDG_RESET_N);
+	gpio_free(gpio_num[GPIO_LCD_RESET_INDEX]);
 	return rc;
 }
 
@@ -1063,7 +1475,7 @@ static int msm_fb_dsi_client_reset(void)
 		rc = msm_fb_dsi_client_qrd1_reset();
 	else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() || 
 			machine_is_msm8625_qrd5()|| machine_is_msm7x27a_qrd5a() || 
-			machine_is_msm8625_evt())
+			machine_is_msm8625_evt() || machine_is_msm8625_qrd7())
 		rc = msm_fb_dsi_client_qrd3_reset();
 	else if (machine_is_msm8625_skua())
 		rc = msm_fb_dsi_client_skua_reset();
@@ -1254,30 +1666,53 @@ static int mipi_dsi_panel_skua_power(int on)
 	return rc;
 }
 
+static int regs_lcdc_initialized =0;
 static int mipi_dsi_panel_qrd3_power(int on)
 {
 	int rc = 0;
 
 	printk("%s: on = %d\n", __func__, on);
-
-	rc = qrd_lcd_ext_power_control(on);
-
-        if (!cont_splash_enabled || cont_splash_done) {
-                if (on) {
-                        gpio_set_value_cansleep(GPIO_QRD3_LCD_BRDG_RESET_N, 0);
-                        msleep(5);
-                        gpio_set_value_cansleep(GPIO_QRD3_LCD_BRDG_RESET_N, 1);
-                } else {
-                        gpio_set_value_cansleep(GPIO_QRD3_LCD_BRDG_RESET_N, 0);
-                }
-        }
-
+#if 1
+//hxh: add for continue
 	/* reduce ref count of ext power */
-	if (cont_splash_enabled && !cont_splash_done) {
+	if (cont_splash_enabled) {
 		qrd_lcd_splash_power_vote(0);
-		cont_splash_done = 1;
 	}
+//hxh: add end
+#endif
 
+	if(regs_lcdc_initialized  ==0){
+	rc = regulator_bulk_get(NULL, ARRAY_SIZE(regs_lcdc),
+						regs_lcdc);
+			if (rc) {
+				pr_err("%s: could not get regulators: %d\n",
+						__func__, rc);
+				
+			}
+
+			rc = regulator_bulk_set_voltage(ARRAY_SIZE(regs_lcdc),
+					regs_lcdc);
+			if (rc) {
+				pr_err("%s: could not set voltages: %d\n",
+						__func__, rc);
+				
+			}
+			regs_lcdc_initialized  =1;
+	}	
+	
+	rc = on ? regulator_bulk_enable(ARRAY_SIZE(regs_lcdc), regs_lcdc) :
+			  regulator_bulk_disable(ARRAY_SIZE(regs_lcdc), regs_lcdc);
+			  
+	//rc = qrd_lcd_ext_power_control(on);
+	
+	/* TODO: panel specific? */
+	if (on) {
+		gpio_set_value_cansleep(GPIO_QRD3_LCD_BRDG_RESET_N, 0);
+		msleep(5);
+		gpio_set_value_cansleep(GPIO_QRD3_LCD_BRDG_RESET_N, 1);
+	} else {
+		gpio_set_value_cansleep(GPIO_QRD3_LCD_BRDG_RESET_N, 0);
+	}
 	return rc;
 }
 
@@ -1289,7 +1724,7 @@ static int mipi_dsi_panel_power(int on)
 		rc = mipi_dsi_panel_qrd1_power(on);
 	else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() || 
 			machine_is_msm8625_qrd5() || machine_is_msm7x27a_qrd5a() || 
-			machine_is_msm8625_evt())
+			machine_is_msm8625_evt() ||machine_is_msm8625_qrd7())
 		rc = mipi_dsi_panel_qrd3_power(on);
 	else if(machine_is_msm8625_skua())
 		rc = mipi_dsi_panel_skua_power(on);
@@ -1299,10 +1734,13 @@ static int mipi_dsi_panel_power(int on)
 }
 
 #define MDP_303_VSYNC_GPIO 97
-
+#if 1
+//hxh: add for continue
 static char mipi_dsi_splash_is_enabled(void) {
     return mdp_pdata.cont_splash_enabled;
 }
+//hxh: add end
+#endif
 
 #ifdef CONFIG_FB_MSM_MIPI_DSI
 static struct mipi_dsi_platform_data mipi_dsi_pdata = {
@@ -1310,7 +1748,7 @@ static struct mipi_dsi_platform_data mipi_dsi_pdata = {
 	.dsi_power_save		= mipi_dsi_panel_power,
 	.dsi_client_reset       = msm_fb_dsi_client_reset,
 	.get_lane_config	= msm_fb_get_lane_config,
-    .splash_is_enabled  = mipi_dsi_splash_is_enabled,
+	.splash_is_enabled      = mipi_dsi_splash_is_enabled,  //hxh: add for continue
 };
 #endif
 
@@ -1335,19 +1773,28 @@ void msm7x27a_set_display_params(char *prim_panel)
 
 void __init msm_fb_add_devices(void)
 {
+#if 1
+//hxh: add for continue
 	/* Using continuous splash or not */
 	if (machine_is_msm8625_qrd7() || machine_is_msm8625_evb() || machine_is_msm8625_qrd5()) {
-            if (cont_splash_enabled) {
+              if (cont_splash_enabled) {
                     /* increase ref count of ext power */
                     qrd_lcd_splash_power_vote(1);
                     mdp_pdata.cont_splash_enabled = 1;
                     /* FIXME: Need these flags to indicate backlight driver the initial backlight level */
-                    mipi_NT35510_pdata.cont_splash_enabled = 1;
+                    mipi_panel_pdata.cont_splash_enabled = 1;  // for mipi panel driver
+                    lcdc_panel_pdata.cont_splash_enabled = 1;  // for lcdc panel driver
                     mipi_NT35510_alaska_pdata.cont_splash_enabled = 1;
                     mipi_himax_pdata.cont_splash_enabled = 1;
-            }
-    }
+              }
 
+	      //Start===Allen
+		qrd3_mipi_dsi_gpio[0] = gpio_cfg[GPIO_LCD_RESET_INDEX];
+		qrd3_mipi_dsi_gpio[1] = gpio_cfg[GPIO_LCD_LED_EN_INDEX];
+	      //End===Allen
+	}
+//hxh: add end
+#endif
 	/* default is NT35510 */
 	if (machine_is_msm8625_skua() && skua_panel_is_himax()) {
 		skua_fb_devices[1] = &mipi_dsi_himax_panel_device;
@@ -1360,13 +1807,13 @@ void __init msm_fb_add_devices(void)
 				ARRAY_SIZE(qrd_fb_devices));
 	else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() || 
 			machine_is_msm8625_qrd5() || machine_is_msm7x27a_qrd5a() || 
-			machine_is_msm8625_evt()) {
+			machine_is_msm8625_evt() || machine_is_msm8625_qrd7() ) {
 		platform_add_devices(evb_fb_devices,
 				ARRAY_SIZE(evb_fb_devices));
 	} else if (machine_is_msm8625_skua())
 		platform_add_devices(skua_fb_devices,
 				ARRAY_SIZE(skua_fb_devices));
-	else if (machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7()) {
+	else if (machine_is_msm7627a_qrd3()) {
 		platform_add_devices(qrd3_fb_devices,
 						ARRAY_SIZE(qrd3_fb_devices));
 	} else
@@ -1376,9 +1823,17 @@ void __init msm_fb_add_devices(void)
 	msm_fb_register_device("mdp", &mdp_pdata);
 	if (machine_is_msm7625a_surf() || machine_is_msm7x27a_surf()
 		|| machine_is_msm8625_surf() || machine_is_msm7627a_qrd3()
-		|| machine_is_msm8625_qrd7())
+		|| machine_is_msm8625_qrd7() 
+//added by luke for lcdc panel device [2012-04-19] 
+                || machine_is_msm8625_qrd5()
+//end
+        ){ 
 		msm_fb_register_device("lcdc", &lcdc_pdata);
+               
+        }
+
 #ifdef CONFIG_FB_MSM_MIPI_DSI
 	msm_fb_register_device("mipi_dsi", &mipi_dsi_pdata);
+	printk("msm_fb_register_device  mipi_dsi \n");
 #endif
 }

@@ -35,6 +35,11 @@
 #include "mdp.h"
 #include "mdp4.h"
 
+//extern unsigned long mdp_timer_duration;			//luke:
+/* Defined in mdp.c to indicate support appboot logo display*/
+//extern boolean mdp_continues_display;				//end
+
+
 u32 dsi_irq;
 
 static boolean tlmm_settings = FALSE;
@@ -133,8 +138,10 @@ static int mipi_dsi_off(struct platform_device *pdev)
 	local_bh_enable();
 
 	mipi_dsi_unprepare_clocks();
-	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
+	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save){
+printk("luke: %s-----lcd_panel_power off! %d\n", __func__, __LINE__);
 		mipi_dsi_pdata->dsi_power_save(0);
+	}
 
 	if (mdp_rev >= MDP_REV_41)
 		mutex_unlock(&mfd->dma->ov_mutex);
@@ -166,9 +173,10 @@ static int mipi_dsi_on(struct platform_device *pdev)
 	pinfo = &mfd->panel_info;
 
 	MSM_FB_INFO("%s: %d\n",__func__,__LINE__);
-	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
+	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save){
+printk("luke: %s-----lcd_panel_power on! %d\n", __func__, __LINE__);
 		mipi_dsi_pdata->dsi_power_save(1);
-
+	}
 	cont_splash_clk_ctrl(0);
 	mipi_dsi_prepare_clocks();
 
@@ -337,7 +345,10 @@ static int mipi_dsi_on(struct platform_device *pdev)
 		up(&mfd->dma->mutex);
 
 	pr_debug("%s-:\n", __func__);
-
+	//if(mdp_continues_display) {		//luke:
+	//	mdp_continues_display = FALSE;
+	//	mdp_timer_duration = (HZ);
+ 	//}					//end
 	return ret;
 }
 

@@ -26,10 +26,18 @@
 #include <asm/mach-types.h>
 #include <mach/rpc_server_handset.h>
 #include <mach/pmic.h>
+#include "linux/input/gt818x.h"
+
+#include <linux/input.h>
 
 #include "devices.h"
 #include "board-msm7627a.h"
 #include "devices-msm7x2xa.h"
+#include <../../../../build/buildplus/target/QRDExt_target.h>
+
+//Start=====Allen
+#include <linux/board-ragentek-cfg.h>
+//End=====Allen
 
 #define ATMEL_TS_I2C_NAME "maXTouch"
 #define ATMEL_X_OFFSET 13
@@ -128,11 +136,10 @@ static const unsigned short keymap_8625[] = {
 	KEY_CAMERA,
 };
 
-static const unsigned short keymap_8625_qrd5[] = {
+static unsigned short keymap_8625_qrd5[] = {
 	KEY_VOLUMEDOWN,
 	KEY_VOLUMEUP,
 };
-
 static const unsigned short keymap_8625_evt[] = {
 	KEY_VOLUMEDOWN,
 	KEY_VOLUMEUP,
@@ -689,6 +696,52 @@ static struct i2c_board_info atmel_ts_i2c_info[] __initdata = {
 	},
 };
 
+#ifdef CONFIG_TOUCHSCREEN_GT868
+
+
+
+#define GT868_IRQ_GPIO		48
+#define GT868_RESET_GPIO	26
+
+static struct goodix_ts_data gt868_platformdata = {
+	.abs_x_max		= 480,
+	.abs_y_max		= 800,
+	.reset_gpio = GT868_RESET_GPIO,
+};
+
+
+static struct i2c_board_info gt868_info[] __initdata  =  
+{ 
+	{ 
+	    I2C_BOARD_INFO("Goodix-TS", 0x5d),
+	   .platform_data = &gt868_platformdata,
+	   .irq = MSM_GPIO_TO_INT(GT868_IRQ_GPIO),
+	}, 
+}; 
+
+static void __init gt868_touchpad_setup(void)
+{
+	int rc;
+
+	gt868_platformdata.reset_gpio =gpio_num[GPIO_TOUCH_PANEL_RESET_INDEX];
+	gt868_platformdata.use_irq =gpio_num[GPIO_TOUCH_PANEL_INT_INDEX];
+
+	rc = gpio_tlmm_config(gpio_cfg[GPIO_TOUCH_PANEL_INT_INDEX], GPIO_CFG_ENABLE);
+	if (rc)
+		pr_err("%s: gpio_tlmm_config for %d failed\n",
+			__func__, GT868_IRQ_GPIO);
+
+	rc = gpio_tlmm_config(gpio_cfg[GPIO_TOUCH_PANEL_RESET_INDEX], GPIO_CFG_ENABLE);
+	if (rc)
+		pr_err("%s: gpio_tlmm_config for %d failed\n",
+			__func__, GT868_RESET_GPIO);
+
+	printk("gt868_touchpad_setup\n");
+	i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
+				gt868_info,
+				ARRAY_SIZE(gt868_info));
+}
+#endif
 static struct msm_handset_platform_data hs_platform_data = {
 	.hs_name = "7k_handset",
 	.pwr_key_delay_ms = 500, /* 0 will disable end key */
@@ -702,8 +755,63 @@ static struct platform_device hs_pdev = {
 	},
 };
 
+#ifdef CONFIG_TOUCHSCREEN_FT5X06
 #define FT5X06_IRQ_GPIO		48
 #define FT5X06_RESET_GPIO	26
+
+#if 0
+static ssize_t
+ft5x06_virtual_keys_register_for_q801(struct kobject *kobj,
+			     struct kobj_attribute *attr,
+			     char *buf)
+{
+	return snprintf(buf, 200,
+	__stringify(EV_KEY) ":" __stringify(KEY_HOME)  ":81:999:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":189:999:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_BACK) ":351:999:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH)   ":459:999:80:60"
+	"\n");
+
+}
+
+static ssize_t
+ft5x06_virtual_keys_register_for_q802(struct kobject *kobj,
+			     struct kobj_attribute *attr,
+			     char *buf)
+{
+//#ifdef ENABLE_PROJECT_FOR_802QC
+#if(ENABLE_PROJECT_FOR_802QC)
+	printk("sym 802 qc\n");
+	return snprintf(buf, 200,
+	__stringify(EV_KEY) ":" __stringify(KEY_HOME)  ":72:866:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":168:866:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":408:866:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":312:866:80:60"
+	"\n");
+
+//#endif
+#endif
+
+	return snprintf(buf, 200,
+	__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":72:866:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":168:866:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":408:866:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":312:866:80:60"
+	"\n");
+
+}
+
+static ssize_t
+ft5x06_virtual_keys_register_for_q803(struct kobject *kobj,
+			     struct kobj_attribute *attr,
+			     char *buf)
+{
+	return snprintf(buf, 200,
+	__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":55:849:80:80"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":240:849:80:80"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":420:849:80:80"
+	"\n");
+}
 
 static ssize_t
 ft5x06_virtual_keys_register(struct kobject *kobj,
@@ -712,7 +820,7 @@ ft5x06_virtual_keys_register(struct kobject *kobj,
 {
 	return snprintf(buf, 200,
 	__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":40:510:80:60"
-	":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":120:510:80:60"
+	":" __stringify(EV_KEY) ":" __stringify(KEY_HOMEPAGE)   ":120:510:80:60"
 	":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":200:510:80:60"
 	":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":280:510:80:60"
 	"\n");
@@ -736,10 +844,11 @@ static struct attribute_group ft5x06_virtual_key_properties_attr_group = {
 };
 
 struct kobject *ft5x06_virtual_key_properties_kobj;
+#endif
 
 static struct ft5x06_ts_platform_data ft5x06_platformdata = {
-	.x_max		= 320,
-	.y_max		= 480,
+	.x_max		= 480,
+	.y_max		= 800,
 	.reset_gpio	= FT5X06_RESET_GPIO,
 	.irq_gpio	= FT5X06_IRQ_GPIO,
 	.irqflags	= IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
@@ -757,20 +866,47 @@ static void __init ft5x06_touchpad_setup(void)
 {
 	int rc;
 
-	rc = gpio_tlmm_config(GPIO_CFG(FT5X06_IRQ_GPIO, 0,
-			GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
-			GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+	if(is_rgtk_lcd_id(RGB_TRULY_LCD_HX8369) ||
+	   is_rgtk_lcd_id(RGB_DJN_LCD_HX8369) ||
+	   is_rgtk_lcd_id(MIPI_ORISE_LCD_OTM8009A)) {
+		ft5x06_platformdata.x_max = 480;
+		ft5x06_platformdata.y_max = 800;		
+	}
+
+	if(is_rgtk_product(RGTK_PRODUCT_Q801)) {
+		ft5x06_platformdata.x_max = 540;
+		ft5x06_platformdata.y_max = 960;
+	//	ft5x06_virtual_keys_attr.show = &ft5x06_virtual_keys_register_for_q801;
+	}
+	
+	if(is_rgtk_product(RGTK_PRODUCT_Q802)) {
+		ft5x06_platformdata.x_max = 480;
+		ft5x06_platformdata.y_max = 800;
+	//	ft5x06_virtual_keys_attr.show = &ft5x06_virtual_keys_register_for_q802;
+	}
+
+	if(is_rgtk_product(RGTK_PRODUCT_Q803) \
+		|| is_rgtk_product(RGTK_PRODUCT_Q203) \
+		|| is_rgtk_product(RGTK_PRODUCT_DC205) ) {
+		ft5x06_platformdata.x_max = 480;
+		ft5x06_platformdata.y_max = 800;
+	//	ft5x06_virtual_keys_attr.show = &ft5x06_virtual_keys_register_for_q803;
+	}
+
+	ft5x06_platformdata.reset_gpio =gpio_num[GPIO_TOUCH_PANEL_RESET_INDEX];
+	ft5x06_platformdata.irq_gpio =gpio_num[GPIO_TOUCH_PANEL_INT_INDEX];
+
+	rc = gpio_tlmm_config(gpio_cfg[GPIO_TOUCH_PANEL_INT_INDEX], GPIO_CFG_ENABLE);
 	if (rc)
 		pr_err("%s: gpio_tlmm_config for %d failed\n",
 			__func__, FT5X06_IRQ_GPIO);
 
-	rc = gpio_tlmm_config(GPIO_CFG(FT5X06_RESET_GPIO, 0,
-			GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN,
-			GPIO_CFG_8MA), GPIO_CFG_ENABLE);
+	rc = gpio_tlmm_config(gpio_cfg[GPIO_TOUCH_PANEL_RESET_INDEX], GPIO_CFG_ENABLE);
 	if (rc)
 		pr_err("%s: gpio_tlmm_config for %d failed\n",
 			__func__, FT5X06_RESET_GPIO);
 
+#if 0
 	ft5x06_virtual_key_properties_kobj =
 			kobject_create_and_add("board_properties", NULL);
 
@@ -780,16 +916,47 @@ static void __init ft5x06_touchpad_setup(void)
 
 	if (!ft5x06_virtual_key_properties_kobj || rc)
 		pr_err("%s: failed to create board_properties\n", __func__);
-
+#endif
+	#if 0
 	if(machine_is_msm8625_skua()){
 		ft5x06_platformdata.x_max = 480;
 		ft5x06_platformdata.y_max = 800;
 	}
+	#endif
 	i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
 				ft5x06_device_info,
 				ARRAY_SIZE(ft5x06_device_info));
 }
+#endif 
 
+
+#ifdef CONFIG_TOUCHSCREEN_AW5306
+
+//static struct aw5x06_ts_platform_data aw5x06_platformdata = {
+//	.reset_gpio	= 26,
+//};
+
+static struct i2c_board_info aw5306_info[] __initdata = {
+	{
+		I2C_BOARD_INFO("AW5306_ts", 0x40),
+	//	.platform_data = &aw5x06_platformdata,
+		.irq = MSM_GPIO_TO_INT(48),
+	},
+};
+static void __init aw5x06_touchpad_setup(void){
+	
+	//	aw5x06_platformdata.reset_gpio =gpio_num[GPIO_TOUCH_PANEL_RESET_INDEX];
+	int rc;
+	rc = gpio_tlmm_config(gpio_cfg[GPIO_TOUCH_PANEL_RESET_INDEX], GPIO_CFG_ENABLE);
+	if (rc)
+		pr_err("%s: gpio_tlmm_config for %d failed\n",
+			__func__, 48);
+
+i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
+				aw5306_info,
+				ARRAY_SIZE(aw5306_info));
+}
+#endif
 #ifdef CONFIG_LEDS_TRICOLOR_FLAHSLIGHT
 
 #define LED_FLASH_EN1 13
@@ -939,8 +1106,25 @@ void __init qrd7627a_add_io_devices(void)
 {
 	int rc;
 
-	/* touchscreen */
-	if (machine_is_msm7627a_qrd1()) {
+	/* touchscreen */	
+	//  begin for add for get TP info , by anxiang.xiao
+	create_tp_info_file();
+	// end  for add for get TP info 
+	if(is_rgtk_product(RGTK_PRODUCT_Q802) \
+		||is_rgtk_product(RGTK_PRODUCT_Q801) \
+		||is_rgtk_product(RGTK_PRODUCT_Q203) \
+		||is_rgtk_product(RGTK_PRODUCT_Q803) \
+		||is_rgtk_product(RGTK_PRODUCT_DC205)) {
+		#ifdef CONFIG_TOUCHSCREEN_FT5X06
+		ft5x06_touchpad_setup();
+		#endif
+		#ifdef CONFIG_TOUCHSCREEN_GT868
+		gt868_touchpad_setup();
+		#endif
+		#ifdef CONFIG_TOUCHSCREEN_AW5306
+		aw5x06_touchpad_setup();
+		#endif
+	} else if (machine_is_msm7627a_qrd1()) {
 		i2c_register_board_info(MSM_GSBI1_QUP_I2C_BUS_ID,
 					synaptic_i2c_clearpad3k,
 					ARRAY_SIZE(synaptic_i2c_clearpad3k));
@@ -972,7 +1156,9 @@ void __init qrd7627a_add_io_devices(void)
 	} else if (machine_is_msm7627a_qrd3() || 
 			machine_is_msm8625_skua() ||
 			machine_is_msm8625_qrd7()) {
+			#ifdef CONFIG_TOUCHSCREEN_FT5X06
 		ft5x06_touchpad_setup();
+			#endif
 	}
 
 	/* headset */
@@ -985,6 +1171,13 @@ void __init qrd7627a_add_io_devices(void)
 
 	/* change the keymap for qrd sku5 */
 	if(machine_is_msm8625_qrd5() || machine_is_msm7x27a_qrd5a()) {
+		if(is_rgtk_product(RGTK_PRODUCT_Q803)  \
+			|| is_rgtk_product(RGTK_PRODUCT_Q203) \
+			|| is_rgtk_product(RGTK_PRODUCT_DC205) ) {
+			keymap_8625_qrd5[0] = KEY_VOLUMEUP;
+			keymap_8625_qrd5[1] = KEY_VOLUMEDOWN;
+		}
+
 		kp_matrix_info_8625.keymap = keymap_8625_qrd5;
 		kp_matrix_info_8625.output_gpios = kp_row_gpios_8625_qrd5;
 		kp_matrix_info_8625.noutputs = ARRAY_SIZE(kp_row_gpios_8625_qrd5);
@@ -1005,6 +1198,7 @@ void __init qrd7627a_add_io_devices(void)
 
 	/* leds */
 	if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() || machine_is_msm8625_qrd5() || machine_is_msm7x27a_qrd5a()) {
+		#if 0
 		rc = gpio_tlmm_config(GPIO_CFG(LED_RED_GPIO_8625, 0,
 				GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP,
 				GPIO_CFG_16MA), GPIO_CFG_ENABLE);
@@ -1020,7 +1214,8 @@ void __init qrd7627a_add_io_devices(void)
 			pr_err("%s: gpio_tlmm_config for %d failed\n",
 				__func__, LED_GREEN_GPIO_8625);
 		}
-
+		#endif
+		
 		//platform_device_register(&gpio_leds_8625);
 		platform_device_register(&pmic_mpp_leds_pdev);
 	}

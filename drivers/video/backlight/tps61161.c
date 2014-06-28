@@ -84,43 +84,45 @@ static int tps61161_set_bl(int level, int max, int min)
 		if (ret)
 			pr_err("%s: can't set lcd backlight!\n", __func__);
 	} else {
-		spin_lock_irqsave(&tps61161_spin_lock, flags); //disable local irq and preemption
-		if (level == 0) {
-			gpio_set_value(bl_ctl_num, 0);
-			prev_bl = level;
-			spin_unlock_irqrestore(&tps61161_spin_lock, flags);
-			return 0;
-		} else if (prev_bl == 0) {
-			printk("[DISP]%s: prev_bl = 0, enter easy scale first\n", __func__);
-			gpio_set_value(bl_ctl_num, 0);
-			DELAY_TOFF;
-			gpio_set_value(bl_ctl_num, 1);
-			DELAY_TESDELAY;
-			gpio_set_value(bl_ctl_num, 0);
-			DELAY_TESDET;
-			gpio_set_value(bl_ctl_num, 1);
-			DELAY_TESWIN;
-		}
-
+	spin_lock_irqsave(&tps61161_spin_lock, flags); //disable local irq and preemption
+	if (level == 0) {
+		gpio_set_value(bl_ctl_num, 0);
 		prev_bl = level;
-
-		/* device address byte = 0x72 */
-		tps61161_send_byte(0x72);
-
-		/* t-EOS and t-start */
-		gpio_set_value(bl_ctl_num, 0);
-		DELAY_TEOS;
-		gpio_set_value(bl_ctl_num, 1);
-		DELAY_TSTART;
-
-		/* data byte */
-		tps61161_send_byte(level & 0x1F); //RFA = 0, address bit = 00, 5 bit level
-		/* t-EOS */
-		gpio_set_value(bl_ctl_num, 0);
-		DELAY_TEOS;
-		gpio_set_value(bl_ctl_num, 1);
-		DELAY_TSTART;
 		spin_unlock_irqrestore(&tps61161_spin_lock, flags);
+		return 0;
+	} else if (prev_bl == 0) {
+			printk("[DISP]%s: prev_bl = 0, enter easy scale first\n", __func__);
+		gpio_set_value(bl_ctl_num, 0);
+		DELAY_TOFF;
+		gpio_set_value(bl_ctl_num, 1);
+		DELAY_TESDELAY;
+		gpio_set_value(bl_ctl_num, 0);
+		DELAY_TESDET;
+		gpio_set_value(bl_ctl_num, 1);
+		DELAY_TESWIN;
+	}
+
+	prev_bl = level;
+
+	/* device address byte = 0x72 */
+	tps61161_send_byte(0x72);
+
+	/* t-EOS and t-start */
+	gpio_set_value(bl_ctl_num, 0);
+	DELAY_TEOS;
+	gpio_set_value(bl_ctl_num, 1);
+	DELAY_TSTART;
+
+	/* data byte */
+	tps61161_send_byte(level & 0x1F); //RFA = 0, address bit = 00, 5 bit level
+
+	/* t-EOS */
+	gpio_set_value(bl_ctl_num, 0);
+	DELAY_TEOS;
+	gpio_set_value(bl_ctl_num, 1);
+	DELAY_TSTART;
+
+	spin_unlock_irqrestore(&tps61161_spin_lock, flags);
 	}
 
 

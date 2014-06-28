@@ -14,6 +14,11 @@
  * Author: San Mehat (san@android.com)
  *
  */
+/****************************************
+History:
+1. chuiguo.zeng@ragentek.com 2012.12.31 BUG_ID:QELS-2641 
+   Description: Fix the problem that the transmission may be disconnected if copy some big files from computer to SD card in USB storage mode.
+ ****************************************/
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -5013,7 +5018,9 @@ msmsdcc_probe(struct platform_device *pdev)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
 	mmc->caps |= MMC_CAP_SDIO_IRQ;
 
-	mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+	//delete BUG_ID:QELS-2641  zengchuiguo 20121231 (start)
+	//mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+	//delete BUG_ID:QELS-2641  zengchuiguo 20121231 (end)
 
 	if (plat->is_sdio_al_client)
 		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;

@@ -558,18 +558,62 @@ config BOSCH_BMA250
 	help
 	  If you say yes here you get support for Bosch Sensortec's
 	  acceleration sensors BMA250.
-
+config INPUT_KIONIX_ACCEL  
+	#tristate "KIONIX_ACCEL" 
+	bool "KIONIX_ACCEL" 
+	depends on I2C=y 
+	default n
+	help 
+		If you say yes here you get support for the Kionix digital 3-axis 
+		accelerometer. 
+  
+          
+config ROHM_RPR400
+   tristate "ROHM  light/proximity sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for Avago
+          light/proximity sensors rpr400.
+          
 config AVAGO_APDS990X
         tristate "Avago apds990x light/proximity sensor support"
         depends on I2C=y
         help
           If you say yes here you get support for Avago
           light/proximity sensors apds990x.
+ 
+config STK31XX_POLL_MODE
+        tristate "STK31XX light/proximity sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for STK31XX
+          light/proximity sensors .
 
+
+config STK31XX_INT_MODE
+	bool "SenseTek STK31xx INT mode"
+
+	---help---
+	Driver will report "Near or Far" as input event
+
+config STK3X1X_INT_MODE
+	bool "SenseTek STK3x1x INT mode"
+
+	---help---
+	Driver will report "Near or Far" as input event
+
+         
 config INPUT_KXTJ9
 	tristate "Kionix KXTJ9 digital accelerometer"
 	depends on I2C && SYSFS
 	help
 	  If you say yes here you get support for Kionix KXTJ9 digital accelerometer.
+
+config INPUT_RPI1040
+        tristate "RPI1040 sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for Bosch Sensortec's
+          acceleration sensors RPI1040.
 
 endif
