@@ -121,6 +121,8 @@ extern void __iomem *__arm_ioremap_caller(unsigned long, size_t, unsigned int,
 extern void __iomem *__arm_ioremap_pfn(unsigned long, unsigned long, size_t, unsigned int);
 extern void __iomem *__arm_ioremap(unsigned long, size_t, unsigned int);
 extern void __iounmap(volatile void __iomem *addr);
+extern void __arm_iounmap(volatile void __iomem *addr);
+extern void (*arch_iounmap)(volatile void __iomem *);
 
 /*
  * Bad read/write accesses...
@@ -283,7 +285,6 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
  */
 #ifndef __arch_ioremap
 #define __arch_ioremap			__arm_ioremap
-#define __arch_iounmap			__iounmap
 #endif
 
 #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
@@ -292,7 +293,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 						MT_DEVICE_STRONGLY_ORDERED)
 #define ioremap_cached(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
 #define ioremap_wc(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE_WC)
-#define iounmap				__arch_iounmap
+#define iounmap				__arm_iounmap
 
 /*
  * io{read,write}{8,16,32} macros
@@ -357,3 +358,4 @@ extern void register_isa_ports(unsigned int mmio, unsigned int io,
 
 #endif	/* __KERNEL__ */
 #endif	/* __ASM_ARM_IO_H */
+
