@@ -991,9 +991,7 @@ static int msm_mctl_dev_open(struct file *f)
 		return rc;
 	}
 	pcam_inst->vbqueue_initialized = 0;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	kref_get(&pmctl->refcount);
-#endif
 	f->private_data = &pcam_inst->eventHandle;
 
 	D("f->private_data = 0x%x, pcam = 0x%x\n",
@@ -1080,9 +1078,7 @@ static int msm_mctl_dev_close(struct file *f)
 	kfree(pcam_inst);
 	if (NULL != pmctl) {
 		D("%s : release ion client", __func__);
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 		kref_put(&pmctl->refcount, msm_release_ion_client);
-#endif
 	}
 	f->private_data = NULL;
 	mutex_unlock(&pcam->mctl_node.dev_lock);

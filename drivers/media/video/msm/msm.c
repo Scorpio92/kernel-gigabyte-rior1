@@ -2122,7 +2122,6 @@ static int msm_mmap(struct file *f, struct vm_area_struct *vma)
 	return rc;
 }
 
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 void msm_release_ion_client(struct kref *ref)
 {
 	struct msm_cam_media_controller *mctl = container_of(ref,
@@ -2130,7 +2129,6 @@ void msm_release_ion_client(struct kref *ref)
 	pr_err("%s Calling ion_client_destroy\n", __func__);
 	ion_client_destroy(mctl->client);
 }
-#endif
 
 static int msm_close(struct file *f)
 {
