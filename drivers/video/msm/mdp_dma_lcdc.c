@@ -198,7 +198,15 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		       mfd->panel_info.bpp);
 		return -ENODEV;
 	}
-
+printk("luke:%s  mfd->cont_splash_done =%d,%d \n ",__func__,mfd->cont_splash_done,__LINE__);
+#if 1
+//hxh: add for continue
+	if (!(mfd->cont_splash_done)) {
+		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+		MDP_OUTP(MDP_BASE + timer_base, 0);
+	}
+//hxh: add end
+#endif
 	/* DMA register config */
 
 	dma_base = DMA_P_BASE;
@@ -329,33 +337,16 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		MDP_OUTP(MDP_BASE + timer_base + 0x38, active_v_end);
 	}
 
-#ifdef CONFIG_HUAWEI_KERNEL
-	ret = 0;
-    lcdtype = get_lcd_panel_type();
-	if( (LCD_HX8357C_TIANMA_HVGA != lcdtype )&&(LCD_HX8357B_TIANMA_HVGA != lcdtype ))
-	{
-		ret = panel_next_on(pdev);
-	}
-#else
-	ret = panel_next_on(pdev);
-#endif
-	if (ret == 0) {
+
+	//ret = panel_next_on(pdev); // luke: modify
+	//if (ret == 0) {
 		/* enable LCDC block */
 		MDP_OUTP(MDP_BASE + timer_base, 1);
 		mdp_pipe_ctrl(block, MDP_BLOCK_POWER_ON, FALSE);
-	}
+	//}
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-
-#ifdef CONFIG_HUAWEI_KERNEL
-	/*need to send 2 frame pclk data before sending sleep out command*/
-	if( (LCD_HX8357C_TIANMA_HVGA == lcdtype )||(LCD_HX8357B_TIANMA_HVGA == lcdtype ))
-	{
-		msleep(50);
-		ret = panel_next_on(pdev);
-	}
-#endif
-/* delete some line */
+        ret = panel_next_on(pdev);   //luke: 
 
 	if (!vsync_cntrl.sysfs_created) {
 		ret = sysfs_create_group(&vsync_cntrl.dev->kobj,
