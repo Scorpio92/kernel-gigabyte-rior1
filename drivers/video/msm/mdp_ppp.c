@@ -1342,6 +1342,7 @@ void put_img(struct file *p_src_file, struct ion_handle *p_ihdl)
 #endif
 }
 
+
 static int mdp_ppp_blit_addr(struct fb_info *info, struct mdp_blit_req *req,
 	unsigned long srcp0_start, unsigned long srcp0_len,
 	unsigned long srcp1_start, unsigned long srcp1_len,
@@ -1442,8 +1443,8 @@ static int mdp_ppp_blit_addr(struct fb_info *info, struct mdp_blit_req *req,
 		if ((req->src.format != MDP_Y_CBCR_H2V2) &&
 			(req->src.format != MDP_Y_CRCB_H2V2)) {
 #endif
-		put_img(p_src_file, *src_ihdl);
-		put_img(p_dst_file, *dst_ihdl);
+			put_img(p_src_file, *src_ihdl);
+			put_img(p_dst_file, *dst_ihdl);
 			return -EINVAL;
 #ifdef CONFIG_FB_MSM_MDP31
 		}
@@ -1482,8 +1483,8 @@ static int mdp_ppp_blit_addr(struct fb_info *info, struct mdp_blit_req *req,
 			printk(KERN_ERR
 				"%s: sharpening strength out of range\n",
 				__func__);
-		put_img(p_src_file, *src_ihdl);
-		put_img(p_dst_file, *dst_ihdl);
+			put_img(p_src_file, *src_ihdl);
+			put_img(p_dst_file, *dst_ihdl);
 			return -EINVAL;
 		}
 
@@ -1596,8 +1597,8 @@ static int mdp_ppp_blit_addr(struct fb_info *info, struct mdp_blit_req *req,
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	up(&mdp_ppp_mutex);
 
-		put_img(p_src_file, *src_ihdl);
-		put_img(p_dst_file, *dst_ihdl);
+	put_img(p_src_file, *src_ihdl);
+	put_img(p_dst_file, *dst_ihdl);
 	return 0;
 }
 

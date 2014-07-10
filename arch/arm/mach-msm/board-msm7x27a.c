@@ -48,7 +48,7 @@
 #include <mach/msm_battery.h>
 #include <linux/smsc911x.h>
 #include <linux/atmel_maxtouch.h>
-#include <linux/fmem.h>
+//#include <linux/fmem.h>
 #include <linux/msm_adc.h>
 #include "devices.h"
 #include "timer.h"
@@ -170,12 +170,10 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 #define MSM_3M_PMEM_ADSP_SIZE	(0x1048000)
 /*   enlarge the pmem space for HDR on 8950s
  */
-/*
 static unsigned int get_pmem_adsp_size(void)
 {
 		return MSM_PMEM_ADSP_SIZE;
 }
-*/
 #endif
 
 
@@ -458,9 +456,6 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
 	.cached = 1,
 	.memory_type = MEMTYPE_EBI1,
-	.request_region = request_fmem_c_region,
-	.release_region = release_fmem_c_region,
-	.reusable = 1,
 };
 
 static struct platform_device android_pmem_adsp_device = {
@@ -781,7 +776,7 @@ static void msm7x27a_cfg_uart2dm_serial(void)
 #else
 static void msm7x27a_cfg_uart2dm_serial(void) { }
 #endif
-
+/*
 static struct fmem_platform_data fmem_pdata;
 
 static struct platform_device fmem_device = {
@@ -789,7 +784,7 @@ static struct platform_device fmem_device = {
 	.id = 1,
 	.dev = { .platform_data = &fmem_pdata },
 };
-
+*/
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_device_dmov,
 	&msm_device_smd,
@@ -827,7 +822,7 @@ static struct platform_device *common_devices[] __initdata = {
 	&android_pmem_device,
 	&android_pmem_adsp_device,
 	&android_pmem_audio_device,
-	&fmem_device,
+//	&fmem_device,
 	&msm_device_nand,
 	&msm_device_snd,
 	&msm_device_adspdec,
@@ -877,7 +872,7 @@ static void fix_sizes(void)
 		pmem_adsp_size = MSM7x25A_MSM_PMEM_ADSP_SIZE;
 	} else {
 		pmem_mdp_size = MSM_PMEM_MDP_SIZE;
-		pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
+		pmem_adsp_size = get_pmem_adsp_size();
 	}
 /*delete qcom code */
 /*
