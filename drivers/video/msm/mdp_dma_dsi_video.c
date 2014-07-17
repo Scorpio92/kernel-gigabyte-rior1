@@ -248,6 +248,22 @@ int mdp_dsi_video_off(struct platform_device *pdev)
 	return ret;
 }
 
+void mdp_dma_video_vsync_ctrl(int enable)
+{
+	if (vsync_cntrl.vsync_irq_enabled == enable)
+		return;
+
+	vsync_cntrl.vsync_irq_enabled = enable;
+
+	if (enable) {
+		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+		mdp3_vsync_irq_enable(LCDC_FRAME_START, MDP_VSYNC_TERM);
+	} else {
+		mdp3_vsync_irq_disable(LCDC_FRAME_START, MDP_VSYNC_TERM);
+		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+	}
+}
+
 void mdp_dsi_video_update(struct msm_fb_data_type *mfd)
 {
 	struct fb_info *fbi = mfd->fbi;
