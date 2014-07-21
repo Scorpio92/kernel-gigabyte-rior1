@@ -1114,9 +1114,6 @@ struct dm_target *dm_table_find_target(struct dm_table *t, sector_t sector)
 	return &t->targets[(KEYS_PER_NODE * n) + k];
 }
 
-/*
- * Establish the new table's queue_limits and validate them.
- */
 int dm_calculate_queue_limits(struct dm_table *table,
 			      struct queue_limits *limits)
 {

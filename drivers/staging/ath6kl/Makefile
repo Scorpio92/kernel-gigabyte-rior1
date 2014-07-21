@@ -120,3 +120,5 @@ ccflags-y += -I$(obj)/hif/sdio/linux_sdio/include
 ccflags-y += -DSDIO
 ath6kl-y += hif/sdio/linux_sdio/src/hif.o
 ath6kl-y += hif/sdio/linux_sdio/src/hif_scatter.o
+
+CFLAGS_ar6000_pm.o = -Wno-enum-compare

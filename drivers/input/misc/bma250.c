@@ -257,7 +257,7 @@ static int bma250_smbus_read_byte_block(struct i2c_client *client,
 static int bma250_set_mode(struct i2c_client *client, unsigned char Mode)
 {
 	int comres = 0;
-	unsigned char data1;
+	unsigned char data1 = 0;
 
 	if (client == NULL) {
 		comres = -1;
@@ -324,7 +324,7 @@ static int bma250_get_mode(struct i2c_client *client, unsigned char *Mode)
 static int bma250_set_range(struct i2c_client *client, unsigned char Range)
 {
 	int comres = 0;
-	unsigned char data1;
+	unsigned char data1=0;
 
 	if (client == NULL) {
 		comres = -1;
@@ -388,7 +388,7 @@ static int bma250_get_range(struct i2c_client *client, unsigned char *Range)
 static int bma250_set_bandwidth(struct i2c_client *client, unsigned char BW)
 {
 	int comres = 0;
-	unsigned char data;
+	unsigned char data=0;
 	int Bandwidth = 0;
 
 	if (client == NULL) {
@@ -444,7 +444,7 @@ static int bma250_set_bandwidth(struct i2c_client *client, unsigned char BW)
 static int bma250_get_bandwidth(struct i2c_client *client, unsigned char *BW)
 {
 	int comres = 0;
-	unsigned char data;
+	unsigned char data=0;
 
 	if (client == NULL) {
 		comres = -1;

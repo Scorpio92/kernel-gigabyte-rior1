@@ -1033,9 +1033,6 @@ static void dm_bio_destructor(struct bio *bio)
 	bio_free(bio, bs);
 }
 
-/*
- * Creates a little bio that just does part of a bvec.
- */
 static struct bio *split_bvec(struct bio *bio, sector_t sector,
 			      unsigned short idx, unsigned int offset,
 			      unsigned int len, struct bio_set *bs)
@@ -1065,9 +1062,6 @@ static struct bio *split_bvec(struct bio *bio, sector_t sector,
 	return clone;
 }
 
-/*
- * Creates a bio that consists of range of complete bvecs.
- */
 static struct bio *clone_bio(struct bio *bio, sector_t sector,
 			     unsigned short idx, unsigned short bv_count,
 			     unsigned int len, struct bio_set *bs)

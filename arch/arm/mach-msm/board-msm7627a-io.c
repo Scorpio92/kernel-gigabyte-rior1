@@ -303,7 +303,7 @@ struct kobject *mxt_virtual_key_properties_kobj;
 
 static int mxt_touchpad_setup(void)
 {
-	int retval;
+	int retval=0;
 
         mxt_virtual_key_properties_kobj =
                 kobject_create_and_add("board_properties", NULL);
