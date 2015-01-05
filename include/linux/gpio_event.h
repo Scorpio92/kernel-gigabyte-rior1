@@ -83,10 +83,10 @@ struct gpio_event_matrix_info {
 	unsigned int ninputs;
 	unsigned int noutputs;
 	/* time to wait before reading inputs after driving each output */
-	struct timespec settle_time;
+	ktime_t settle_time;
 	/* time to wait before scanning the keypad a second time */
-	struct timespec debounce_delay;
-	struct timespec poll_time;
+	ktime_t debounce_delay;
+	ktime_t poll_time;
 	unsigned flags;
 };
 
@@ -119,6 +119,9 @@ struct gpio_event_input_info {
 	uint16_t type;
 	const struct gpio_event_direct_entry *keymap;
 	size_t keymap_size;
+#ifdef CONFIG_HUAWEI_KERNEL
+	int (*func)(struct gpio_event_input_devs *input_devs,struct gpio_event_input_info *data);
+#endif
 };
 
 /* outputs */
@@ -136,8 +139,8 @@ struct gpio_event_output_info {
 	const struct gpio_event_direct_entry *keymap;
 	size_t keymap_size;
 };
-
-
+/*return slide status*/
+int get_slide_pressed(void);
 /* axes */
 
 enum gpio_event_axis_flags {

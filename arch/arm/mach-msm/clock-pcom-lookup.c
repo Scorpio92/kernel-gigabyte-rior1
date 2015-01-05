@@ -14,6 +14,7 @@
 #include "clock-pll.h"
 #include "clock-pcom.h"
 #include "clock-voter.h"
+#include <linux/io.h>
 
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
@@ -21,19 +22,19 @@
 #define PLLn_MODE(n)	(MSM_CLK_CTL_BASE + 0x300 + 28 * (n))
 #define PLL4_MODE	(MSM_CLK_CTL_BASE + 0x374)
 
-static DEFINE_CLK_PCOM(adm_clk,		ADM_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(adsp_clk,	ADSP_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(ahb_m_clk,	AHB_M_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(ahb_s_clk,	AHB_S_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(cam_m_clk,	CAM_M_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(adm_clk,		ADM_CLK,	0);
+static DEFINE_CLK_PCOM(adsp_clk,	ADSP_CLK,	0);
+static DEFINE_CLK_PCOM(ahb_m_clk,	AHB_M_CLK,	0);
+static DEFINE_CLK_PCOM(ahb_s_clk,	AHB_S_CLK,	0);
+static DEFINE_CLK_PCOM(cam_m_clk,	CAM_M_CLK,	0);
 static DEFINE_CLK_PCOM(axi_rotator_clk,	AXI_ROTATOR_CLK, 0);
-static DEFINE_CLK_PCOM(ce_clk,		CE_CLK,		CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(csi0_clk,	CSI0_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(csi0_p_clk,	CSI0_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(csi0_vfe_clk,	CSI0_VFE_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(csi1_clk,	CSI1_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(csi1_p_clk,	CSI1_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(csi1_vfe_clk,	CSI1_VFE_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(ce_clk,		CE_CLK,		0);
+static DEFINE_CLK_PCOM(csi0_clk,	CSI0_CLK,	0);
+static DEFINE_CLK_PCOM(csi0_p_clk,	CSI0_P_CLK,	0);
+static DEFINE_CLK_PCOM(csi0_vfe_clk,	CSI0_VFE_CLK,	0);
+static DEFINE_CLK_PCOM(csi1_clk,	CSI1_CLK,	0);
+static DEFINE_CLK_PCOM(csi1_p_clk,	CSI1_P_CLK,	0);
+static DEFINE_CLK_PCOM(csi1_vfe_clk,	CSI1_VFE_CLK,	0);
 
 static struct pll_shared_clk pll0_clk = {
 	.id = PLL_0,
@@ -112,38 +113,36 @@ static struct pcom_clk dsi_pixel_clk = {
 };
 
 static DEFINE_CLK_PCOM(dsi_ref_clk,	DSI_REF_CLK,	0);
-static DEFINE_CLK_PCOM(ebi1_clk,	EBI1_CLK,
-		CLKFLAG_SKIP_AUTO_OFF | CLKFLAG_MIN);
-static DEFINE_CLK_PCOM(ebi2_clk,	EBI2_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(ecodec_clk,	ECODEC_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(ebi1_clk,	EBI1_CLK,	CLKFLAG_MIN);
+static DEFINE_CLK_PCOM(ebi2_clk,	EBI2_CLK,	0);
+static DEFINE_CLK_PCOM(ecodec_clk,	ECODEC_CLK,	0);
 static DEFINE_CLK_PCOM(emdh_clk,	EMDH_CLK,   CLKFLAG_MIN | CLKFLAG_MAX);
-static DEFINE_CLK_PCOM(gp_clk,		GP_CLK,		CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(grp_2d_clk,	GRP_2D_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(grp_2d_p_clk,	GRP_2D_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(gp_clk,		GP_CLK,		0);
+static DEFINE_CLK_PCOM(grp_2d_clk,	GRP_2D_CLK,	0);
+static DEFINE_CLK_PCOM(grp_2d_p_clk,	GRP_2D_P_CLK,	0);
 static DEFINE_CLK_PCOM(grp_3d_clk,	GRP_3D_CLK,	0);
-static DEFINE_CLK_PCOM(grp_3d_p_clk,	GRP_3D_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(grp_3d_p_clk,	GRP_3D_P_CLK,	0);
 static DEFINE_CLK_PCOM(gsbi1_qup_clk,	GSBI1_QUP_CLK,	0);
 static DEFINE_CLK_PCOM(gsbi1_qup_p_clk,	GSBI1_QUP_P_CLK, 0);
 static DEFINE_CLK_PCOM(gsbi2_qup_clk,	GSBI2_QUP_CLK,	0);
 static DEFINE_CLK_PCOM(gsbi2_qup_p_clk,	GSBI2_QUP_P_CLK, 0);
-static DEFINE_CLK_PCOM(gsbi_clk,	GSBI_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(gsbi_p_clk,	GSBI_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(hdmi_clk,	HDMI_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(i2c_clk,		I2C_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(icodec_rx_clk,	ICODEC_RX_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(icodec_tx_clk,	ICODEC_TX_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(gsbi_clk,	GSBI_CLK,	0);
+static DEFINE_CLK_PCOM(gsbi_p_clk,	GSBI_P_CLK,	0);
+static DEFINE_CLK_PCOM(hdmi_clk,	HDMI_CLK,	0);
+static DEFINE_CLK_PCOM(i2c_clk,		I2C_CLK,	0);
+static DEFINE_CLK_PCOM(icodec_rx_clk,	ICODEC_RX_CLK,	0);
+static DEFINE_CLK_PCOM(icodec_tx_clk,	ICODEC_TX_CLK,	0);
 static DEFINE_CLK_PCOM(imem_clk,	IMEM_CLK,	0);
-static DEFINE_CLK_PCOM(mdc_clk,		MDC_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(mdc_clk,		MDC_CLK,	0);
 static DEFINE_CLK_PCOM(mdp_clk,		MDP_CLK,	CLKFLAG_MIN);
 static DEFINE_CLK_PCOM(mdp_lcdc_pad_pclk_clk, MDP_LCDC_PAD_PCLK_CLK,
-		CLKFLAG_SKIP_AUTO_OFF);
+		0);
 static DEFINE_CLK_PCOM(mdp_lcdc_pclk_clk, MDP_LCDC_PCLK_CLK,
-		CLKFLAG_SKIP_AUTO_OFF);
+		0);
 static DEFINE_CLK_PCOM(mdp_vsync_clk,	MDP_VSYNC_CLK,	0);
 static DEFINE_CLK_PCOM(mdp_dsi_p_clk,	MDP_DSI_P_CLK,	0);
-static DEFINE_CLK_PCOM(pbus_clk,	PBUS_CLK,
-		CLKFLAG_SKIP_AUTO_OFF | CLKFLAG_MIN);
-static DEFINE_CLK_PCOM(pcm_clk,		PCM_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(pbus_clk,	PBUS_CLK,	CLKFLAG_MIN);
+static DEFINE_CLK_PCOM(pcm_clk,		PCM_CLK,	0);
 static DEFINE_CLK_PCOM(pmdh_clk,	PMDH_CLK,   CLKFLAG_MIN | CLKFLAG_MAX);
 static DEFINE_CLK_PCOM(sdac_clk,	SDAC_CLK,	0);
 static DEFINE_CLK_PCOM(sdc1_clk,	SDC1_CLK,	0);
@@ -154,12 +153,12 @@ static DEFINE_CLK_PCOM(sdc3_clk,	SDC3_CLK,	0);
 static DEFINE_CLK_PCOM(sdc3_p_clk,	SDC3_P_CLK,	0);
 static DEFINE_CLK_PCOM(sdc4_clk,	SDC4_CLK,	0);
 static DEFINE_CLK_PCOM(sdc4_p_clk,	SDC4_P_CLK,	0);
-static DEFINE_CLK_PCOM(spi_clk,		SPI_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(tsif_clk,	TSIF_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(tsif_p_clk,	TSIF_P_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(tsif_ref_clk,	TSIF_REF_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(tv_dac_clk,	TV_DAC_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(tv_enc_clk,	TV_ENC_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(spi_clk,		SPI_CLK,	0);
+static DEFINE_CLK_PCOM(tsif_clk,	TSIF_CLK,	0);
+static DEFINE_CLK_PCOM(tsif_p_clk,	TSIF_P_CLK,	0);
+static DEFINE_CLK_PCOM(tsif_ref_clk,	TSIF_REF_CLK,	0);
+static DEFINE_CLK_PCOM(tv_dac_clk,	TV_DAC_CLK,	0);
+static DEFINE_CLK_PCOM(tv_enc_clk,	TV_ENC_CLK,	0);
 static DEFINE_CLK_PCOM(uart1_clk,	UART1_CLK,	0);
 static DEFINE_CLK_PCOM(uart1dm_clk,	UART1DM_CLK,	0);
 static DEFINE_CLK_PCOM(uart2_clk,	UART2_CLK,	0);
@@ -172,8 +171,8 @@ static DEFINE_CLK_PCOM(usb_hs3_p_clk,	USB_HS3_P_CLK,	0);
 static DEFINE_CLK_PCOM(usb_hs_clk,	USB_HS_CLK,	0);
 static DEFINE_CLK_PCOM(usb_hs_core_clk,	USB_HS_CORE_CLK, 0);
 static DEFINE_CLK_PCOM(usb_hs_p_clk,	USB_HS_P_CLK,	0);
-static DEFINE_CLK_PCOM(usb_otg_clk,	USB_OTG_CLK,	CLKFLAG_SKIP_AUTO_OFF);
-static DEFINE_CLK_PCOM(usb_phy_clk,	USB_PHY_CLK,	CLKFLAG_SKIP_AUTO_OFF);
+static DEFINE_CLK_PCOM(usb_otg_clk,	USB_OTG_CLK,	0);
+static DEFINE_CLK_PCOM(usb_phy_clk,	USB_PHY_CLK,	0);
 static DEFINE_CLK_PCOM(vdc_clk,		VDC_CLK,	CLKFLAG_MIN);
 static DEFINE_CLK_PCOM(vfe_axi_clk,	VFE_AXI_CLK,	0);
 static DEFINE_CLK_PCOM(vfe_clk,		VFE_CLK,	0);
@@ -318,30 +317,34 @@ static struct clk_lookup msm_cmn_clk_7625a_7627a[] __initdata = {
 	CLK_LOOKUP("slave_iface_clk",		ahb_s_clk.c,	"mipi_dsi.1"),
 	CLK_LOOKUP("cam_m_clk",		cam_m_clk.c,	NULL),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0036"),
-	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-001e"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-001b"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0010"),
-	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-003c"),
-	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-003d"),
-	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0076"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0078"),
-	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-007a"),
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-006c"),
+	/*the cam_clk is for s5k4e1, whose I2C addr is 0x6E*/
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-006e"),
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-007a"), //mclk for mt9v113
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0042"), //mclk for gc0313
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0037"), //mclk for bf3905
 	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-000d"),
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-005a"),
+    CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-006f"),//mclck for s5k3h2
+	CLK_LOOKUP("cam_clk",		cam_m_clk.c,	"0-0040"),//mclck for hi542
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov9726.0"),
 	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov9726.0"),
 	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov9726.0"),
-#ifdef CONFIG_GC0339
-	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_gc0339.0"),
-	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_gc0339.0"),
-	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_gc0339.0"),
-#endif
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_ov7692.0"),
 	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_ov7692.0"),
 	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_ov7692.0"),
+#ifdef CONFIG_HUAWEI_CAMERA
+	/* If disable these three sentences, the camera will not work,for not
+	 * receiving any frames from camera driver.
+	   If add a new front mipi camera,we can add three sentences as mt9v113
+	 */
 	CLK_LOOKUP("csi_clk",		csi0_clk.c,	"msm_camera_mt9v113.0"),
 	CLK_LOOKUP("csi_pclk",		csi0_p_clk.c,	"msm_camera_mt9v113.0"),
-	CLK_LOOKUP("csi_vfe_clk",   csi0_vfe_clk.c,	"msm_camera_mt9v113.0"),
+	CLK_LOOKUP("csi_vfe_clk",	csi0_vfe_clk.c,	"msm_camera_mt9v113.0"),
+#endif 
 	CLK_LOOKUP("csi_clk",		csi1_clk.c,	NULL),
 	CLK_LOOKUP("csi_pclk",		csi1_p_clk.c,	NULL),
 	CLK_LOOKUP("csi_vfe_clk",	csi1_vfe_clk.c,	NULL),
@@ -393,7 +396,12 @@ static struct clk_lookup msm_cmn_clk_7625a_7627a[] __initdata = {
 	CLK_LOOKUP("core_clk",		uart1_clk.c,	"msm_serial.0"),
 	CLK_LOOKUP("core_clk",		uart2_clk.c,	"msm_serial.1"),
 	CLK_LOOKUP("core_clk",		uart1dm_clk.c,	"msm_serial_hs.0"),
+/* uart2dm should use msm_serial_hs clock instead of msm_serial_hsl clock */
+#ifndef CONFIG_HUAWEI_KERNEL
 	CLK_LOOKUP("core_clk",		uart2dm_clk.c,	"msm_serial_hsl.0"),
+#else
+	CLK_LOOKUP("core_clk",		uart2dm_clk.c,	"msm_serial_hs.1"),
+#endif
 	CLK_LOOKUP("core_clk",		usb_hs_core_clk.c, "msm_otg"),
 	CLK_LOOKUP("alt_core_clk",	usb_hs_clk.c,	"msm_otg"),
 	CLK_LOOKUP("iface_clk",		usb_hs_p_clk.c,	"msm_otg"),

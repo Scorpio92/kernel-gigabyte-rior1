@@ -39,11 +39,19 @@
 #endif
 #include "diag_dci.h"
 
+
+#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+#include "phudiagchar.h"
+#include "phudiagfwd.h"
+#endif
 #define MODE_CMD		41
 #define RESET_ID		2
 #define ALL_EQUIP_ID		100
 #define ALL_SSID		-1
 #define MAX_SSID_PER_RANGE	100
+#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+int phudiagfwd_usb_diag_suspend_packet_num = 0;
+#endif
 
 int diag_debug_buf_idx;
 unsigned char diag_debug_buf[1024];
@@ -120,7 +128,7 @@ int chk_config_get_id(void)
 		return 0;
 
 	if (driver->use_device_tree) {
-		if (machine_is_copper())
+		if (machine_is_msm8974())
 			return MSM8974_TOOLS_ID;
 		else
 			return 0;
@@ -133,8 +141,9 @@ int chk_config_get_id(void)
 		case MSM_CPU_8064:
 			return APQ8064_TOOLS_ID;
 		case MSM_CPU_8930:
+		case MSM_CPU_8930AA:
 			return MSM8930_TOOLS_ID;
-		case MSM_CPU_COPPER:
+		case MSM_CPU_8974:
 			return MSM8974_TOOLS_ID;
 		case MSM_CPU_8625:
 			return MSM8625_TOOLS_ID;
@@ -157,9 +166,10 @@ int chk_apps_only(void)
 	case MSM_CPU_8960:
 	case MSM_CPU_8064:
 	case MSM_CPU_8930:
+	case MSM_CPU_8930AA:
 	case MSM_CPU_8627:
 	case MSM_CPU_9615:
-	case MSM_CPU_COPPER:
+	case MSM_CPU_8974:
 		return 1;
 	default:
 		return 0;
@@ -175,8 +185,8 @@ int chk_apps_master(void)
 {
 	if (driver->use_device_tree)
 		return 1;
-	else if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_msm9615() ||
-		cpu_is_apq8064() || cpu_is_msm8627())
+	else if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_msm8930aa() ||
+		cpu_is_msm9615() || cpu_is_apq8064() || cpu_is_msm8627())
 		return 1;
 	else
 		return 0;
@@ -198,6 +208,39 @@ int chk_polling_response(void)
 		return 1;
 	else
 		return 0;
+}
+
+/*
+ * This function should be called if you feel that the logging process may
+ * need to be woken up. For instance, if the logging mode is MEMORY_DEVICE MODE
+ * and while trying to read data from a SMD data channel there are no buffers
+ * available to read the data into, then this function should be called to
+ * determine if the logging process needs to be woken up.
+ */
+void chk_logging_wakeup(void)
+{
+	int i;
+
+	/* Find the index of the logging process */
+	for (i = 0; i < driver->num_clients; i++)
+		if (driver->client_map[i].pid ==
+			driver->logging_process_id)
+			break;
+
+	if (i < driver->num_clients) {
+		/* At very high logging rates a race condition can
+		 * occur where the buffers containing the data from
+		 * an smd channel are all in use, but the data_ready
+		 * flag is cleared. In this case, the buffers never
+		 * have their data read/logged.  Detect and remedy this
+		 * situation.
+		 */
+		if ((driver->data_ready[i] & USER_SPACE_LOG_TYPE) == 0) {
+			driver->data_ready[i] |= USER_SPACE_LOG_TYPE;
+			pr_debug("diag: Force wakeup of logging process\n");
+			wake_up_interruptible(&driver->wait_q);
+		}
+	}
 }
 
 void __diag_smd_send_req(void)
@@ -234,16 +277,52 @@ void __diag_smd_send_req(void)
 			if (!buf)
 				pr_info("Out of diagmem for Modem\n");
 			else {
+				#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+				mutex_lock(&phudriver->diagchar_mutex);
+				if(phudriver->opened)
+				{	
+					if(r != phudiagfwd_ring_buf_set_data_before_process(phudriver->in_buf, r))
+					{
+						printk(KERN_INFO "__diag_smd_send_req write in_buf out of memory !\n");
+						mutex_unlock(&phudriver->diagchar_mutex);
+						return;
+					}
+				}
+				#endif
 				APPEND_DEBUG('i');
 				smd_read(driver->ch, buf, r);
 				APPEND_DEBUG('j');
+				#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+				if(phudriver->opened)
+				{
+					memcpy(phudriver->in_buf->end,buf,r);
+					phudriver->in_buf->end += r;
+				}
+				mutex_unlock(&phudriver->diagchar_mutex);
+				#endif
 				write_ptr_modem->length = r;
 				*in_busy_ptr = 1;
 				diag_device_write(buf, MODEM_DATA,
 							 write_ptr_modem);
 			}
 		}
+	} else if (driver->ch && !buf &&
+		(driver->logging_mode == MEMORY_DEVICE_MODE)) {
+		chk_logging_wakeup();
 	}
+
+	#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+	phudiagfwd_usb_diag_suspend_packet_num++;
+	mutex_lock(&phudriver->diagchar_mutex);
+	if(phudriver->opened && NULL == buf 
+	   && phudiagfwd_usb_diag_suspend_packet_num > 10 )
+	{
+		phudiagfwd_usb_diag_suspend_packet_num = 10;
+		phudiagfwd_read_data_from_smd();
+	}
+	mutex_unlock(&phudriver->diagchar_mutex);
+	#endif
+		
 }
 
 int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
@@ -300,12 +379,12 @@ int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
 				&(driver->diag_read_sdio_work));
 		}
 #endif
-#ifdef CONFIG_DIAG_HSIC_PIPE
+#ifdef CONFIG_DIAG_BRIDGE_CODE
 		else if (proc_num == HSIC_DATA) {
 			driver->in_busy_hsic_read = 0;
 			driver->in_busy_hsic_write_on_device = 0;
 			if (driver->hsic_ch)
-				queue_work(driver->diag_hsic_wq,
+				queue_work(driver->diag_bridge_wq,
 					&(driver->diag_read_hsic_work));
 		}
 #endif
@@ -352,7 +431,7 @@ int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
 						"while USB write\n");
 		}
 #endif
-#ifdef CONFIG_DIAG_HSIC_PIPE
+#ifdef CONFIG_DIAG_BRIDGE_CODE
 		else if (proc_num == HSIC_DATA) {
 			if (driver->hsic_device_enabled) {
 				write_ptr->buf = buf;
@@ -360,6 +439,10 @@ int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
 			} else
 				pr_err("diag: Incorrect hsic data "
 						"while USB write\n");
+		} else if (proc_num == SMUX_DATA) {
+				write_ptr->buf = buf;
+				pr_debug("diag: writing SMUX data\n");
+				err = usb_diag_write(driver->mdm_ch, write_ptr);
 		}
 #endif
 		APPEND_DEBUG('d');
@@ -408,6 +491,9 @@ void __diag_smd_wcnss_send_req(void)
 					 write_ptr_wcnss);
 			}
 		}
+	} else if (driver->ch_wcnss && !buf &&
+		(driver->logging_mode == MEMORY_DEVICE_MODE)) {
+		chk_logging_wakeup();
 	}
 }
 
@@ -454,6 +540,9 @@ void __diag_smd_qdsp_send_req(void)
 							 write_ptr_qdsp);
 			}
 		}
+	} else if (driver->chqdsp && !buf &&
+		(driver->logging_mode == MEMORY_DEVICE_MODE)) {
+		chk_logging_wakeup();
 	}
 }
 
@@ -507,6 +596,7 @@ void diag_create_msg_mask_table(void)
 	CREATE_MSG_MASK_TBL_ROW(20);
 	CREATE_MSG_MASK_TBL_ROW(21);
 	CREATE_MSG_MASK_TBL_ROW(22);
+	CREATE_MSG_MASK_TBL_ROW(23);
 }
 
 static void diag_set_msg_mask(int rt_mask)
@@ -1170,6 +1260,21 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 					packet_type = 0;
 				}
 			}
+/* support automation diag command */
+#ifdef CONFIG_HUAWEI_KERNEL
+			/* automation cmd_code is 0xF6 */
+			/* judge if it is automation cmd_code */
+			else if ((entry.cmd_code == 255) 
+					&& (entry.subsys_id == 0xF6) 
+					&& (cmd_code == 0xF6))
+			{
+				if ((entry.cmd_code_lo <= subsys_id) && (entry.cmd_code_hi >= subsys_id))
+				{
+					diag_send_data(entry, buf, len,data_type);
+					packet_type = 0;
+				}
+			}
+#endif
 		}
 	}
 #if defined(CONFIG_DIAG_OVER_USB)
@@ -1225,7 +1330,8 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 		driver->apps_rsp_buf[1] = 0x1;
 		driver->apps_rsp_buf[2] = 0x1;
 		driver->apps_rsp_buf[3] = 0x0;
-		*(int *)(driver->apps_rsp_buf + 4) = MSG_MASK_TBL_CNT;
+		/* -1 to un-account for OEM SSID range */
+		*(int *)(driver->apps_rsp_buf + 4) = MSG_MASK_TBL_CNT - 1;
 		*(uint16_t *)(driver->apps_rsp_buf + 8) = MSG_SSID_0;
 		*(uint16_t *)(driver->apps_rsp_buf + 10) = MSG_SSID_0_LAST;
 		*(uint16_t *)(driver->apps_rsp_buf + 12) = MSG_SSID_1;
@@ -1789,6 +1895,9 @@ static int diag_smd_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 	pr_debug("diag: open SMD port, Id = %d, r = %d\n", pdev->id, r);
 
+	#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+	phudriver->ch = driver->ch;
+	#endif
 	return 0;
 }
 
@@ -2047,6 +2156,10 @@ void diagfwd_init(void)
 		goto err;
 	}
 #endif
+	#ifdef CONFIG_HUAWEI_FEATURE_PHUDIAG
+	phudriver->diag_wq = driver->diag_wq;
+	phudriver->diag_read_smd_work = &(driver->diag_read_smd_work);
+	#endif
 	platform_driver_register(&msm_smd_ch1_driver);
 	platform_driver_register(&diag_smd_lite_driver);
 

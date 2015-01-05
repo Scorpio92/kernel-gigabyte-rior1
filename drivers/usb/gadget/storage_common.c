@@ -3,21 +3,12 @@
  *
  * Copyright (C) 2003-2008 Alan Stern
  * Copyeight (C) 2009 Samsung Electronics
- * Author: Michal Nazarewicz (m.nazarewicz@samsung.com)
+ * Author: Michal Nazarewicz (mina86@mina86.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -52,11 +43,21 @@
  * characters rather then a pointer to void.
  */
 
+/*
+ * When USB_GADGET_DEBUG_FILES is defined the module param num_buffers
+ * sets the number of pipeline buffers (length of the fsg_buffhd array).
+ * The valid range of num_buffers is: num >= 2 && num <= 4.
+ */
+
 
 #include <linux/usb/storage.h>
 #include <scsi/scsi.h>
 #include <asm/unaligned.h>
 
+
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <asm-arm/huawei/usb_switch_huawei.h>
+#endif
 
 /*
  * Thanks to NetChip Technologies for donating this product ID.
@@ -148,47 +149,7 @@
 
 #endif /* DUMP_MSGS */
 
-
-
-
-
 /*-------------------------------------------------------------------------*/
-
-/* Bulk-only data structures */
-
-/* Command Block Wrapper */
-struct fsg_bulk_cb_wrap {
-	__le32	Signature;		/* Contains 'USBC' */
-	u32	Tag;			/* Unique per command id */
-	__le32	DataTransferLength;	/* Size of the data */
-	u8	Flags;			/* Direction in bit 7 */
-	u8	Lun;			/* LUN (normally 0) */
-	u8	Length;			/* Of the CDB, <= MAX_COMMAND_SIZE */
-	u8	CDB[16];		/* Command Data Block */
-};
-
-#define USB_BULK_CB_WRAP_LEN	31
-#define USB_BULK_CB_SIG		0x43425355	/* Spells out USBC */
-#define USB_BULK_IN_FLAG	0x80
-
-/* Command Status Wrapper */
-struct bulk_cs_wrap {
-	__le32	Signature;		/* Should = 'USBS' */
-	u32	Tag;			/* Same as original command */
-	__le32	Residue;		/* Amount not transferred */
-	u8	Status;			/* See below */
-};
-
-#define USB_BULK_CS_WRAP_LEN	13
-#define USB_BULK_CS_SIG		0x53425355	/* Spells out 'USBS' */
-#define USB_STATUS_PASS		0
-#define USB_STATUS_FAIL		1
-#define USB_STATUS_PHASE_ERROR	2
-
-/* Bulk-only class specific requests */
-#define USB_BULK_RESET_REQUEST		0xff
-#define USB_BULK_GET_MAX_LUN_REQUEST	0xfe
-
 
 /* CBI Interrupt data structure */
 struct interrupt_data {
@@ -275,13 +236,35 @@ static struct fsg_lun *fsg_lun_from_dev(struct device *dev)
 #define EP0_BUFSIZE	256
 #define DELAYED_STATUS	(EP0_BUFSIZE + 999)	/* An impossibly large value */
 
-/* Number of buffers for CBW, DATA and CSW */
 #ifdef CONFIG_USB_CSW_HACK
-#define FSG_NUM_BUFFERS    4
+#define fsg_num_buffers		4
 #else
-#define FSG_NUM_BUFFERS    2
-#endif
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 
+static unsigned int fsg_num_buffers = CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS;
+module_param_named(num_buffers, fsg_num_buffers, uint, S_IRUGO);
+MODULE_PARM_DESC(num_buffers, "Number of pipeline buffers");
+
+#else
+
+/*
+ * Number of buffers we will use.
+ * 2 is usually enough for good buffering pipeline
+ */
+#define fsg_num_buffers	CONFIG_USB_GADGET_STORAGE_NUM_BUFFERS
+
+#endif /* CONFIG_USB_DEBUG */
+#endif /* CONFIG_USB_CSW_HACK */
+
+/* check if fsg_num_buffers is within a valid range */
+static inline int fsg_num_buffers_validate(void)
+{
+	if (fsg_num_buffers >= 2 && fsg_num_buffers <= 4)
+		return 0;
+	pr_err("fsg_num_buffers %u is out of range (%d to %d)\n",
+	       fsg_num_buffers, 2 ,4);
+	return -EINVAL;
+}
 
 /* Default size of buffer length. */
 #define FSG_BUFLEN	((u32)16384)
@@ -594,16 +577,16 @@ static __maybe_unused struct usb_ss_cap_descriptor fsg_ss_cap_desc = {
 		| USB_5GBPS_OPERATION),
 	.bFunctionalitySupport = USB_LOW_SPEED_OPERATION,
 	.bU1devExitLat =	USB_DEFAULT_U1_DEV_EXIT_LAT,
-	.bU2DevExitLat =	USB_DEFAULT_U2_DEV_EXIT_LAT,
+	.bU2DevExitLat =	cpu_to_le16(USB_DEFAULT_U2_DEV_EXIT_LAT),
 };
 
 static __maybe_unused struct usb_bos_descriptor fsg_bos_desc = {
 	.bLength =		USB_DT_BOS_SIZE,
 	.bDescriptorType =	USB_DT_BOS,
 
-	.wTotalLength =		USB_DT_BOS_SIZE
+	.wTotalLength =		cpu_to_le16(USB_DT_BOS_SIZE
 				+ USB_DT_USB_EXT_CAP_SIZE
-				+ USB_DT_USB_SS_CAP_SIZE,
+				+ USB_DT_USB_SS_CAP_SIZE),
 
 	.bNumDeviceCaps =	2,
 };
@@ -715,7 +698,10 @@ static int fsg_lun_open(struct fsg_lun *curlun, const char *filename)
 		goto out;
 	}
 
-	if (inode->i_bdev) {
+	if (curlun->cdrom) {
+		curlun->blksize = 2048;
+		curlun->blkbits = 11;
+	} else if (inode->i_bdev) {
 		curlun->blksize = bdev_logical_block_size(inode->i_bdev);
 		curlun->blkbits = blksize_bits(curlun->blksize);
 	} else {
@@ -726,10 +712,9 @@ static int fsg_lun_open(struct fsg_lun *curlun, const char *filename)
 	num_sectors = size >> curlun->blkbits; /* File size in logic-block-size blocks */
 	min_sectors = 1;
 	if (curlun->cdrom) {
-		num_sectors &= ~3;	/* Reduce to a multiple of 2048 */
-		min_sectors = 300*4;	/* Smallest track is 300 frames */
-		if (num_sectors >= 256*60*75*4) {
-			num_sectors = (256*60*75 - 1) * 4;
+		min_sectors = 300;	/* Smallest track is 300 frames */
+		if (num_sectors >= 256*60*75) {
+			num_sectors = 256*60*75 - 1;
 			LINFO(curlun, "file too big: %s\n", filename);
 			LINFO(curlun, "using only first %d blocks\n",
 					(int) num_sectors);
@@ -943,10 +928,19 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
 	int		rc = 0;
 
-
-//#ifndef CONFIG_USB_ANDROID_MASS_STORAGE
-/* No CONFIG_USB_ANDROID_MASS_STORAGE in ICS anymore*/
-#if 0
+#ifdef CONFIG_HUAWEI_KERNEL
+    USB_PR("%s: buf=%s\n", __func__, buf);
+    
+    /* delete 9 lines. do not ignore unshare in normal mode
+     * if we turn on usb mass storage, we never exit to normal mode anymore
+     */
+#endif
+    
+    /* do not include these lines in huawei code.
+     * if the code is included, usb mass storage can't be turned off
+     * when connected with the mac host 
+     */
+#if !defined (CONFIG_USB_ANDROID_MASS_STORAGE) && !defined(CONFIG_HUAWEI_KERNEL)
 	/* disabled in android because we need to allow closing the backing file
 	 * if the media was removed
 	 */

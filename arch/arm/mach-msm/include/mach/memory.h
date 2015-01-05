@@ -42,7 +42,12 @@
 
 #define EBI0_PHYS_OFFSET PHYS_OFFSET
 #define EBI0_PAGE_OFFSET PAGE_OFFSET
+/* modified for 1G ddr memory support */
+#ifdef CONFIG_HUAWEI_KERNEL
+#define EBI0_SIZE 0x20000000
+#else
 #define EBI0_SIZE 0x10000000
+#endif
 
 #ifndef __ASSEMBLY__
 
@@ -78,6 +83,7 @@ void invalidate_caches(unsigned long, unsigned long, unsigned long);
 int platform_physical_remove_pages(u64, u64);
 int platform_physical_active_pages(u64, u64);
 int platform_physical_low_power_pages(u64, u64);
+unsigned long get_ddr_size(void);
 
 extern int (*change_memory_power)(u64, u64, int);
 

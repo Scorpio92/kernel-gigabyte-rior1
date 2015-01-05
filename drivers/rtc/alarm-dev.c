@@ -1,7 +1,6 @@
 /* drivers/rtc/alarm-dev.c
  *
  * Copyright (C) 2007-2009 Google, Inc.
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -14,7 +13,7 @@
  *
  */
 
-#include <asm/mach/time.h>
+#include <linux/module.h>
 #include <linux/android_alarm.h>
 #include <linux/device.h>
 #include <linux/miscdevice.h>
@@ -22,9 +21,10 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/sysdev.h>
 #include <linux/uaccess.h>
 #include <linux/wakelock.h>
+
+#include <asm/mach/time.h>
 
 #define ANDROID_ALARM_PRINT_INFO (1U << 0)
 #define ANDROID_ALARM_PRINT_IO (1U << 1)
@@ -32,7 +32,9 @@
 
 static int debug_mask = ANDROID_ALARM_PRINT_INFO;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
-
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+extern int msmrtc_remote_rtc_set_alarm(struct timespec*);
+#endif /*CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM*/
 #define pr_alarm(debug_level_mask, args...) \
 	do { \
 		if (debug_mask & ANDROID_ALARM_PRINT_##debug_level_mask) { \
@@ -58,11 +60,6 @@ static uint32_t wait_pending;
 
 static struct alarm alarms[ANDROID_ALARM_TYPE_COUNT];
 
-#define ANDROID_ALARM_RTC_DEVICEUP 6
-void set_alarm_rtc_deviceup_type(int isdeviceup);
-int get_alarm_rtc_deviceup_type(void);
-void set_alarm_deviceup_dev(ktime_t end);
-
 static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int rv = 0;
@@ -71,14 +68,7 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct timespec new_rtc_time;
 	struct timespec tmp_time;
 	enum android_alarm_type alarm_type = ANDROID_ALARM_IOCTL_TO_TYPE(cmd);
-	uint32_t alarm_type_mask = 0;
-	if (alarm_type == ANDROID_ALARM_RTC_DEVICEUP) {
-		alarm_type = ANDROID_ALARM_RTC_WAKEUP;
-		set_alarm_rtc_deviceup_type(1);
-	} else {
-		set_alarm_rtc_deviceup_type(0);
-	}
-	alarm_type_mask = 1U << alarm_type;
+	uint32_t alarm_type_mask = 1U << alarm_type;
 
 	if (alarm_type >= ANDROID_ALARM_TYPE_COUNT)
 		return -EINVAL;
@@ -103,7 +93,7 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case ANDROID_ALARM_CLEAR(0):
 		spin_lock_irqsave(&alarm_slock, flags);
 		pr_alarm(IO, "alarm %d clear\n", alarm_type);
-        alarm_try_to_cancel(&alarms[alarm_type]);
+		alarm_try_to_cancel(&alarms[alarm_type]);
 		if (alarm_pending) {
 			alarm_pending &= ~alarm_type_mask;
 			if (!alarm_pending && !wait_pending)
@@ -133,12 +123,11 @@ from_old_alarm_set:
 		spin_lock_irqsave(&alarm_slock, flags);
 		pr_alarm(IO, "alarm %d set %ld.%09ld\n", alarm_type,
 			new_alarm_time.tv_sec, new_alarm_time.tv_nsec);
-        alarm_enabled |= alarm_type_mask;
+		alarm_enabled |= alarm_type_mask;
 		alarm_start_range(&alarms[alarm_type],
 			timespec_to_ktime(new_alarm_time),
 			timespec_to_ktime(new_alarm_time));
 		spin_unlock_irqrestore(&alarm_slock, flags);
-        set_alarm_deviceup_dev(timespec_to_ktime(new_alarm_time));
 		if (ANDROID_ALARM_BASE_CMD(cmd) != ANDROID_ALARM_SET_AND_WAIT(0)
 		    && cmd != ANDROID_ALARM_SET_AND_WAIT_OLD)
 			break;
@@ -174,6 +163,18 @@ from_old_alarm_set:
 		if (rv < 0)
 			goto err1;
 		break;
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+    /*set rtc alarm time ioctl case*/
+	case ANDROID_ALARM_SET_POWERUP_RTC:
+		if (copy_from_user(&new_alarm_time, (void __user *)arg,
+		    sizeof(new_alarm_time))) {
+			rv = -EFAULT;
+			goto err1;
+		}
+		printk("Set alarm time sec is %ld\n",new_alarm_time.tv_sec);
+                msmrtc_remote_rtc_set_alarm(&new_alarm_time);
+		break;
+#endif /*CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM*/
 	case ANDROID_ALARM_GET_TIME(0):
 		switch (alarm_type) {
 		case ANDROID_ALARM_RTC_WAKEUP:

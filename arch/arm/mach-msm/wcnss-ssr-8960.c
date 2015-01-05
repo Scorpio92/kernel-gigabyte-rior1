@@ -53,26 +53,6 @@ static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 	if (!(new_state & SMSM_RESET))
 		return;
 
-	smem_reset_reason = smem_get_entry(SMEM_SSR_REASON_WCNSS0,
-		&smem_reset_size);
-
-	if (!smem_reset_reason || !smem_reset_size) {
-		pr_err("%s: wcnss subsystem failure reason: %s\n", __func__,
-				"(unknown, smem_get_entry failed)");
-	} else if (!smem_reset_reason[0]) {
-		pr_err("%s: wcnss subsystem failure reason: %s\n", __func__,
-				"(unknown, init string found)");
-	} else {
-		size = smem_reset_size < MAX_BUF_SIZE ? smem_reset_size :
-				(MAX_BUF_SIZE - 1);
-		memcpy(buffer, smem_reset_reason, size);
-		buffer[size] = '\0';
-		pr_err("%s: wcnss subsystem failure reason: %s\n", __func__,
-				buffer);
-		memset(smem_reset_reason, 0, smem_reset_size);
-		wmb();
-	}
-
 	if (ss_restart_inprogress) {
 		pr_err("%s: Ignoring smsm reset req, restart in progress\n",
 						MODULE_NAME);
@@ -178,10 +158,9 @@ static int riva_powerup(const struct subsys_data *subsys)
 	return ret;
 }
 
-/* RAM segments for Riva SS;
- * We don't specify the full 5MB allocated for Riva. Only 3MB is specified */
+/* 5MB RAM segments for Riva SS */
 static struct ramdump_segment riva_segments[] = {{0x8f200000,
-						0x8f500000 - 0x8f200000} };
+						0x8f700000 - 0x8f200000} };
 
 static int riva_ramdump(int enable, const struct subsys_data *subsys)
 {

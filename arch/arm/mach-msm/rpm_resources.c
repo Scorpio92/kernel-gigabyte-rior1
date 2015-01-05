@@ -867,6 +867,29 @@ void msm_rpmrs_show_resources(void)
 	spin_unlock_irqrestore(&msm_rpmrs_lock, flags);
 }
 
+s32 msm_cpuidle_get_deep_idle_latency(void)
+{
+	int i;
+	struct msm_rpmrs_level *level = msm_rpmrs_levels, *best = level;
+
+	if (!level)
+		return 0;
+
+	for (i = 0; i < msm_rpmrs_level_count; i++, level++) {
+		if (!level->available)
+			continue;
+		if (level->sleep_mode != MSM_PM_SLEEP_MODE_POWER_COLLAPSE)
+			continue;
+		/* Pick the first power collapse mode by default */
+		if (best->sleep_mode != MSM_PM_SLEEP_MODE_POWER_COLLAPSE)
+			best = level;
+		/* Find the lowest latency for power collapse */
+		if (level->latency_us < best->latency_us)
+			best = level;
+	}
+	return best->latency_us - 1;
+}
+
 static void *msm_rpmrs_lowest_limits(bool from_idle,
 		enum msm_pm_sleep_mode sleep_mode, uint32_t latency_us,
 		uint32_t sleep_us, uint32_t *power)
@@ -1082,7 +1105,8 @@ static struct msm_pm_sleep_ops msm_rpmrs_ops = {
 
 static int __init msm_rpmrs_l2_init(void)
 {
-	if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_apq8064()) {
+	if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_msm8930aa() ||
+	    cpu_is_apq8064() || cpu_is_msm8627()) {
 
 		msm_pm_set_l2_flush_flag(0);
 

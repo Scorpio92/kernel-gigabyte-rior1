@@ -59,7 +59,6 @@
 #include <linux/prefetch.h>
 #include <linux/migrate.h>
 #include <linux/page-debug-flags.h>
-#include <linux/kconfig.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>

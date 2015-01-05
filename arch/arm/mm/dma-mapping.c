@@ -21,7 +21,6 @@
 #include <linux/highmem.h>
 #include <linux/memblock.h>
 #include <linux/slab.h>
-#include <linux/kconfig.h>
 
 #include <asm/memory.h>
 #include <asm/highmem.h>

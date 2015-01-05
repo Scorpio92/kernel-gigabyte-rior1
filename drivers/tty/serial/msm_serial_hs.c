@@ -47,6 +47,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <linux/dmapool.h>
+#include <linux/tty_flip.h>
 #include <linux/wait.h>
 #include <linux/sysfs.h>
 #include <linux/stat.h>
@@ -55,7 +56,6 @@
 #include <linux/debugfs.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
-#include <asm/system.h>
 
 #include <mach/hardware.h>
 #include <mach/dma.h>
@@ -63,6 +63,12 @@
 
 #include "msm_serial_hs_hwreg.h"
 
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <linux/hardware_self_adapt.h>
+#ifdef CONFIG_HUAWEI_POWER_DOWN_CHARGE
+#define POWER_OFF_CHARGE 1
+#endif
+#endif
 static int hs_serial_debug_mask = 1;
 module_param_named(debug_mask, hs_serial_debug_mask,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -95,6 +101,8 @@ enum msm_hs_clk_req_off_state_e {
 struct msm_hs_tx {
 	unsigned int tx_ready_int_en;  /* ok to dma more tx */
 	unsigned int dma_in_flight;    /* tx dma in progress */
+	enum flush_reason flush;
+	wait_queue_head_t wait;
 	struct msm_dmov_cmd xfer;
 	dmov_box *command_ptr;
 	u32 *command_ptr_ptr;
@@ -166,6 +174,7 @@ struct msm_hs_port {
 	struct work_struct clock_off_w; /* work for actual clock off */
 	struct workqueue_struct *hsuart_wq; /* hsuart workqueue */
 	struct mutex clk_mutex; /* mutex to guard against clock off/clock on */
+    /*delete*/
 };
 
 #define MSM_UARTDM_BURST_SIZE 16   /* DM burst size (in bytes) */
@@ -895,7 +904,7 @@ static void msm_hs_submit_tx_locked(struct uart_port *uport)
 
 	dma_sync_single_for_device(uport->dev, tx->mapped_cmd_ptr_ptr,
 				   sizeof(u32), DMA_TO_DEVICE);
-
+	msm_uport->tx.flush = FLUSH_NONE;
 	msm_dmov_enqueue_cmd(msm_uport->dma_tx_channel, &tx->xfer);
 }
 
@@ -1115,9 +1124,13 @@ static void msm_hs_dmov_tx_callback(struct msm_dmov_cmd *cmd_ptr,
 {
 	struct msm_hs_port *msm_uport;
 
-	WARN_ON(result != 0x80000002);  /* DMA did not finish properly */
-
 	msm_uport = container_of(cmd_ptr, struct msm_hs_port, tx.xfer);
+	if (msm_uport->tx.flush == FLUSH_STOP)
+		/* DMA FLUSH unsuccesfful */
+		WARN_ON(!(result & DMOV_RSLT_FLUSH));
+	else
+		/* DMA did not finish properly */
+		WARN_ON(!(result & DMOV_RSLT_DONE));
 
 	tasklet_schedule(&msm_uport->tx.tlet);
 }
@@ -1129,6 +1142,12 @@ static void msm_serial_hs_tx_tlet(unsigned long tlet_ptr)
 				tlet_ptr, struct msm_hs_port, tx.tlet);
 
 	spin_lock_irqsave(&(msm_uport->uport.lock), flags);
+	if (msm_uport->tx.flush == FLUSH_STOP) {
+		msm_uport->tx.flush = FLUSH_SHUTDOWN;
+		wake_up(&msm_uport->tx.wait);
+		spin_unlock_irqrestore(&(msm_uport->uport.lock), flags);
+		return;
+	}
 
 	msm_uport->imr_reg |= UARTDM_ISR_TX_READY_BMSK;
 	msm_hs_write(&(msm_uport->uport), UARTDM_IMR_ADDR, msm_uport->imr_reg);
@@ -1229,6 +1248,7 @@ static void msm_hs_enable_ms_locked(struct uart_port *uport)
 
 }
 
+/*delete*/
 /*
  *  Standard API, Break Signal
  *
@@ -1691,6 +1711,7 @@ static int msm_hs_startup(struct uart_port *uport)
 	mb();
 
 	if (use_low_power_wakeup(msm_uport)) {
+        printk(KERN_ERR "--BT %s wakeup irq is on \n", __FUNCTION__);
 		ret = irq_set_irq_wake(msm_uport->wakeup.irq, 1);
 		if (unlikely(ret)) {
 			pr_err("%s():Err setting wakeup irq\n", __func__);
@@ -1770,6 +1791,7 @@ static int uartdm_init_port(struct uart_port *uport)
 	tx->xfer.cmdptr = DMOV_CMD_ADDR(tx->mapped_cmd_ptr_ptr);
 
 	init_waitqueue_head(&rx->wait);
+	init_waitqueue_head(&tx->wait);
 	wake_lock_init(&rx->wake_lock, WAKE_LOCK_SUSPEND, "msm_serial_hs_rx");
 	wake_lock_init(&msm_uport->dma_wake_lock, WAKE_LOCK_SUSPEND,
 		       "msm_serial_hs_dma");
@@ -1873,6 +1895,22 @@ static int __devinit msm_hs_probe(struct platform_device *pdev)
 	struct msm_hs_port *msm_uport;
 	struct resource *resource;
 	struct msm_serial_hs_platform_data *pdata = pdev->dev.platform_data;
+    
+#ifdef CONFIG_HUAWEI_KERNEL
+#ifdef CONFIG_HUAWEI_POWER_DOWN_CHARGE
+	static unsigned int charge_flag = 0; //poweroff charge flag
+
+	charge_flag = get_charge_flag();
+	/*if device in power-off charge, return directly
+	 *it used to release wake_lock msm_serial_hs_dma
+	 */
+	if( POWER_OFF_CHARGE == charge_flag )
+	{
+		printk("release msm_hs during power off charge!\n");
+		return 0;
+	}
+#endif
+#endif
 
 	if (pdev->id < 0 || pdev->id >= UARTDM_NR) {
 		printk(KERN_ERR "Invalid plaform device ID = %d\n", pdev->id);
@@ -1913,7 +1951,7 @@ static int __devinit msm_hs_probe(struct platform_device *pdev)
 				dev_err(uport->dev, "Cannot configure"
 					"gpios\n");
 	}
-
+    printk(KERN_ERR "--BT %s wakeup irq check: %d\n", __FUNCTION__, msm_uport->wakeup.irq);
 	resource = platform_get_resource_byname(pdev, IORESOURCE_DMA,
 						"uartdm_channels");
 	if (unlikely(!resource))
@@ -2043,19 +2081,41 @@ static int __init msm_serial_hs_init(void)
  */
 static void msm_hs_shutdown(struct uart_port *uport)
 {
+	int ret;
+	unsigned int data;
+	unsigned long flags;
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 
-	BUG_ON(msm_uport->rx.flush < FLUSH_STOP);
+	if (msm_uport->tx.dma_in_flight) {
+		spin_lock_irqsave(&uport->lock, flags);
+		/* disable UART TX interface to DM */
+		data = msm_hs_read(uport, UARTDM_DMEN_ADDR);
+		data &= ~UARTDM_TX_DM_EN_BMSK;
+		msm_hs_write(uport, UARTDM_DMEN_ADDR, data);
+		/* turn OFF UART Transmitter */
+		msm_hs_write(uport, UARTDM_CR_ADDR, UARTDM_CR_TX_DISABLE_BMSK);
+		/* reset UART TX */
+		msm_hs_write(uport, UARTDM_CR_ADDR, RESET_TX);
+		/* reset UART TX Error */
+		msm_hs_write(uport, UARTDM_CR_ADDR, RESET_TX_ERROR);
+		msm_uport->tx.flush = FLUSH_STOP;
+		spin_unlock_irqrestore(&uport->lock, flags);
+		/* discard flush */
+		msm_dmov_flush(msm_uport->dma_tx_channel, 0);
+		ret = wait_event_timeout(msm_uport->tx.wait,
+			msm_uport->tx.flush == FLUSH_SHUTDOWN, 100);
+		if (!ret)
+			pr_err("%s():HSUART TX Stalls.\n", __func__);
+	}
 	tasklet_kill(&msm_uport->tx.tlet);
+	BUG_ON(msm_uport->rx.flush < FLUSH_STOP);
 	wait_event(msm_uport->rx.wait, msm_uport->rx.flush == FLUSH_SHUTDOWN);
 	tasklet_kill(&msm_uport->rx.tlet);
 	cancel_delayed_work_sync(&msm_uport->rx.flip_insert_work);
-
 	flush_workqueue(msm_uport->hsuart_wq);
 	pm_runtime_disable(uport->dev);
 	pm_runtime_set_suspended(uport->dev);
 
-	mutex_lock(&msm_uport->clk_mutex);
 	/* Disable the transmitter */
 	msm_hs_write(uport, UARTDM_CR_ADDR, UARTDM_CR_TX_DISABLE_BMSK);
 	/* Disable the receiver */
@@ -2068,7 +2128,6 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	 * Hence mb() requires here.
 	 */
 	mb();
-
 	if (msm_uport->clk_state != MSM_HS_CLK_OFF) {
 		/* to balance clk_state */
 		clk_disable_unprepare(msm_uport->clk);
@@ -2076,8 +2135,8 @@ static void msm_hs_shutdown(struct uart_port *uport)
 			clk_disable_unprepare(msm_uport->pclk);
 		wake_unlock(&msm_uport->dma_wake_lock);
 	}
-	msm_uport->clk_state = MSM_HS_CLK_PORT_OFF;
 
+	msm_uport->clk_state = MSM_HS_CLK_PORT_OFF;
 	dma_unmap_single(uport->dev, msm_uport->tx.dma_base,
 			 UART_XMIT_SIZE, DMA_TO_DEVICE);
 
@@ -2088,7 +2147,6 @@ static void msm_hs_shutdown(struct uart_port *uport)
 	free_irq(uport->irq, msm_uport);
 	if (use_low_power_wakeup(msm_uport))
 		free_irq(msm_uport->wakeup.irq, msm_uport);
-	mutex_unlock(&msm_uport->clk_mutex);
 	mutex_destroy(&msm_uport->clk_mutex);
 }
 
@@ -2100,6 +2158,8 @@ static void __exit msm_serial_hs_exit(void)
 	uart_unregister_driver(&msm_hs_driver);
 }
 
+#if 0
+#if (defined(CONFIG_HUAWEI_BT_WCN2243) || (!defined(CONFIG_HUAWEI_KERNEL)))
 static int msm_hs_runtime_idle(struct device *dev)
 {
 	/*
@@ -2133,12 +2193,19 @@ static const struct dev_pm_ops msm_hs_dev_pm_ops = {
 	.runtime_idle    = msm_hs_runtime_idle,
 };
 
+#endif
+#endif
 static struct platform_driver msm_serial_hs_platform_driver = {
 	.probe	= msm_hs_probe,
 	.remove = __devexit_p(msm_hs_remove),
 	.driver = {
 		.name = "msm_serial_hs",
+/*deactive pm */
+#if 0
+#if (defined(CONFIG_HUAWEI_BT_WCN2243) || (!defined(CONFIG_HUAWEI_KERNEL)))
 		.pm   = &msm_hs_dev_pm_ops,
+#endif
+#endif
 	},
 };
 
@@ -2166,6 +2233,7 @@ static struct uart_ops msm_hs_ops = {
 	.config_port = msm_hs_config_port,
 	.release_port = msm_hs_release_port,
 	.request_port = msm_hs_request_port,
+    /*delete*/
 };
 
 module_init(msm_serial_hs_init);

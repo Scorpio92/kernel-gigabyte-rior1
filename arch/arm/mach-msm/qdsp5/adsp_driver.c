@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/qdsp5/adsp_driver.c
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, 2012 Code Aurora Forum. All rights reserved.
  * Author: Iliyan Malchev <ibm@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -45,6 +45,7 @@ struct adsp_ion_region {
 	struct ion_client *client;
 	int fd;
 };
+
 struct adsp_device {
 	struct msm_adsp_module *module;
 
@@ -399,7 +400,6 @@ static int adsp_ion_lookup_paddr(struct msm_adsp_module *module, void **addr,
 	return -1;
 }
 
-
 int adsp_pmem_paddr_fixup(struct msm_adsp_module *module, void **addr)
 {
 	struct adsp_ion_region *region;
@@ -658,7 +658,7 @@ static int adsp_open(struct inode *inode, struct file *filp)
 	MM_INFO("opened module '%s' adev %p\n", adev->name, adev);
 	filp->private_data = adev;
 	adev->abort = 0;
-    INIT_HLIST_HEAD(&adev->module->ion_regions);
+	INIT_HLIST_HEAD(&adev->module->ion_regions);
 	mutex_init(&adev->module->ion_regions_lock);
 
 	return 0;

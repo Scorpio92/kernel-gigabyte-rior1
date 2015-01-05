@@ -58,5 +58,6 @@
 #define MSM8625_CFG_CTL_SIZE		SZ_4K
 
 #define MSM8625_CPR_PHYS		0xC0900000
+#define MSM8625_CPR_SIZE		SZ_4K
 
 #endif

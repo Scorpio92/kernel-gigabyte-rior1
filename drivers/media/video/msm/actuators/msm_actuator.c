@@ -10,6 +10,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include "msm_actuator.h"
 
 static struct msm_actuator_ctrl_t msm_actuator_t;
@@ -81,7 +82,7 @@ int32_t msm_actuator_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = write_arr[i].reg_addr;
 				i2c_byte2 = value;
 				if (size != (i+1)) {
-					i2c_byte2 = value & 0xFF;
+					i2c_byte2 = (i2c_byte2 & 0xFF00) >> 8;
 					CDBG("%s: byte1:0x%x, byte2:0x%x\n",
 					__func__, i2c_byte1, i2c_byte2);
 					rc = msm_camera_i2c_write(
@@ -96,7 +97,7 @@ int32_t msm_actuator_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
 
 					i++;
 					i2c_byte1 = write_arr[i].reg_addr;
-					i2c_byte2 = (value & 0xFF00) >> 8;
+					i2c_byte2 = value & 0xFF;
 				}
 			} else {
 				i2c_byte1 = (value & 0xFF00) >> 8;
@@ -185,6 +186,8 @@ int32_t msm_actuator_write_focus(
 		}
 		curr_lens_pos = next_lens_pos;
 		usleep(wait_time);
+        if(0 == damping_code_step)
+            break;
 	}
 
 	if (curr_lens_pos != code_boundary) {
@@ -253,6 +256,7 @@ int32_t msm_actuator_move_focus(
 			target_step_pos = dest_step_pos;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
+			/*change from Qualcomm. delete some codes*/
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
@@ -273,6 +277,7 @@ int32_t msm_actuator_move_focus(
 			target_step_pos = step_boundary;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
+			/*change from Qualcomm. delete some codes*/
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
@@ -368,60 +373,16 @@ int32_t msm_actuator_set_default_focus(
 	return rc;
 }
 
-static struct reg_settings_t *powerdown_settings = NULL;
-static int32_t powerdown_setting_size = 0;
 int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 {
 	int32_t rc = 0;
-	int16_t step_pos = 0;
-	int16_t i = 0;
-	CDBG("%s called\n", __func__);
-
-	if (a_ctrl->step_position_table) {
-		if (a_ctrl->step_position_table[a_ctrl->curr_step_pos] >=
-			a_ctrl->step_position_table[a_ctrl->pwd_step]) {
-			step_pos = (a_ctrl->
-				step_position_table[a_ctrl->curr_step_pos] -
-				a_ctrl->step_position_table[a_ctrl->
-				pwd_step]) / 10;
-			for (i = 0; i < 10; i++) {
-				rc = a_ctrl->func_tbl->
-					actuator_i2c_write(a_ctrl,
-					i * step_pos, 0);
-				usleep(500);
-			}
-			rc = a_ctrl->func_tbl->actuator_i2c_write(a_ctrl,
-				a_ctrl->step_position_table[a_ctrl->
-				curr_step_pos],
-				0);
-		}
-		CDBG("%s after msm_actuator_set_default_focus\n", __func__);
-		kfree(a_ctrl->step_position_table);
-	}
-
-	//software powerdown, set to init state.
-	if(powerdown_setting_size &&(NULL != powerdown_settings))
-	{
-		if (a_ctrl->func_tbl->actuator_init_focus) {
-			rc = a_ctrl->func_tbl->actuator_init_focus(a_ctrl,
-				powerdown_setting_size,
-				a_ctrl->i2c_data_type, powerdown_settings);
-			if (rc < 0) {
-				pr_err("%s Error actuator_init_focus\n",
-					__func__);
-			}
-		}
-		kfree(powerdown_settings);
-		powerdown_settings = NULL;
-		powerdown_setting_size = 0;
-	}
-
 	if (a_ctrl->vcm_enable) {
 		rc = gpio_direction_output(a_ctrl->vcm_pwd, 0);
 		if (!rc)
 			gpio_free(a_ctrl->vcm_pwd);
 	}
 
+	kfree(a_ctrl->step_position_table);
 	a_ctrl->step_position_table = NULL;
 	return rc;
 }
@@ -453,8 +414,7 @@ int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 	}
 	a_ctrl->total_steps = set_info->af_tuning_params.total_steps;
 	a_ctrl->pwd_step = set_info->af_tuning_params.pwd_step;
-	a_ctrl->total_steps = set_info->af_tuning_params.total_steps;
-
+	//delete this line for it is a duplicated written as the line before
 	if (copy_from_user(&a_ctrl->region_params,
 		(void *)set_info->af_tuning_params.region_params,
 		a_ctrl->region_size * sizeof(struct region_params_t)))
@@ -485,15 +445,6 @@ int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 					__func__);
 				return -EFAULT;
 			}
-			powerdown_settings = kmalloc(sizeof(struct reg_settings_t) *
-				(set_info->actuator_params.init_setting_size),
-				GFP_KERNEL);
-			if (powerdown_settings == NULL) {
-				pr_err("%s Error allocating memory for init_settings\n",
-					__func__);
-				return -EFAULT;
-			}
-
 			if (copy_from_user(init_settings,
 				(void *)set_info->actuator_params.init_settings,
 				set_info->actuator_params.init_setting_size *
@@ -503,18 +454,6 @@ int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 					__func__);
 				return -EFAULT;
 			}
-
-			if (copy_from_user(powerdown_settings,
-				(void *)set_info->actuator_params.init_settings,
-				set_info->actuator_params.init_setting_size *
-				sizeof(struct reg_settings_t))) {
-				kfree(powerdown_settings);
-				pr_err("%s Error copying init_settings\n",
-					__func__);
-				return -EFAULT;
-			}
-			powerdown_setting_size = set_info->actuator_params.init_setting_size;
-
 			rc = a_ctrl->func_tbl->actuator_init_focus(a_ctrl,
 				set_info->actuator_params.init_setting_size,
 				a_ctrl->i2c_data_type,

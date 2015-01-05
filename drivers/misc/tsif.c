@@ -31,8 +31,8 @@
 #include <linux/tsif_api.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>          /* kfree, kzalloc */
+#include <linux/gpio.h>
 
-#include <mach/gpio.h>
 #include <mach/dma.h>
 #include <mach/msm_tsif.h>
 

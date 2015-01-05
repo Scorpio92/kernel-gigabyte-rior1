@@ -1,7 +1,6 @@
 /* drivers/rtc/alarm.c
  *
  * Copyright (C) 2007-2009 Google, Inc.
- * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -14,7 +13,7 @@
  *
  */
 
-#include <asm/mach/time.h>
+#include <linux/module.h>
 #include <linux/android_alarm.h>
 #include <linux/device.h>
 #include <linux/miscdevice.h>
@@ -22,8 +21,9 @@
 #include <linux/rtc.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <linux/sysdev.h>
 #include <linux/wakelock.h>
+
+#include <asm/mach/time.h>
 
 #define ANDROID_ALARM_PRINT_ERROR (1U << 0)
 #define ANDROID_ALARM_PRINT_INIT_STATUS (1U << 1)
@@ -163,28 +163,7 @@ void alarm_init(struct alarm *alarm,
 	pr_alarm(FLOW, "created alarm, type %d, func %pF\n", type, function);
 }
 
-static int alarm_rtc_deviceup = 0;
 
-void set_alarm_rtc_deviceup_type(int isdeviceup)
-{
-	alarm_rtc_deviceup = isdeviceup;
-};
-
-int get_alarm_rtc_deviceup_type(void)
-{
-	return alarm_rtc_deviceup;
-};
-
-void set_alarm_deviceup_dev(ktime_t end)
-{
-    if (get_alarm_rtc_deviceup_type()) {
-        struct rtc_wkalrm rtc_alarm;
-        rtc_time_to_tm(ktime_to_timespec(end).tv_sec, &rtc_alarm.time);
-        rtc_alarm.enabled = 1;
-        alarm_set_deviceup(alarm_rtc_dev, &rtc_alarm);
-        set_alarm_rtc_deviceup_type(0);
-    }
-};
 /**
  * alarm_start_range - (re)start an alarm
  * @alarm:	the alarm to be added

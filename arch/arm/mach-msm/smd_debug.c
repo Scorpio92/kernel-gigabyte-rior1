@@ -748,18 +748,12 @@ static ssize_t debug_read(struct file *file, char __user *buf,
 	return simple_read_from_buffer(buf, count, ppos, debug_buffer, bsize);
 }
 
-static int debug_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-	return 0;
-}
-
 static const struct file_operations debug_ops = {
 	.read = debug_read,
-	.open = debug_open,
+	.open = simple_open,
 };
 
-static void debug_create(const char *name, mode_t mode,
+static void debug_create(const char *name, umode_t mode,
 			 struct dentry *dent,
 			 int (*fill)(char *buf, int max))
 {
@@ -815,6 +809,46 @@ late_initcall(smd_debugfs_init);
 late_initcall(smsm_debugfs_init);
 #endif
 
+#ifdef CONFIG_HUAWEI_KERNEL
+struct IRAM_LOG_DESC {
+  //magic number of this structure	
+  int iram_log_magic;
+  //lenght of valid log
+  int iram_log_size;			
+};
+//magic number to valid log
+#define IRAM_LOG_MAGIC 0x8800dead
+
+/* 
+ *detect modem crash log validity and return related information
+ *return: 1 valid log found in smem; 0 no log found
+ */
+int detect_modem_crash_log(void **ppcrash_log,int *plog_len)
+{
+	char *x;
+	int size;
+	
+	//get smem entry address
+	x = smem_get_entry(SMEM_ERR_CRASH_LOG, &size);
+	if (0 != x) {
+		struct IRAM_LOG_DESC *piram_desc=(struct IRAM_LOG_DESC *)x;
+		//valid magic number 
+		if(IRAM_LOG_MAGIC==piram_desc->iram_log_magic) {
+			printk("modem crash log detected len %d\n",piram_desc->iram_log_size);
+			//return the address of data part
+			if(NULL!=ppcrash_log)
+				*ppcrash_log=(x+sizeof(struct IRAM_LOG_DESC));
+			//return the length of daa part
+			if(NULL!=plog_len)
+				*plog_len = piram_desc->iram_log_size;
+			return 1;
+		}else {
+			printk("no modem crash log detected\n");
+		}
+	}	
+	return 0;
+}
+#endif
 
 #define MAX_NUM_SLEEP_CLIENTS		64
 #define MAX_SLEEP_NAME_LEN		8

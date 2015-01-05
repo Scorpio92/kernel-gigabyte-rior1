@@ -23,6 +23,8 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
 #include <linux/wakelock.h>
+#include <linux/pm_qos.h>
+#include <linux/hrtimer.h>
 
 /*
  * The following are bit fields describing the usb_request.udc_priv word.
@@ -135,6 +137,9 @@ enum usb_chg_state {
  *			or more downstream ports. Capable of supplying
  *			IDEV_CHG_MAX irrespective of devices connected on
  *			accessory ports.
+ * USB_PROPRIETARY_CHARGER A proprietary charger pull DP and DM to specific
+ *			voltages between 2.0-3.3v for identification.
+ *
  */
 enum usb_chg_type {
 	USB_INVALID_CHARGER = 0,
@@ -145,6 +150,7 @@ enum usb_chg_type {
 	USB_ACA_B_CHARGER,
 	USB_ACA_C_CHARGER,
 	USB_ACA_DOCK_CHARGER,
+	USB_PROPRIETARY_CHARGER,
 };
 
 /**
@@ -283,7 +289,7 @@ struct msm_otg_platform_data {
  * @bus_perf_client: Bus performance client handle to request BUS bandwidth
  */
 struct msm_otg {
-	struct otg_transceiver otg;
+	struct usb_phy phy;
 	struct msm_otg_platform_data *pdata;
 	int irq;
 	struct clk *clk;
@@ -316,6 +322,7 @@ struct msm_otg {
 	int async_int;
 	unsigned cur_power;
 	struct delayed_work chg_work;
+	struct delayed_work pmic_id_status_work;
 	enum usb_chg_state chg_state;
 	enum usb_chg_type chg_type;
 	u8 dcd_retries;
@@ -324,7 +331,7 @@ struct msm_otg {
 	unsigned mA_port;
 	struct timer_list id_timer;
 	unsigned long caps;
-	struct clk *xo_handle;
+	struct msm_xo_voter *xo_handle;
 	uint32_t bus_perf_client;
 	/*
 	 * Allowing PHY power collpase turns off the HSUSB 3.3v and 1.8v
@@ -347,6 +354,7 @@ struct msm_otg {
 	unsigned long lpm_flags;
 #define PHY_PWR_COLLAPSED		BIT(0)
 #define PHY_RETENTIONED			BIT(1)
+#define XO_SHUTDOWN			BIT(2)
 	int reset_counter;
 	unsigned long b_last_se0_sess;
 	unsigned long tmouts;
@@ -359,6 +367,8 @@ struct msm_hsic_host_platform_data {
 	unsigned strobe;
 	unsigned data;
 	struct msm_bus_scale_pdata *bus_scale_table;
+	unsigned log2_irq_thresh;
+	u32 swfi_latency;
 };
 
 struct msm_usb_host_platform_data {

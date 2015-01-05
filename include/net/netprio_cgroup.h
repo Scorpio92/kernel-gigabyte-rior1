@@ -16,7 +16,6 @@
 #include <linux/cgroup.h>
 #include <linux/hardirq.h>
 #include <linux/rcupdate.h>
-#include <linux/kconfig.h>
 
 
 struct netprio_map {

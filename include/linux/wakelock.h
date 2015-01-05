@@ -28,10 +28,11 @@
 
 enum {
 	WAKE_LOCK_SUSPEND, /* Prevent suspend */
-	WAKE_LOCK_IDLE,    /* Prevent low power idle */
 	WAKE_LOCK_TYPE_COUNT
 };
+
 struct wake_lock {
+#ifdef CONFIG_HAS_WAKELOCK
 	struct list_head    link;
 	int                 flags;
 	const char         *name;
@@ -46,6 +47,7 @@ struct wake_lock {
 		ktime_t         max_time;
 		ktime_t         last_time;
 	} stat;
+#endif
 #endif
 };
 
@@ -69,10 +71,6 @@ int wake_lock_active(struct wake_lock *lock);
  * number of jiffies until all active wake locks time out.
  */
 long has_wake_lock(int type);
-
-#ifdef CONFIG_MSM_SM_EVENT
-void add_active_wakelock_event(void);
-#endif
 
 #else
 

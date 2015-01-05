@@ -11,19 +11,16 @@
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
-#include <linux/sysdev.h>
 #include <linux/cpu.h>
 #include <linux/sysfs.h>
 #include <linux/cpufreq.h>
+#include <linux/module.h>
 #include <linux/jiffies.h>
 #include <linux/percpu.h>
 #include <linux/kobject.h>
 #include <linux/spinlock.h>
 #include <linux/notifier.h>
 #include <asm/cputime.h>
-
-#define CREATE_TRACE_POINTS
-#include <trace/events/cpufreq.h>
 
 static spinlock_t cpufreq_stats_lock;
 
@@ -63,9 +60,8 @@ static int cpufreq_stats_update(unsigned int cpu)
 	spin_lock(&cpufreq_stats_lock);
 	stat = per_cpu(cpufreq_stats_table, cpu);
 	if (stat->time_in_state)
-		stat->time_in_state[stat->last_index] =
-			cputime64_add(stat->time_in_state[stat->last_index],
-				      cputime_sub(cur_time, stat->last_time));
+		stat->time_in_state[stat->last_index] +=
+			cur_time - stat->last_time;
 	stat->last_time = cur_time;
 	spin_unlock(&cpufreq_stats_lock);
 	return 0;
@@ -310,7 +306,6 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
 	if (old_index == new_index)
 		return 0;
 
-	trace_cpufreq_chg(freq->cpu, freq->new);
 	spin_lock(&cpufreq_stats_lock);
 	stat->last_index = new_index;
 #ifdef CONFIG_CPU_FREQ_STAT_DETAILS

@@ -10,12 +10,13 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/module.h>
 #include <linux/msm_adsp.h>
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/android_pmem.h>
 #include <linux/slab.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
 #include <media/v4l2-device.h>
@@ -25,6 +26,7 @@
 #include <linux/clk.h>
 #include <mach/clk.h>
 #include <mach/camera.h>
+#include <mach/dal_axi.h>
 #include "msm_vfe7x27a_v4l2.h"
 #include "msm.h"
 
@@ -113,6 +115,7 @@
 #define VFE_ASYNC_TIMER2_START  29
 #define VFE_STATS_AUTOFOCUS_UPDATE  30
 #define VFE_STATS_WB_EXP_UPDATE  31
+#define VFE_IMMEDIATE_STOP      32
 #define VFE_ROLL_OFF_UPDATE  33
 #define VFE_DEMOSAICv3_BPC_UPDATE  34
 #define VFE_TESTGEN_START  35
@@ -237,7 +240,7 @@ struct cmd_id_map cmds_map[] = {
 	{VFE_CMD_CAPTURE, VFE_START, QDSP_CMDQUEUE,
 			"VFE_CMD_CAPTURE", "VFE_START"},
 	{VFE_CMD_DUMMY_7, VFE_MAX, VFE_MAX},
-	{VFE_CMD_STOP, VFE_STOP, QDSP_CMDQUEUE, "VFE_CMD_STOP", "VFE_STOP"},
+        {VFE_CMD_STOP, VFE_IMMEDIATE_STOP, QDSP_CMDQUEUE, "VFE_CMD_STOP", "VFE_IMMEDIATE_STOP"},
 	{VFE_CMD_GET_HW_VERSION, VFE_MAX, VFE_MAX},
 	{VFE_CMD_GET_FRAME_SKIP_COUNTS, VFE_MAX, VFE_MAX},
 	{VFE_CMD_OUTPUT1_BUFFER_ENQ, VFE_MAX, VFE_MAX},
@@ -332,6 +335,7 @@ struct cmd_id_map cmds_map[] = {
 		"VFE_SCALE_OUTPUT2_CONFIG"},
 	{VFE_CMD_CAPTURE_RAW, VFE_START, QDSP_CMDQUEUE,
 			"VFE_CMD_CAPTURE_RAW", "VFE_START"},
+	{VFE_CMD_STOP_LIVESHOT, VFE_MAX, VFE_MAX},
 	{VFE_CMD_RECONFIG_VFE, VFE_MAX, VFE_MAX},
 };
 
@@ -399,6 +403,8 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 	void *data = NULL;
 	struct buf_info *outch = NULL;
 	uint32_t y_phy, cbcr_phy;
+	static uint32_t liveshot_y_phy;
+	static struct vfe_endframe liveshot_swap;
 	struct table_cmd *table_pending = NULL;
 	unsigned long flags;
 	void   *cmd_data = NULL;
@@ -406,8 +412,8 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 	struct msm_free_buf *free_buf = NULL;
 	struct vfe_outputack fack;
 	int i;
-
-	CDBG("%s:id=%d\n", __func__, id);
+    /* apply a qualcomm patch */
+	//pr_info("%s:id=%d\n", __func__, id);
 	if (id != VFE_ADSP_EVENT) {
 		data = kzalloc(len, GFP_ATOMIC);
 		if (!data) {
@@ -423,10 +429,8 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 		/* messages */
 		getevent(data, len);
 		CDBG("%s:messages:msg_id=%d\n", __func__, id);
-
 		switch (id) {
 		case MSG_SNAPSHOT:
-			msm_camio_set_perf_lvl(S_PREVIEW);
 			while (vfe2x_ctrl->snap.frame_cnt <
 				vfe2x_ctrl->num_snap) {
 				vfe_7x_ops(driver_data, MSG_OUTPUT_S, len,
@@ -435,19 +439,17 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 					vfe_7x_ops(driver_data, MSG_OUTPUT_T,
 						len, getevent);
 			}
-
 			vfe2x_send_isp_msg(vfe2x_ctrl, MSG_ID_SNAPSHOT_DONE);
 			vfe2x_ctrl->snapshot_done = 1;
 			if (vfe2x_ctrl->stop_pending) {
-			cmd_data = buf;
-			*(uint32_t *)cmd_data = VFE_STOP;
-			/* Send Stop cmd here */
-			len  = 4;
-			msm_adsp_write(vfe_mod, QDSP_CMDQUEUE,
-                 cmd_data, len);
-			vfe2x_ctrl->stop_pending = 0;
+				cmd_data = buf;
+				*(uint32_t *)cmd_data = VFE_STOP;
+				/* Send Stop cmd here */
+				len  = 4;
+				msm_adsp_write(vfe_mod, QDSP_CMDQUEUE,
+						cmd_data, len);
+				vfe2x_ctrl->stop_pending = 0;
 			}
-
 			kfree(data);
 			return;
 		case MSG_OUTPUT_S:
@@ -578,48 +580,139 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 			if (op_mode & SNAPSHOT_MASK_MODE) {
 				kfree(data);
 				return;
-			} else {
-				free_buf = vfe2x_check_free_buffer(
+			}
+			free_buf = vfe2x_check_free_buffer(
 					VFE_MSG_OUTPUT_IRQ,
 					VFE_MSG_OUTPUT_PRIMARY);
-			      CDBG("free_buf = %x\n", (unsigned int) free_buf);
-			      if (free_buf) {
+			CDBG("free_buf = %x\n",
+					(unsigned int) free_buf);
+			spin_lock_irqsave(
+					&vfe2x_ctrl->liveshot_enabled_lock,
+					flags);
+			if (!vfe2x_ctrl->liveshot_enabled) {
+				spin_unlock_irqrestore(
+						&vfe2x_ctrl->
+						liveshot_enabled_lock,
+						flags);
+				if (free_buf) {
 					fack.header = VFE_OUTPUT2_ACK;
 
 					fack.output2newybufferaddress =
-						(void *)(free_buf->ch_paddr[0]);
+						(void *)
+						(free_buf->ch_paddr[0]);
 
 					fack.output2newcbcrbufferaddress =
-						(void *)(free_buf->ch_paddr[1]);
+						(void *)
+						(free_buf->ch_paddr[1]);
 
 					cmd_data = &fack;
 					len = sizeof(fack);
-					msm_adsp_write(vfe_mod, QDSP_CMDQUEUE,
+					msm_adsp_write(vfe_mod,
+							QDSP_CMDQUEUE,
 							cmd_data, len);
-			      } else {
+				} else {
 					fack.header = VFE_OUTPUT2_ACK;
 					fack.output2newybufferaddress =
-					(void *)
-				((struct vfe_endframe *)data)->y_address;
+						(void *)
+						((struct vfe_endframe *)
+						 data)->y_address;
 					fack.output2newcbcrbufferaddress =
-					(void *)
-				((struct vfe_endframe *)data)->cbcr_address;
+						(void *)
+						((struct vfe_endframe *)
+						 data)->cbcr_address;
 					cmd_data = &fack;
 					len = sizeof(fack);
-					msm_adsp_write(vfe_mod, QDSP_CMDQUEUE,
-						cmd_data, len);
+					msm_adsp_write(vfe_mod,
+							QDSP_CMDQUEUE,
+							cmd_data, len);
 					if (!vfe2x_ctrl->zsl_mode) {
 						kfree(data);
 						return;
 					}
 				}
+			} else { /* Live snapshot */
+				spin_unlock_irqrestore(
+						&vfe2x_ctrl->
+						liveshot_enabled_lock,
+						flags);
+				if (free_buf) {
+					/* liveshot_swap to enqueue
+					   when liveshot snapshot buffer
+					   is obtainedi from adsp */
+					liveshot_swap.y_address =
+						((struct vfe_endframe *)
+						 data)->y_address;
+					liveshot_swap.cbcr_address =
+						((struct vfe_endframe *)
+						 data)->cbcr_address;
+
+					fack.header = VFE_OUTPUT2_ACK;
+
+					fack.output2newybufferaddress =
+						(void *)
+						(free_buf->ch_paddr[0]);
+
+					fack.output2newcbcrbufferaddress =
+						(void *)
+						(free_buf->ch_paddr[1]);
+
+					liveshot_y_phy =
+						(uint32_t)
+						fack.output2newybufferaddress;
+
+					cmd_data = &fack;
+					len = sizeof(fack);
+					msm_adsp_write(vfe_mod,
+							QDSP_CMDQUEUE,
+							cmd_data, len);
+				} else if (liveshot_y_phy !=
+						((struct vfe_endframe *)
+						 data)->y_address) {
+
+					fack.header = VFE_OUTPUT2_ACK;
+					fack.output2newybufferaddress =
+						(void *)
+						((struct vfe_endframe *)
+						 data)->y_address;
+
+					fack.output2newcbcrbufferaddress =
+						(void *)
+						((struct vfe_endframe *)
+						 data)->cbcr_address;
+
+					cmd_data = &fack;
+					len = sizeof(fack);
+					msm_adsp_write(vfe_mod,
+							QDSP_CMDQUEUE,
+							cmd_data, len);
+					kfree(data);
+					return;
+				} else {
+					/* Enque data got
+					 * during freebuf */
+					fack.header = VFE_OUTPUT2_ACK;
+					fack.output2newybufferaddress =
+						(void *)
+						(liveshot_swap.y_address);
+
+					fack.output2newcbcrbufferaddress =
+						(void *)
+						(liveshot_swap.cbcr_address);
+					cmd_data = &fack;
+					len = sizeof(fack);
+					msm_adsp_write(vfe_mod,
+							QDSP_CMDQUEUE,
+							cmd_data, len);
+				}
 			}
-			y_phy = ((struct vfe_endframe *)data)->y_address;
-			cbcr_phy = ((struct vfe_endframe *)data)->cbcr_address;
+			y_phy = ((struct vfe_endframe *)data)->
+				y_address;
+			cbcr_phy = ((struct vfe_endframe *)data)->
+				cbcr_address;
 
 
-			CDBG("vfe_7x_convert, y_phy = 0x%x, cbcr_phy = 0x%x\n",
-				 y_phy, cbcr_phy);
+			CDBG("MSG_OUT2:y_phy= 0x%x, cbcr_phy= 0x%x\n",
+					y_phy, cbcr_phy);
 			if (free_buf) {
 				for (i = 0; i < 3; i++) {
 					if (vfe2x_ctrl->free_buf.buf[i].
@@ -637,14 +730,23 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 					CDBG("Address doesnt match\n");
 			}
 			memcpy(((struct vfe_frame_extra *)extdata),
-				&((struct vfe_endframe *)data)->extra,
-				sizeof(struct vfe_frame_extra));
+					&((struct vfe_endframe *)data)->extra,
+					sizeof(struct vfe_frame_extra));
 
 			vfe2x_ctrl->vfeFrameId =
-				((struct vfe_frame_extra *)extdata)->frame_id;
-			vfe_send_outmsg(&vfe2x_ctrl->subdev,
+				((struct vfe_frame_extra *)extdata)->
+				frame_id;
+
+			if (!vfe2x_ctrl->liveshot_enabled) {
+				/* Liveshot not enalbed */
+				vfe_send_outmsg(&vfe2x_ctrl->subdev,
 						MSG_ID_OUTPUT_PRIMARY,
 						y_phy, cbcr_phy);
+			} else if (liveshot_y_phy == y_phy) {
+				vfe_send_outmsg(&vfe2x_ctrl->subdev,
+						MSG_ID_OUTPUT_PRIMARY,
+						y_phy, cbcr_phy);
+			}
 			break;
 		case MSG_RESET_ACK:
 		case MSG_START_ACK:
@@ -700,7 +802,7 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 			if (vfe2x_ctrl->vfeFrameId == 0)
 				vfe2x_ctrl->vfeFrameId = 1; /* wrapped back */
 			if ((op_mode & SNAPSHOT_MASK_MODE) && !raw_mode
-				) {
+				&& (vfe2x_ctrl->num_snap <= 1)) {
 				CDBG("Ignore SOF for snapshot\n");
 				kfree(data);
 				return;
@@ -801,6 +903,7 @@ static int vfe_7x_config_axi(int mode,
 	int    cnt;
 	int rc = 0;
 	int o_mode = 0;
+	unsigned long flags;
 
 	if (op_mode & SNAPSHOT_MASK_MODE)
 		o_mode = SNAPSHOT_MASK_MODE;
@@ -909,8 +1012,17 @@ static int vfe_7x_config_axi(int mode,
 		ao->output2buffer1_cbcr_phy = ad->ping.ch_paddr[1];
 		ao->output2buffer2_y_phy = ad->pong.ch_paddr[0];
 		ao->output2buffer2_cbcr_phy = ad->pong.ch_paddr[1];
-		ao->output2buffer3_y_phy = ad->free_buf.ch_paddr[0];
-		ao->output2buffer3_cbcr_phy = ad->free_buf.ch_paddr[1];
+		spin_lock_irqsave(&vfe2x_ctrl->liveshot_enabled_lock,
+				flags);
+		if (vfe2x_ctrl->liveshot_enabled) { /* Live shot */
+			ao->output2buffer3_y_phy = ad->pong.ch_paddr[0];
+			ao->output2buffer3_cbcr_phy = ad->pong.ch_paddr[1];
+		} else {
+			ao->output2buffer3_y_phy = ad->free_buf.ch_paddr[0];
+			ao->output2buffer3_cbcr_phy = ad->free_buf.ch_paddr[1];
+		}
+		spin_unlock_irqrestore(&vfe2x_ctrl->liveshot_enabled_lock,
+				flags);
 		bptr = &ao->output2buffer4_y_phy;
 		for (cnt = 0; cnt < 5; cnt++) {
 			*bptr = ad->pong.ch_paddr[0];
@@ -1315,7 +1427,8 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 		break;
 	case CMD_GENERAL:
 	case CMD_STATS_DISABLE: {
-		CDBG("CMD_GENERAL:%d %d\n", vfecmd.id, vfecmd.length);
+        /* apply a qualcomm patch */
+		//pr_info("CMD_GENERAL:%d %d\n", vfecmd.id, vfecmd.length);
 		if (vfecmd.id == VFE_CMD_OPERATION_CFG) {
 			if (copy_from_user(&vfe2x_ctrl->start_cmd,
 						(void __user *)(vfecmd.value),
@@ -1333,6 +1446,26 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 		if (vfecmd.id == VFE_CMD_RECONFIG_VFE) {
 			CDBG("VFE is RECONFIGURED\n");
 			vfe2x_ctrl->reconfig_vfe = 1;
+			return 0;
+		}
+		if (vfecmd.id == VFE_CMD_LIVESHOT) {
+			CDBG("live shot enabled\n");
+			spin_lock_irqsave(&vfe2x_ctrl->liveshot_enabled_lock,
+					flags);
+			vfe2x_ctrl->liveshot_enabled = 1;
+			spin_unlock_irqrestore(&vfe2x_ctrl->
+					liveshot_enabled_lock,
+					flags);
+			return 0;
+		}
+		if (vfecmd.id == VFE_CMD_STOP_LIVESHOT) {
+			CDBG("live shot disabled\n");
+			spin_lock_irqsave(&vfe2x_ctrl->liveshot_enabled_lock,
+					flags);
+			vfe2x_ctrl->liveshot_enabled = 0;
+			spin_unlock_irqrestore(
+					&vfe2x_ctrl->liveshot_enabled_lock,
+					flags);
 			return 0;
 		}
 		if (vfecmd.length > 256 - 4) {
@@ -1358,12 +1491,14 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 			rc = -EFAULT;
 			goto config_done;
 		}
-		CDBG("%s %s\n", cmds_map[vfecmd.id].isp_id_name,
-			cmds_map[vfecmd.id].vfe_id_name);
+        /* apply a qualcomm patch */
+		//pr_info("%s %s\n", cmds_map[vfecmd.id].isp_id_name,
+			//cmds_map[vfecmd.id].vfe_id_name);
 		*(uint32_t *)cmd_data = header;
 		if (queue == QDSP_CMDQUEUE) {
 			switch (vfecmd.id) {
 			case VFE_CMD_RESET:
+				axi_halt(AXI_HALT_PORT_VFE);
 				msm_camio_vfe_blk_reset_2();
 				vfestopped = 0;
 				break;
@@ -1398,24 +1533,12 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 				vfestopped = 1;
 				spin_lock_irqsave(&vfe2x_ctrl->table_lock,
 						flags);
-//				if (op_mode & SNAPSHOT_MASK_MODE) {
-//					vfe2x_ctrl->stop_pending = 0;
-//					vfe2x_send_isp_msg(vfe2x_ctrl,
-//						msgs_map[MSG_STOP_ACK].
-//						isp_id);
-//					spin_unlock_irqrestore(
-//							&vfe2x_ctrl->table_lock,
-//							flags);
-//					return 0;
-//				}
-
-				if ((op_mode & SNAPSHOT_MASK_MODE)  && !vfe2x_ctrl->snapshot_done) {
-				vfe2x_ctrl->stop_pending = 1;
-				spin_unlock_irqrestore(&vfe2x_ctrl->table_lock,
-				flags);
-				return 0;
-				}
-
+				if ((op_mode & SNAPSHOT_MASK_MODE) && !vfe2x_ctrl->snapshot_done) {
+                                        vfe2x_ctrl->stop_pending = 1;
+                                        spin_unlock_irqrestore(&vfe2x_ctrl->table_lock,
+                                                flags);
+                                        return 0;
+                                }
 				if ((!list_empty(&vfe2x_ctrl->table_q)) ||
 						vfe2x_ctrl->tableack_pending) {
 					CDBG("stop pending\n");
@@ -1425,7 +1548,7 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 							flags);
 					return 0;
 				}
-                vfe2x_ctrl->snapshot_done = 0;
+				vfe2x_ctrl->snapshot_done = 0;
 				spin_unlock_irqrestore(&vfe2x_ctrl->table_lock,
 						flags);
 				vfe2x_ctrl->vfe_started = 0;
@@ -1676,6 +1799,7 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 					VFE_MSG_OUTPUT_SECONDARY);
 		} else if ((op_mode & SNAPSHOT_MASK_MODE) &&
 				(vfe2x_ctrl->num_snap > 1)) {
+			int i = 0;
 			CDBG("Burst mode AXI config SEC snap cnt %d\n",
 				vfe2x_ctrl->num_snap);
 			for (i = 0; i < vfe2x_ctrl->num_snap - 2; i++) {
@@ -1717,6 +1841,7 @@ static long msm_vfe_subdev_ioctl(struct v4l2_subdev *sd,
 					VFE_MSG_OUTPUT_PRIMARY);
 		} else if ((op_mode & SNAPSHOT_MASK_MODE) &&
 				(vfe2x_ctrl->num_snap > 1)) {
+			int i = 0;
 			CDBG("Burst mode AXI config PRIM snap cnt %d\n",
 				vfe2x_ctrl->num_snap);
 			for (i = 0; i < vfe2x_ctrl->num_snap - 2; i++) {
@@ -1843,6 +1968,7 @@ int msm_vfe_subdev_init(struct v4l2_subdev *sd,
 	spin_lock_init(&vfe2x_ctrl->sd_notify_lock);
 	spin_lock_init(&vfe2x_ctrl->table_lock);
 	spin_lock_init(&vfe2x_ctrl->vfe_msg_lock);
+	spin_lock_init(&vfe2x_ctrl->liveshot_enabled_lock);
 	init_waitqueue_head(&stopevent.wait);
 	INIT_LIST_HEAD(&vfe2x_ctrl->table_q);
 	INIT_LIST_HEAD(&vfe2x_ctrl->vfe_msg_q);

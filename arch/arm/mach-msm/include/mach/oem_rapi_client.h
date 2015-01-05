@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,34 +21,12 @@
 #include <linux/types.h>
 #include <mach/msm_rpcrouter.h>
 
-#ifdef CONFIG_MSM_AMSS_ENHANCE_DEBUG
-#define NZI_ITEM_FILE_NAME_LENGTH 8
-typedef struct {
-	uint32_t len;
-	uint32_t data[3];
-} extent_t;
-typedef struct {
-	extent_t extension;
-	uint32_t address;
-	char file_name[NZI_ITEM_FILE_NAME_LENGTH];	/* This indicate the log type */
-	uint32_t size; 					/* Size of the buffer */
-} nzi_buf_item_type;
-int send_modem_logaddr(nzi_buf_item_type *input);
-#endif
-
 enum {
 	OEM_RAPI_CLIENT_EVENT_NONE = 0,
 
 	/*
 	 * list of oem rapi client events
 	 */
-	OEM_RAPI_CLIENT_EVENT_TRI_COLOR_LED_WORK = 21,
-	OEM_RAPI_STREAMING_SILENT_PROFILE_SET = 30,
-	OEM_RAPI_STREAMING_SILENT_PROFILE_GET = 31,
-
-	OEM_RAPI_CLIENT_EVENT_QRDCOMPACTDUMP_NZIITEM_WRITE = 40,
-
-	OEM_RAPI_CLIENT_EVENT_DEBUG_SLEEP_MONITOR = 41,
 
 	OEM_RAPI_CLIENT_EVENT_MAX
 
@@ -92,6 +70,40 @@ int oem_rapi_client_streaming_function(
 	struct oem_rapi_client_streaming_func_ret *ret);
 
 int oem_rapi_client_close(void);
+
+#ifdef CONFIG_HUAWEI_KERNEL
+/*  Returned status codes for requested operation.                         */
+  typedef enum {
+    NV_DONE_S,          /* Request completed okay */
+    NV_BUSY_S,          /* Request is queued */
+    NV_BADCMD_S,        /* Unrecognizable command field */
+    NV_FULL_S,          /* The NVM is full */
+    NV_FAIL_S,          /* Command failed, reason other than NVM was full */
+    NV_NOTACTIVE_S,     /* Variable was not active */
+    NV_BADPARM_S,       /* Bad parameter in command block */
+    NV_READONLY_S,      /* Parameter is write-protected and thus read only */
+    NV_BADTG_S,         /* Item not valid for Target */
+    NV_NOMEM_S,         /* free memory exhausted */
+    NV_NOTALLOC_S,      /* address is not a valid allocation */
+    NV_STAT_ENUM_PAD = 0x7FFF,     /* Pad to 16 bits on ARM */
+    NV_RPC_ERROR_S   = NV_STAT_ENUM_PAD+1, /* nv rpc call error */
+    NV_STAT_ENUM_MAX = 0x7FFFFFFF     /* Pad to 16 bits on ARM */
+  } nv_stat_enum_type;
+
+/* usb rpc to replace pcom mechanism for fix reset issue */
+/*
+ * the oem_rapi_client_streaming write nv function
+ * it can be used to all kernel file
+ * the caller must ensure the pointer not be NULL.
+ */
+nv_stat_enum_type oem_rapi_write_nv(u16 nv, void *buf, u8 size);
+/*
+ * the oem_rapi_client_streaming read nv function
+ * it can be used to all kernel file
+ * the caller must ensure the pointer not be NULL.
+ */
+nv_stat_enum_type oem_rapi_read_nv(u16 nv, void *buf, u8 size);
+#endif
 
 struct msm_rpc_client *oem_rapi_client_init(void);
 

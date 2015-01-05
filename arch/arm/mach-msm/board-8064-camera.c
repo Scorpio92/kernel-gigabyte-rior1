@@ -11,15 +11,19 @@
  *
  */
 
-#include <asm/mach-types.h>
 #include <linux/i2c.h>
 #include <linux/gpio.h>
+
+#include <asm/mach-types.h>
+
 #include <mach/board.h>
 #include <mach/msm_bus_board.h>
 #include <mach/gpiomux.h>
 
 #include "devices.h"
 #include "board-8064.h"
+
+#ifdef CONFIG_MSM_CAMERA
 
 static struct gpiomux_setting cam_settings[] = {
 	{
@@ -98,7 +102,6 @@ static struct gpiomux_setting cam_settings[] = {
 	},
 
 };
-
 
 static struct msm_gpiomux_config apq8064_cam_common_configs[] = {
 	{
@@ -188,12 +191,11 @@ static struct msm_camera_sensor_flash_src msm_flash_src = {
 	.flash_sr_type = MSM_CAMERA_FLASH_SRC_EXT,
 	._fsrc.ext_driver_src.led_en = VFE_CAMIF_TIMER1_GPIO,
 	._fsrc.ext_driver_src.led_flash_en = VFE_CAMIF_TIMER2_GPIO,
+	._fsrc.ext_driver_src.flash_id = MAM_CAMERA_EXT_LED_FLASH_SC628A,
 };
 
 static struct msm_gpiomux_config apq8064_cam_2d_configs[] = {
 };
-
-#ifdef CONFIG_MSM_CAMERA
 
 static struct msm_bus_vectors cam_init_vectors[] = {
 	{
@@ -332,17 +334,11 @@ static struct msm_bus_scale_pdata cam_bus_client_pdata = {
 static struct msm_camera_device_platform_data msm_camera_csi_device_data[] = {
 	{
 		.csid_core = 0,
-		.is_csiphy = 1,
-		.is_csid   = 1,
-		.is_ispif  = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 	},
 	{
 		.csid_core = 1,
-		.is_csiphy = 1,
-		.is_csid   = 1,
-		.is_ispif  = 1,
 		.is_vpe    = 1,
 		.cam_bus_scale_table = &cam_bus_client_pdata,
 	},
@@ -429,6 +425,19 @@ static struct msm_actuator_info msm_act_main_cam_0_info = {
 	.vcm_pwd        = 0,
 	.vcm_enable     = 0,
 };
+
+static struct i2c_board_info msm_act_main_cam1_i2c_info = {
+	I2C_BOARD_INFO("msm_actuator", 0x18),
+};
+
+static struct msm_actuator_info msm_act_main_cam_1_info = {
+	.board_info     = &msm_act_main_cam1_i2c_info,
+	.cam_name       = MSM_ACTUATOR_MAIN_CAM_1,
+	.bus_id         = APQ_8064_GSBI4_QUP_I2C_BUS_ID,
+	.vcm_pwd        = 0,
+	.vcm_enable     = 0,
+};
+
 
 static struct msm_camera_i2c_conf apq8064_front_cam_i2c_conf = {
 	.use_i2c_mux = 1,

@@ -1,5 +1,3 @@
-/* drivers/input/touchscreen/ft5x06_ts.c
-*/
 /*
  *
  * FocalTech ft5x06 TouchScreen driver.
@@ -64,8 +62,6 @@
 #define FT5X06_PMODE_STANDBY		0x02
 #define FT5X06_PMODE_HIBERNATE		0x03
 
-//#define FT5X06_VTG_MIN_UV	2850000
-//#define FT5X06_VTG_MAX_UV	2850000
 #define FT5X06_VTG_MIN_UV	2600000
 #define FT5X06_VTG_MAX_UV	3300000
 #define FT5X06_I2C_VTG_MIN_UV	1800000
@@ -93,17 +89,6 @@ struct ft5x06_ts_data {
 #endif
 };
 
-/*
-*ft5x06_i2c_read-read data and write data by i2c
-*@client: handle of i2c
-*@writebuf: Data that will be written to the slave
-*@writelen: How many bytes to write
-*@readbuf: Where to store data read from slave
-*@readlen: How many bytes to read
-*
-*Returns negative errno, else the number of messages executed
-*
-*/
 static int ft5x06_i2c_read(struct i2c_client *client, char *writebuf,
 			   int writelen, char *readbuf, int readlen)
 {
@@ -112,29 +97,29 @@ static int ft5x06_i2c_read(struct i2c_client *client, char *writebuf,
 	if (writelen > 0) {
 		struct i2c_msg msgs[] = {
 			{
-			 .addr = client->addr,
-			 .flags = 0,
-			 .len = writelen,
-			 .buf = writebuf,
+				 .addr = client->addr,
+				 .flags = 0,
+				 .len = writelen,
+				 .buf = writebuf,
 			 },
 			{
-			 .addr = client->addr,
-			 .flags = I2C_M_RD,
-			 .len = readlen,
-			 .buf = readbuf,
+				 .addr = client->addr,
+				 .flags = I2C_M_RD,
+				 .len = readlen,
+				 .buf = readbuf,
 			 },
 		};
 		ret = i2c_transfer(client->adapter, msgs, 2);
 		if (ret < 0)
-			dev_err(&client->dev, "f%s: i2c read error.\n",
+			dev_err(&client->dev, "%s: i2c read error.\n",
 				__func__);
 	} else {
 		struct i2c_msg msgs[] = {
 			{
-			 .addr = client->addr,
-			 .flags = I2C_M_RD,
-			 .len = readlen,
-			 .buf = readbuf,
+				 .addr = client->addr,
+				 .flags = I2C_M_RD,
+				 .len = readlen,
+				 .buf = readbuf,
 			 },
 		};
 		ret = i2c_transfer(client->adapter, msgs, 1);
@@ -144,9 +129,6 @@ static int ft5x06_i2c_read(struct i2c_client *client, char *writebuf,
 	return ret;
 }
 
-/*
-*write data by i2c
-*/
 static int ft5x06_i2c_write(struct i2c_client *client, char *writebuf,
 			    int writelen)
 {
@@ -154,22 +136,19 @@ static int ft5x06_i2c_write(struct i2c_client *client, char *writebuf,
 
 	struct i2c_msg msgs[] = {
 		{
-		 .addr = client->addr,
-		 .flags = 0,
-		 .len = writelen,
-		 .buf = writebuf,
+			 .addr = client->addr,
+			 .flags = 0,
+			 .len = writelen,
+			 .buf = writebuf,
 		 },
 	};
 	ret = i2c_transfer(client->adapter, msgs, 1);
 	if (ret < 0)
-		dev_err(&client->dev, "f%s: i2c write error.\n", __func__);
+		dev_err(&client->dev, "%s: i2c write error.\n", __func__);
 
 	return ret;
 }
 
-/*
-*report the point information
-*/
 static void ft5x06_report_value(struct ft5x06_ts_data *data)
 {
 	struct ts_event *event = &data->event;
@@ -201,7 +180,6 @@ static void ft5x06_report_value(struct ft5x06_ts_data *data)
 	input_sync(data->input_dev);
 }
 
-/*Read touch point information when the interrupt  is asserted.*/
 static int ft5x06_handle_touchdata(struct ft5x06_ts_data *data)
 {
 	struct ts_event *event = &data->event;
@@ -241,9 +219,6 @@ static int ft5x06_handle_touchdata(struct ft5x06_ts_data *data)
 	return 0;
 }
 
-/*The ft5x06 device will signal the host about TRIGGER_FALLING.
-*Processed when the interrupt is asserted.
-*/
 static irqreturn_t ft5x06_ts_interrupt(int irq, void *dev_id)
 {
 	struct ft5x06_ts_data *data = dev_id;
@@ -467,15 +442,10 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	input_set_drvdata(input_dev, data);
 	i2c_set_clientdata(client, data);
 
-/*
-	set_bit(EV_KEY, input_dev->evbit);
-	set_bit(EV_ABS, input_dev->evbit);
-	set_bit(BTN_MISC, input_dev->keybit);
-	set_bit(BTN_TOUCH, input_dev->keybit);
-*/
 	__set_bit(EV_KEY, input_dev->evbit);
 	__set_bit(EV_ABS, input_dev->evbit);
 	__set_bit(BTN_TOUCH, input_dev->keybit);
+	__set_bit(INPUT_PROP_DIRECT, input_dev->propbit);
 
 	input_set_abs_params(input_dev, ABS_MT_POSITION_X, 0,
 			     pdata->x_max, 0, 0);
@@ -563,7 +533,7 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 	dev_info(&client->dev, "[FTS] Firmware version = 0x%x\n", reg_value);
 
 	reg_addr = FT5X06_REG_POINT_RATE;
-	err = ft5x06_i2c_read(client, &reg_addr, 1, &reg_value, 1);
+	ft5x06_i2c_read(client, &reg_addr, 1, &reg_value, 1);
 	if (err)
 		dev_err(&client->dev, "report rate read failed");
 	dev_info(&client->dev, "[FTS] report rate is %dHz.\n", reg_value * 10);
@@ -581,6 +551,7 @@ static int ft5x06_ts_probe(struct i2c_client *client,
 		dev_err(&client->dev, "request irq failed\n");
 		goto free_reset_gpio;
 	}
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN +
 	    FT5X06_SUSPEND_LEVEL;

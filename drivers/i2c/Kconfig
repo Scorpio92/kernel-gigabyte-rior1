@@ -7,7 +7,7 @@ menuconfig I2C
 	depends on HAS_IOMEM
 	select RT_MUTEXES
 	---help---
-	  I2C (pronounce: I-square-C) is a slow serial bus protocol used in
+	  I2C (pronounce: I-squared-C) is a slow serial bus protocol used in
 	  many micro controller applications and developed by Philips.  SMBus,
 	  or System Management Bus is a subset of the I2C protocol.  More
 	  information is contained in the directory <file:Documentation/i2c/>,
@@ -86,6 +86,15 @@ config I2C_SMBUS
 
 source drivers/i2c/algos/Kconfig
 source drivers/i2c/busses/Kconfig
+source drivers/i2c/gyroscope/Kconfig
+
+#modify for 4125 baseline
+source drivers/i2c/chips/Kconfig
+
+config HUAWEI_I2C_DEBUG_TOOL
+	bool "I2C debug tools"
+	help
+	  used to debug i2c devices, example camera touch etc.. 
 
 config I2C_DEBUG_CORE
 	bool "I2C Core debugging messages"

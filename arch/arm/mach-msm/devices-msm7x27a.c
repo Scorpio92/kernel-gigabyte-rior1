@@ -219,6 +219,47 @@ struct platform_device msm_device_dmov = {
 	},
 };
 
+static struct acpuclk_pdata msm7x27a_acpuclk_pdata = {
+	.max_speed_delta_khz = 400000,
+};
+
+struct platform_device msm7x27a_device_acpuclk = {
+	.name		= "acpuclk-7627",
+	.id		= -1,
+	.dev.platform_data = &msm7x27a_acpuclk_pdata,
+};
+
+static struct acpuclk_pdata msm7x27aa_acpuclk_pdata = {
+	.max_speed_delta_khz = 504000,
+};
+
+struct platform_device msm7x27aa_device_acpuclk = {
+	.name		= "acpuclk-7627",
+	.id		= -1,
+	.dev.platform_data = &msm7x27aa_acpuclk_pdata,
+};
+
+static struct acpuclk_pdata msm8625_acpuclk_pdata = {
+	/* TODO: Need to update speed delta from H/w Team */
+	.max_speed_delta_khz = 604800,
+};
+
+static struct acpuclk_pdata msm8625ab_acpuclk_pdata = {
+	.max_speed_delta_khz = 801600,
+};
+
+struct platform_device msm8625_device_acpuclk = {
+	.name		= "acpuclk-7627",
+	.id		= -1,
+	.dev.platform_data = &msm8625_acpuclk_pdata,
+};
+
+struct platform_device msm8625ab_device_acpuclk = {
+	.name		= "acpuclk-7627",
+	.id		= -1,
+	.dev.platform_data = &msm8625ab_acpuclk_pdata,
+};
+
 struct platform_device msm_device_smd = {
 	.name	= "msm_smd",
 	.id	= -1,
@@ -468,6 +509,19 @@ void __init msm_pm_register_irqs(void)
 
 }
 
+static struct msm_pm_cpr_ops msm8625_pm_cpr_ops = {
+	.cpr_suspend = msm_cpr_pm_suspend,
+	.cpr_resume = msm_cpr_pm_resume,
+};
+
+void __init msm_pm_register_cpr_ops(void)
+{
+	/* CPR presents on revision >= v2.0 chipsets */
+	if (cpu_is_msm8625() &&
+			SOCINFO_VERSION_MAJOR(socinfo_get_version()) >= 2)
+		msm_pm_set_cpr_ops(&msm8625_pm_cpr_ops);
+}
+
 #define MSM_SDC1_BASE         0xA0400000
 #define MSM_SDC2_BASE         0xA0500000
 #define MSM_SDC3_BASE         0xA0600000
@@ -535,8 +589,8 @@ static struct resource resources_sdc3[] = {
 	},
 	{
 		.name	= "sdcc_dma_chnl",
-		.start	= DMOV_SDC3_CHAN,
-		.end	= DMOV_SDC3_CHAN,
+		.start	= DMOV_NAND_CHAN,
+		.end	= DMOV_NAND_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 	{
@@ -740,7 +794,26 @@ void __init msm8x25_spm_device_init(void)
 {
 	msm_spm_init(msm_spm_data, ARRAY_SIZE(msm_spm_data));
 }
+#ifdef CONFIG_HUAWEI_FEATURE_OEMINFO
+static struct resource rmt_oeminfo_resources[] = {
+       {
+		.flags  = IORESOURCE_MEM,
+       },
+};
 
+static struct platform_device rmt_oeminfo_device = {
+       .name           = "rmt_oeminfo",
+       .id             = -1,
+       .num_resources  = ARRAY_SIZE(rmt_oeminfo_resources),
+       .resource       = rmt_oeminfo_resources,
+};
+
+int __init rmt_oeminfo_add_device(void)
+{
+  platform_device_register(&rmt_oeminfo_device);
+  return 0;
+}
+#endif
 #define MDP_BASE		0xAA200000
 #define MIPI_DSI_HW_BASE	0xA1100000
 
@@ -854,10 +927,15 @@ void __init msm7x25a_kgsl_3d0_init(void)
 void __init msm8x25_kgsl_3d0_init(void)
 {
 	if (cpu_is_msm8625()) {
-		kgsl_3d0_pdata.idle_timeout = HZ;
-		kgsl_3d0_pdata.strtstp_sleepwake = true;
-		/* 8x25 supports a higher GPU frequency */
-		kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 300000000;
+		kgsl_3d0_pdata.idle_timeout = HZ/5;
+		kgsl_3d0_pdata.strtstp_sleepwake = false;
+
+		if (SOCINFO_VERSION_MAJOR(socinfo_get_version()) >= 2)
+			/* 8x25 v2.0 & above supports a higher GPU frequency */
+			kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 320000000;
+		else
+			kgsl_3d0_pdata.pwrlevel[0].gpu_freq = 300000000;
+
 		kgsl_3d0_pdata.pwrlevel[0].bus_freq = 200000000;
 	}
 }
@@ -1006,6 +1084,8 @@ struct platform_device msm8625_device_uart_dm1 = {
 	},
 };
 
+/* uart2dm should use msm_serial_hs driver instead of msm_serial_hsl driver */
+#ifndef CONFIG_HUAWEI_KERNEL
 static struct resource msm8625_uart2dm_resources[] = {
 	{
 		.start	= MSM_UART2DM_PHYS,
@@ -1026,6 +1106,52 @@ struct platform_device msm8625_device_uart_dm2 = {
 	.num_resources	= ARRAY_SIZE(msm8625_uart2dm_resources),
 	.resource	= msm8625_uart2dm_resources,
 };
+#else
+static struct resource msm8625_uart2_dm_resources[] = {
+/* define IORESOURCE_MEM, IORESOURCE_IRQ, IORESOURCE_DMA for uart2dm used in msm_hs_probe() */
+	{
+		.start	= MSM_UART2DM_PHYS,
+		.end	= MSM_UART2DM_PHYS + PAGE_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.start	= MSM8625_INT_UART2DM_IRQ,
+		.end	= MSM8625_INT_UART2DM_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= MSM8625_INT_UART2DM_RX,
+		.end	= MSM8625_INT_UART2DM_RX,
+		.flags	= IORESOURCE_IRQ,
+	},
+	{
+		.start	= DMOV_HSUART2_TX_CHAN,
+		.end	= DMOV_HSUART2_RX_CHAN,
+		.name	= "uartdm_channels",
+		.flags	= IORESOURCE_DMA,
+	},
+	{
+		.start	= DMOV_HSUART2_TX_CRCI,
+		.end	= DMOV_HSUART2_RX_CRCI,
+		.name	= "uartdm_crci",
+		.flags	= IORESOURCE_DMA,
+	},
+};
+
+static u64 msm_uart_dm2_dma_mask = DMA_BIT_MASK(32);
+
+struct platform_device msm8625_device_uart_dm2 = {
+	.name	= "msm_serial_hs",
+	.id	= 1, 
+	.num_resources	= ARRAY_SIZE(msm8625_uart2_dm_resources),
+	.resource	= msm8625_uart2_dm_resources,
+	.dev	= {
+		.dma_mask		= &msm_uart_dm2_dma_mask,
+		.coherent_dma_mask	= DMA_BIT_MASK(32),
+	},
+};
+
+#endif
 
 static struct resource msm8625_resources_adsp[] = {
 	{
@@ -1201,12 +1327,22 @@ static struct resource msm8625_resources_sdc3[] = {
 		.end	= MSM8625_INT_SDC3_1,
 		.flags	= IORESOURCE_IRQ,
 	},
-	{
-		.name	= "sdcc_dma_chnl",
-		.start	= DMOV_SDC3_CHAN,
-		.end	= DMOV_SDC3_CHAN,
-		.flags	= IORESOURCE_DMA,
-	},
+    /*change DMA channel to 8*/
+#ifdef CONFIG_HUAWEI_KERNEL
+    {
+        .name   = "sdcc_dma_chnl",
+        .start  = DMOV_SDC3_CHAN,
+        .end    = DMOV_SDC3_CHAN,
+        .flags  = IORESOURCE_DMA,
+    },
+#else
+    {
+        .name   = "sdcc_dma_chnl",
+        .start  = DMOV_NAND_CHAN,
+        .end    = DMOV_NAND_CHAN,
+        .flags  = IORESOURCE_DMA,
+    },
+#endif
 	{
 		.name	= "sdcc_dma_crci",
 		.start	= DMOV_SDC3_CRCI,
@@ -1293,12 +1429,6 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 
 	if (controller < 1 || controller > 4)
 		return -EINVAL;
-
-	if (machine_is_msm8625_skua() || machine_is_msm8625_evb() || machine_is_msm8625_qrd5() || machine_is_msm8625_skub())
-	{
-		msm8625_device_sdc3.resource[2].start = DMOV_NAND_CHAN;
-		msm8625_device_sdc3.resource[2].end = DMOV_NAND_CHAN;
-	}
 
 	if (cpu_is_msm8625())
 		pdev = msm8625_sdcc_devices[controller-1];
@@ -1487,6 +1617,8 @@ static struct platform_device msm8625_mdp_device = {
 	.resource       = msm8625_mdp_resources,
 };
 
+struct platform_device mipi_dsi_device;
+
 void __init msm_fb_register_device(char *name, void *data)
 {
 	if (!strncmp(name, "mdp", 3)) {
@@ -1495,10 +1627,13 @@ void __init msm_fb_register_device(char *name, void *data)
 		else
 			msm_register_device(&msm_mdp_device, data);
 	} else if (!strncmp(name, "mipi_dsi", 8)) {
-		if (cpu_is_msm8625())
+		if (cpu_is_msm8625()) {
 			msm_register_device(&msm8625_mipi_dsi_device, data);
-		else
+			mipi_dsi_device = msm8625_mipi_dsi_device;
+		} else {
 			msm_register_device(&msm_mipi_dsi_device, data);
+			mipi_dsi_device = msm_mipi_dsi_device;
+		}
 	} else if (!strncmp(name, "lcdc", 4)) {
 			msm_register_device(&msm_lcdc_device, data);
 	} else {
@@ -1531,6 +1666,83 @@ struct platform_device msm8625_kgsl_3d0 = {
 	},
 };
 
+static struct resource pl310_resources[] = {
+	{
+		.start = 0xC0400000,
+		.end   = 0xC0400000 + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name   = "l2_irq",
+		.start  = MSM8625_INT_L2CC_INTR,
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device pl310_erp_device = {
+	.name           = "pl310_erp",
+	.id             = -1,
+	.resource       = pl310_resources,
+	.num_resources  = ARRAY_SIZE(pl310_resources),
+};
+
+enum {
+	MSM8625,
+	MSM8625A,
+	MSM8625AB,
+};
+
+static int __init msm8625_cpu_id(void)
+{
+	int raw_id, cpu;
+
+	raw_id = socinfo_get_raw_id();
+	switch (raw_id) {
+	/* Part number for 1GHz part */
+	case 0x770:
+	case 0x771:
+	case 0x77C:
+	case 0x780:
+	case 0x8D0:
+		cpu = MSM8625;
+		break;
+	/* Part number for 1.2GHz part */
+	case 0x773:
+	case 0x774:
+	case 0x781:
+	case 0x8D1:
+		cpu = MSM8625A;
+		break;
+	case 0x775:
+	case 0x776:
+	case 0x779:
+	case 0x77D:
+	case 0x782:
+	case 0x8D2:
+		cpu = MSM8625AB;
+		break;
+	default:
+		pr_err("Invalid Raw ID\n");
+		return -ENODEV;
+	}
+	return cpu;
+}
+
+static struct resource cpr_resources[] = {
+	{
+		.start = MSM8625_INT_CPR_IRQ0,
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.start = MSM8625_CPR_PHYS,
+		.end = MSM8625_CPR_PHYS + SZ_4K - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+/**
+ * These are various Vdd levels supported by PMIC
+ */
 static uint32_t msm_c2_pmic_mv[] __initdata = {
 	1350000, 1337500, 1325000, 1312500, 1300000,
 	1287500, 1275000, 1262500, 1250000, 1237500,
@@ -1541,7 +1753,9 @@ static uint32_t msm_c2_pmic_mv[] __initdata = {
 	0, 1050000,
 };
 
-
+/**
+ * This data will be based on CPR mode of operation
+ */
 static struct msm_cpr_mode msm_cpr_mode_data[] = {
 	[NORMAL_MODE] = {
 			.ring_osc_data = {
@@ -1634,49 +1848,6 @@ static struct msm_cpr_config msm_cpr_pdata = {
 	.vp_data = &vp_data,
 	.get_quot = msm_cpr_get_quot,
 	.clk_enable = msm_cpr_clk_enable,
-};
-
-enum {
-	MSM8625,
-	MSM8625A,
-};
-
-
-static int __init msm8625_cpu_id(void)
-{
-	int raw_id, cpu;
-
-	raw_id = socinfo_get_raw_id();
-	switch (raw_id) {
-	/* Part number for 1GHz part */
-	case 0x770:
-	case 0x771:
-	case 0x780:
-		cpu = MSM8625;
-		break;
-	/* Part number for 1.2GHz part */
-	case 0x773:
-	case 0x774:
-	case 0x781:
-		cpu = MSM8625A;
-		break;
-	default:
-		pr_err("Invalid Raw ID\n");
-		return -ENODEV;
-	}
-	return cpu;
-}
-
-static struct resource cpr_resources[] = {
-	{
-		.start = MSM8625_INT_CPR_IRQ0,
-		.flags = IORESOURCE_IRQ,
-	},
-	{
-		.start = MSM8625_CPR_PHYS,
-		.end = MSM8625_CPR_PHYS + SZ_4K - 1,
-		.flags = IORESOURCE_MEM,
-	},
 };
 
 static struct platform_device msm8625_device_cpr = {
@@ -1838,7 +2009,12 @@ static struct clk_lookup msm_clock_8625_dummy[] = {
 	CLK_DUMMY("core_clk",		uart1_clk.c,	"msm_serial.0", 0),
 	CLK_DUMMY("core_clk",		uart2_clk.c,	"msm_serial.1", 0),
 	CLK_DUMMY("core_clk",		uart1dm_clk.c,	"msm_serial_hs.0", 0),
+/* uart2dm should use msm_serial_hs clock instead of msm_serial_hsl clock */
+#ifndef CONFIG_HUAWEI_KERNEL
 	CLK_DUMMY("core_clk",		uart2dm_clk.c,	"msm_serial_hsl.0", 0),
+#else	
+	CLK_DUMMY("core_clk",		uart2dm_clk.c,	"msm_serial_hs.1", 0),
+#endif	
 	CLK_DUMMY("usb_hs_core_clk",	usb_hs_core_clk.c, NULL, 0),
 	CLK_DUMMY("usb_hs2_clk",	usb_hs2_clk.c,	NULL, 0),
 	CLK_DUMMY("usb_hs_clk",		usb_hs_clk.c,	NULL, 0),
@@ -1858,6 +2034,40 @@ struct clock_init_data msm8625_dummy_clock_init_data __initdata = {
 	.size = ARRAY_SIZE(msm_clock_8625_dummy),
 };
 
+
+static int __init msm_gpio_config_gps(void)
+{
+	unsigned int gps_gpio = 7;
+	int ret = 0;
+
+	if (!machine_is_msm8625_evb())
+		return ret;
+
+	ret = gpio_tlmm_config(GPIO_CFG(gps_gpio, 0, GPIO_CFG_OUTPUT,
+			GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	if (ret < 0) {
+		pr_err("gpio tlmm failed for gpio-%d\n", gps_gpio);
+		return ret;
+	}
+
+	ret = gpio_request(gps_gpio, "gnss-gpio");
+	if (ret < 0) {
+		pr_err("failed to request gpio-%d\n", gps_gpio);
+		return ret;
+	}
+
+	ret = gpio_direction_input(gps_gpio);
+	if (ret < 0) {
+		pr_err("failed to change direction for gpio-%d\n", gps_gpio);
+		return ret;
+	}
+
+	ret = gpio_export(gps_gpio, true);
+	if (ret < 0)
+		pr_err("failed to export gpio for user\n");
+
+	return ret;
+}
 
 int __init msm7x2x_misc_init(void)
 {
@@ -1889,6 +2099,9 @@ int __init msm7x2x_misc_init(void)
 		pl310_resources[1].start = INT_L2CC_INTR;
 
 	platform_device_register(&pl310_erp_device);
+
+	if (msm_gpio_config_gps() < 0)
+		pr_err("Error for gpio config for GPS gpio\n");
 
 	return 0;
 }
@@ -1941,16 +2154,9 @@ void __init msm_common_io_init(void)
 
 void __init msm8625_init_irq(void)
 {
-	msm_gic_irq_extn_init(MSM_QGIC_DIST_BASE, MSM_QGIC_CPU_BASE);
+	msm_gic_irq_extn_init();
 	gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE,
 			(void *)MSM_QGIC_CPU_BASE);
-	/* Edge trigger PPIs
-	*/
-	writel_relaxed(0x555555F5,
-		MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-	writel_relaxed(0x0000FFFF,
-		MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
-	mb();
 }
 
 void __init msm8625_map_io(void)

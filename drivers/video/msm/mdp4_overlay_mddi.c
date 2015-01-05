@@ -32,7 +32,9 @@
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mdp4.h"
-
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <linux/hardware_self_adapt.h>
+#endif
 static struct mdp4_overlay_pipe *mddi_pipe;
 static struct msm_fb_data_type *mddi_mfd;
 static int busy_wait_cnt;
@@ -87,6 +89,56 @@ void mdp4_mddi_vsync_enable(struct msm_fb_data_type *mfd,
 		MDP_OUTP(MDP_BASE + 0x20c, data);
 	}
 }
+/* Config MDP reg according bpp ,the interface for 
+ * dma_s pipe or dma_p(overlay) pipe.
+ */
+#ifdef CONFIG_FB_MSM_BPP_SWITCH
+void mdp4_dma_s_update_lcd(struct msm_fb_data_type *mfd,
+				struct mdp4_overlay_pipe *pipe);
+void mdp4_switch_bpp_config(struct msm_fb_data_type *mfd,uint32 bpp)
+{
+    uint32 mddi_ld_param;
+    uint16 mddi_vdo_packet_reg;
+    mfd->panel_info.bpp = bpp;    
+    printk(KERN_ERR "%s: switch bpp into %d\n", __func__,bpp);
+    if(24 == bpp)
+    {
+       mdp4_dma_s_update_lcd(mfd,mddi_pipe); 
+    }
+    else if (16 == bpp)
+    {
+        mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+        mddi_ld_param = 0;
+        mddi_vdo_packet_reg = mfd->panel_info.mddi.vdopkt;
+        if (mfd->panel_info.type == MDDI_PANEL) {
+        	if (mfd->panel_info.pdest == DISPLAY_1)
+        		mddi_ld_param = 0;
+        	else
+        		mddi_ld_param = 1;
+        } else {
+        	mddi_ld_param = 2;
+        }
+
+        MDP_OUTP(MDP_BASE + 0x00090, mddi_ld_param);
+        /* config registers base on bpp(16 ,24 or other) */
+        if (mfd->panel_info.bpp == 24)
+        	MDP_OUTP(MDP_BASE + 0x00094,
+        	 (MDDI_VDO_PACKET_DESC_24 << 16) | mddi_vdo_packet_reg);
+        else if (mfd->panel_info.bpp == 16)
+        	MDP_OUTP(MDP_BASE + 0x00094,
+        	 (MDDI_VDO_PACKET_DESC_16 << 16) | mddi_vdo_packet_reg);
+        else
+        	MDP_OUTP(MDP_BASE + 0x00094,
+        	 (MDDI_VDO_PACKET_DESC << 16) | mddi_vdo_packet_reg);
+
+        MDP_OUTP(MDP_BASE + 0x00098, 0x01);
+        mdp4_overlay_dmap_cfg(mfd, 0);
+        mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+    }
+    else 
+        return;    
+}
+#endif
 
 #define WHOLESCREEN
 
@@ -163,7 +215,8 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 
 		MDP_OUTP(MDP_BASE + 0x00098, 0x01);
 		mdp4_init_writeback_buf(mfd, MDP4_MIXER0);
-		pipe->blt_addr = 0;
+		pipe->ov_blt_addr = 0;
+		pipe->dma_blt_addr = 0;
 	} else {
 		pipe = mddi_pipe;
 	}
@@ -235,14 +288,14 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 
 	mdp4_overlay_rgb_setup(pipe);
 
-	mdp4_mixer_stage_up(pipe);
+	mdp4_mixer_stage_up(pipe, 1);
 
 	mdp4_overlayproc_cfg(pipe);
 
 	mdp4_overlay_dmap_xy(pipe);
 
 	mdp4_overlay_dmap_cfg(mfd, 0);
-
+	mdp4_mixer_stage_commit(pipe->mixer_num);
 	mdp4_mddi_vsync_enable(mfd, pipe, 0);
 
 	/* MDP cmd block disable */
@@ -254,23 +307,25 @@ int mdp4_mddi_overlay_blt_start(struct msm_fb_data_type *mfd)
 	unsigned long flag;
 
 	pr_debug("%s: blt_end=%d blt_addr=%x pid=%d\n",
-	__func__, mddi_pipe->blt_end, (int)mddi_pipe->blt_addr, current->pid);
+		__func__, mddi_pipe->blt_end,
+		(int)mddi_pipe->ov_blt_addr, current->pid);
 
 	mdp4_allocate_writeback_buf(mfd, MDP4_MIXER0);
 
-	if (mfd->ov0_wb_buf->phys_addr == 0) {
+	if (mfd->ov0_wb_buf->write_addr == 0) {
 		pr_info("%s: no blt_base assigned\n", __func__);
 		return -EBUSY;
 	}
 
-	if (mddi_pipe->blt_addr == 0) {
+	if (mddi_pipe->ov_blt_addr == 0) {
 		mdp4_mddi_dma_busy_wait(mfd);
 		spin_lock_irqsave(&mdp_spin_lock, flag);
 		mddi_pipe->blt_end = 0;
 		mddi_pipe->blt_cnt = 0;
 		mddi_pipe->ov_cnt = 0;
 		mddi_pipe->dmap_cnt = 0;
-		mddi_pipe->blt_addr = mfd->ov0_wb_buf->phys_addr;
+		mddi_pipe->ov_blt_addr = mfd->ov0_wb_buf->write_addr;
+		mddi_pipe->dma_blt_addr = mfd->ov0_wb_buf->write_addr;
 		mdp4_stat.blt_mddi++;
 		spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	return 0;
@@ -284,9 +339,9 @@ int mdp4_mddi_overlay_blt_stop(struct msm_fb_data_type *mfd)
 	unsigned long flag;
 
 	pr_debug("%s: blt_end=%d blt_addr=%x\n",
-		 __func__, mddi_pipe->blt_end, (int)mddi_pipe->blt_addr);
+		 __func__, mddi_pipe->blt_end, (int)mddi_pipe->ov_blt_addr);
 
-	if ((mddi_pipe->blt_end == 0) && mddi_pipe->blt_addr) {
+	if ((mddi_pipe->blt_end == 0) && mddi_pipe->ov_blt_addr) {
 		spin_lock_irqsave(&mdp_spin_lock, flag);
 		mddi_pipe->blt_end = 1;	/* mark as end */
 		spin_unlock_irqrestore(&mdp_spin_lock, flag);
@@ -323,7 +378,7 @@ void mdp4_blt_xy_update(struct mdp4_overlay_pipe *pipe)
 	int bpp;
 	char *overlay_base;
 
-	if (pipe->blt_addr == 0)
+	if (pipe->ov_blt_addr == 0)
 		return;
 
 
@@ -336,7 +391,7 @@ void mdp4_blt_xy_update(struct mdp4_overlay_pipe *pipe)
 	if (pipe->dmap_cnt & 0x01)
 		off = pipe->src_height * pipe->src_width * bpp;
 
-	addr = pipe->blt_addr + off;
+	addr = pipe->ov_blt_addr + off;
 
 	/* dmap */
 	MDP_OUTP(MDP_BASE + 0x90008, addr);
@@ -344,11 +399,15 @@ void mdp4_blt_xy_update(struct mdp4_overlay_pipe *pipe)
 	off = 0;
 	if (pipe->ov_cnt & 0x01)
 		off = pipe->src_height * pipe->src_width * bpp;
-	addr2 = pipe->blt_addr + off;
+	addr2 = pipe->ov_blt_addr + off;
 	/* overlay 0 */
 	overlay_base = MDP_BASE + MDP4_OVERLAYPROC0_BASE;/* 0x10000 */
 	outpdw(overlay_base + 0x000c, addr2);
 	outpdw(overlay_base + 0x001c, addr2);
+}
+
+void mdp4_primary_rdptr(void)
+{
 }
 
 /*
@@ -371,7 +430,8 @@ void mdp4_dma_p_done_mddi(struct mdp_dma_data *dma)
 
 		if (mddi_pipe->blt_end) {
 			mddi_pipe->blt_end = 0;
-			mddi_pipe->blt_addr = 0;
+			mddi_pipe->ov_blt_addr = 0;
+			mddi_pipe->dma_blt_addr = 0;
 			pr_debug("%s: END, ov_cnt=%d dmap_cnt=%d\n", __func__,
 				mddi_pipe->ov_cnt, mddi_pipe->dmap_cnt);
 			mdp_intr_mask &= ~INTR_DMA_P_DONE;
@@ -406,7 +466,7 @@ void mdp4_overlay0_done_mddi(struct mdp_dma_data *dma)
 {
 	int diff;
 
-	if (mddi_pipe->blt_addr == 0) {
+	if (mddi_pipe->ov_blt_addr == 0) {
 		mdp_pipe_ctrl(MDP_OVERLAY0_BLOCK, MDP_BLOCK_POWER_OFF, TRUE);
 		spin_lock(&mdp_spin_lock);
 		dma->busy = FALSE;
@@ -473,7 +533,7 @@ void mdp4_mddi_overlay_restore(void)
 		mdp4_mddi_dma_busy_wait(mddi_mfd);
 		mdp4_overlay_update_lcd(mddi_mfd);
 
-		if (mddi_pipe->blt_addr)
+		if (mddi_pipe->ov_blt_addr)
 			mdp4_mddi_blt_dmap_busy_wait(mddi_mfd);
 		mdp4_mddi_overlay_kickoff(mddi_mfd, mddi_pipe);
 		mddi_mfd->dma_update_flag = 1;
@@ -525,7 +585,11 @@ void mdp4_mddi_dma_busy_wait(struct msm_fb_data_type *mfd)
 	if (need_wait) {
 		/* wait until DMA finishes the current job */
 		pr_debug("%s: PENDING, pid=%d\n", __func__, current->pid);
+#ifdef CONFIG_HUAWEI_KERNEL
+        wait_for_completion_interruptible_timeout(&mfd->dma->comp, 1 * HZ);
+#else
 		wait_for_completion(&mfd->dma->comp);
+#endif
 	}
 	pr_debug("%s: DONE, pid=%d\n", __func__, current->pid);
 }
@@ -539,17 +603,17 @@ void mdp4_mddi_kickoff_video(struct msm_fb_data_type *mfd,
 	 * to be called before kickoff.
 	 * vice versa for blt disabled.
 	 */
-	if (mddi_pipe->blt_addr && mddi_pipe->blt_cnt == 0)
+	if (mddi_pipe->ov_blt_addr && mddi_pipe->blt_cnt == 0)
 		mdp4_overlay_update_lcd(mfd); /* first time */
-	else if (mddi_pipe->blt_addr == 0  && mddi_pipe->blt_cnt) {
+	else if (mddi_pipe->ov_blt_addr == 0  && mddi_pipe->blt_cnt) {
 		mdp4_overlay_update_lcd(mfd); /* last time */
 		mddi_pipe->blt_cnt = 0;
 	}
 
 	pr_debug("%s: blt_addr=%d blt_cnt=%d\n",
-		__func__, (int)mddi_pipe->blt_addr, mddi_pipe->blt_cnt);
+		__func__, (int)mddi_pipe->ov_blt_addr, mddi_pipe->blt_cnt);
 
-	if (mddi_pipe->blt_addr)
+	if (mddi_pipe->ov_blt_addr)
 		mdp4_mddi_blt_dmap_busy_wait(mddi_mfd);
 	mdp4_mddi_overlay_kickoff(mfd, pipe);
 }
@@ -557,7 +621,7 @@ void mdp4_mddi_kickoff_video(struct msm_fb_data_type *mfd,
 void mdp4_mddi_kickoff_ui(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
-	pr_debug("%s: pid=%d\n", __func__, current->pid);
+    /*delete some lines*/
 	mdp4_mddi_overlay_kickoff(mfd, pipe);
 }
 
@@ -566,13 +630,18 @@ void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
 	unsigned long flag;
-	/* change mdp clk while mdp is idle` */
-	mdp4_set_perf_level();
+/* use dma_p(overlay) pipe ,change bpp into 16 */
+#ifdef CONFIG_FB_MSM_BPP_SWITCH
+	if(16 != mfd->panel_info.bpp)
+	{
+		mdp4_switch_bpp_config(mfd,16);	
+	}
+#endif
 
 	mdp_enable_irq(MDP_OVERLAY0_TERM);
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	mfd->dma->busy = TRUE;
-	if (mddi_pipe->blt_addr)
+	if (mddi_pipe->ov_blt_addr)
 		mfd->dma->dmap_busy = TRUE;
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	/* start OVERLAY pipe */
@@ -652,12 +721,16 @@ void mdp4_dma_s_update_lcd(struct msm_fb_data_type *mfd,
 void mdp4_mddi_dma_s_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
-	/* change mdp clk while mdp is idle` */
-	mdp4_set_perf_level();
-
+/* use dma_s pipe ,change bpp into 24 */
+#ifdef CONFIG_FB_MSM_BPP_SWITCH
+	if(24 != mfd->panel_info.bpp)
+	{
+		mdp4_switch_bpp_config(mfd,24);	
+	}
+#endif
 	mdp_enable_irq(MDP_DMA_S_TERM);
 
-	if (mddi_pipe->blt_addr == 0)
+	if (mddi_pipe->ov_blt_addr == 0)
 		mfd->dma->busy = TRUE;
 
 	mfd->ibuf_flushed = TRUE;
@@ -666,7 +739,12 @@ void mdp4_mddi_dma_s_kickoff(struct msm_fb_data_type *mfd,
 	mdp4_stat.kickoff_dmas++;
 
 	/* wait until DMA finishes the current job */
+#ifdef CONFIG_HUAWEI_KERNEL
+    /* huawei modify */
+	wait_for_completion_interruptible_timeout(&mfd->dma->comp, 2 * HZ);
+#else
 	wait_for_completion(&mfd->dma->comp);
+#endif
 	mdp_disable_irq(MDP_DMA_S_TERM);
 }
 
@@ -688,11 +766,12 @@ void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 	if (mfd && mfd->panel_power_on) {
 		mdp4_mddi_dma_busy_wait(mfd);
 
-		if (mddi_pipe && mddi_pipe->blt_addr)
+		if (mddi_pipe && mddi_pipe->ov_blt_addr)
 			mdp4_mddi_blt_dmap_busy_wait(mfd);
-
+		mdp4_overlay_mdp_perf_upd(mfd, 0);
 		mdp4_overlay_update_lcd(mfd);
 
+		mdp4_overlay_mdp_perf_upd(mfd, 1);
 		if (mdp_hw_revision < MDP4_REVISION_V2_1) {
 			/* dmas dmap switch */
 			if (mdp4_overlay_mixer_play(mddi_pipe->mixer_num)

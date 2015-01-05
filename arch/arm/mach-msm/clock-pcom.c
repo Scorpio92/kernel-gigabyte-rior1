@@ -18,8 +18,8 @@
 
 #include <mach/clk.h>
 #include <mach/socinfo.h>
+#include <mach/proc_comm.h>
 
-#include "proc_comm.h"
 #include "clock.h"
 #include "clock-pcom.h"
 
@@ -190,7 +190,6 @@ static enum handoff pc_clk_handoff(struct clk *clk)
 struct clk_ops clk_ops_pcom = {
 	.enable = pc_clk_enable,
 	.disable = pc_clk_disable,
-	.auto_off = pc_clk_disable,
 	.reset = pc_reset,
 	.set_rate = pc_clk_set_rate,
 	.set_max_rate = pc_clk_set_max_rate,
@@ -205,7 +204,6 @@ struct clk_ops clk_ops_pcom = {
 struct clk_ops clk_ops_pcom_ext_config = {
 	.enable = pc_clk_enable,
 	.disable = pc_clk_disable,
-	.auto_off = pc_clk_disable,
 	.reset = pc_reset,
 	.set_rate = pc_clk_set_ext_config,
 	.set_max_rate = pc_clk_set_max_rate,

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,8 +20,11 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/wakelock.h>
+#include <linux/pm_qos.h>
+
 #include <mach/debug_mm.h>
 #include <mach/msm_rpcrouter.h>
+#include <mach/cpuidle.h>
 
 #define MVS_PROG 0x30000014
 #define MVS_VERS 0x00030001
@@ -323,6 +326,7 @@ struct audio_mvs_info_type {
 
 	wait_queue_head_t wait;
 	wait_queue_head_t mode_wait;
+	wait_queue_head_t in_wait;
 	wait_queue_head_t out_wait;
 
 	struct mutex lock;
@@ -330,7 +334,9 @@ struct audio_mvs_info_type {
 	struct mutex out_lock;
 
 	struct wake_lock suspend_lock;
-	struct wake_lock idle_lock;
+	struct pm_qos_request pm_qos_req;
+
+	struct completion complete;
 };
 
 static struct audio_mvs_info_type audio_mvs_info;
@@ -422,6 +428,8 @@ static int audio_mvs_setup_mode(struct audio_mvs_info_type *audio)
 		set_voc_mode_msg.min_rate = cpu_to_be32(audio->rate_type);
 		set_voc_mode_msg.max_rate = cpu_to_be32(audio->rate_type);
 
+		MM_DBG("audio->mvs_mode %d audio->rate_type %d\n",
+			audio->mvs_mode, audio->rate_type);
 		msm_rpc_setup_req(&set_voc_mode_msg.rpc_hdr,
 				  audio->rpc_prog,
 				  audio->rpc_ver,
@@ -691,7 +699,8 @@ static int audio_mvs_start(struct audio_mvs_info_type *audio)
 
 	/* Prevent sleep. */
 	wake_lock(&audio->suspend_lock);
-	wake_lock(&audio->idle_lock);
+	pm_qos_update_request(&audio->pm_qos_req,
+			      msm_cpuidle_get_deep_idle_latency());
 
 	/* Acquire MVS. */
 	memset(&acquire_msg, 0, sizeof(acquire_msg));
@@ -778,8 +787,8 @@ static int audio_mvs_stop(struct audio_mvs_info_type *audio)
 	}
 
 	/* Allow sleep. */
+	pm_qos_update_request(&audio->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 	wake_unlock(&audio->suspend_lock);
-	wake_unlock(&audio->idle_lock);
 
 	return rc;
 }
@@ -919,10 +928,16 @@ static void audio_mvs_process_rpc_request(uint32_t procedure,
 
 				MM_DBG("UL AMR frame_type %d\n",
 					 be32_to_cpu(*args));
-			} else if ((frame_mode == MVS_FRAME_MODE_PCM_UL) ||
-				   (frame_mode == MVS_FRAME_MODE_VOC_TX)) {
-				/* PCM and EVRC don't have frame_type */
+                    /* NOTE: merge QC case 01094468, modify 2 lines */
+                    } else if ((frame_mode == MVS_FRAME_MODE_PCM_UL) ||
+                              (frame_mode == MVS_FRAME_MODE_PCM_WB_UL)) {
+				/* PCM doesn't have frame_type */
 				buf_node->frame.frame_type = 0;
+			} else if (frame_mode == MVS_FRAME_MODE_VOC_TX) {
+				/* Extracting EVRC current buffer frame rate*/
+				buf_node->frame.frame_type = be32_to_cpu(*args);
+				pr_debug("%s: UL EVRC frame_type %d\n",
+					__func__, be32_to_cpu(*args));
 			} else if (frame_mode == MVS_FRAME_MODE_G711_UL) {
 				/* Extract G711 frame type. */
 				buf_node->frame.frame_type = be32_to_cpu(*args);
@@ -1042,7 +1057,9 @@ static void audio_mvs_process_rpc_request(uint32_t procedure,
 							cpu_to_be32(0x00000001);
 				dl_reply.cdc_param.gnr_arg.pkt_status =
 					cpu_to_be32(AUDIO_MVS_PKT_NORMAL);
-			} else if (frame_mode == MVS_FRAME_MODE_PCM_DL) {
+			/* NOTE: merge QC case 01094468, modify 2 lines */
+			} else if ((frame_mode == MVS_FRAME_MODE_PCM_DL) ||
+					   (frame_mode == MVS_FRAME_MODE_PCM_WB_DL)) {            
 				dl_reply.cdc_param.gnr_arg.param1 = 0;
 				dl_reply.cdc_param.gnr_arg.param2 = 0;
 				dl_reply.cdc_param.\
@@ -1052,7 +1069,7 @@ static void audio_mvs_process_rpc_request(uint32_t procedure,
 					cpu_to_be32(AUDIO_MVS_PKT_NORMAL);
 			} else if (frame_mode == MVS_FRAME_MODE_VOC_RX) {
 				dl_reply.cdc_param.gnr_arg.param1 =
-						cpu_to_be32(audio->rate_type);
+					cpu_to_be32(buf_node->frame.frame_type);
 				dl_reply.cdc_param.gnr_arg.param2 = 0;
 				dl_reply.cdc_param.\
 						gnr_arg.valid_pkt_status_ptr =
@@ -1132,6 +1149,7 @@ static void audio_mvs_process_rpc_request(uint32_t procedure,
 
 		mutex_unlock(&audio->in_lock);
 
+		wake_up(&audio->in_wait);
 		dl_reply.valid_frame_info_ptr = cpu_to_be32(0x00000001);
 
 		dl_reply.frame_mode = cpu_to_be32(audio->frame_mode);
@@ -1177,6 +1195,9 @@ static int audio_mvs_thread(void *data)
 			       rpc_hdr_len);
 
 			break;
+		} else if ((rpc_hdr_len == 0) &&
+				(audio->state == AUDIO_MVS_CLOSED)) {
+			break;
 		} else if (rpc_hdr_len < RPC_COMMON_HDR_SZ) {
 			continue;
 		} else {
@@ -1220,7 +1241,7 @@ static int audio_mvs_thread(void *data)
 		kfree(rpc_hdr);
 		rpc_hdr = NULL;
 	}
-
+	complete_and_exit(&audio->complete, 0);
 	MM_DBG("MVS thread stopped\n");
 
 	return 0;
@@ -1343,8 +1364,12 @@ static int audio_mvs_release(struct inode *inode, struct file *file)
 	mutex_lock(&audio->lock);
 	if (audio->state == AUDIO_MVS_STARTED)
 		audio_mvs_stop(audio);
-	audio_mvs_free_buf(audio);
 	audio->state = AUDIO_MVS_CLOSED;
+	msm_rpc_read_wakeup(audio->rpc_endpt);
+	wait_for_completion(&audio->complete);
+	msm_rpc_close(audio->rpc_endpt);
+	audio->task = NULL;
+	audio_mvs_free_buf(audio);
 	mutex_unlock(&audio->lock);
 
 	MM_DBG("Release done\n");
@@ -1433,40 +1458,52 @@ static ssize_t audio_mvs_write(struct file *file,
 
 	MM_DBG("\n");
 
-	mutex_lock(&audio->in_lock);
-	if (audio->state == AUDIO_MVS_STARTED) {
-		if (count <= sizeof(struct msm_audio_mvs_frame)) {
-			if (!list_empty(&audio->free_in_queue)) {
-				buf_node =
-					list_first_entry(&audio->free_in_queue,
+	rc = wait_event_interruptible_timeout(audio->in_wait,
+		(!list_empty(&audio->free_in_queue) ||
+		audio->state == AUDIO_MVS_STOPPED), 1 * HZ);
+	if (rc > 0) {
+		mutex_lock(&audio->in_lock);
+		if (audio->state == AUDIO_MVS_STARTED) {
+			if (count <= sizeof(struct msm_audio_mvs_frame)) {
+				if (!list_empty(&audio->free_in_queue)) {
+					buf_node = list_first_entry(
+						&audio->free_in_queue,
 						struct audio_mvs_buf_node,
 						list);
-				list_del(&buf_node->list);
+					list_del(&buf_node->list);
 
-				rc = copy_from_user(&buf_node->frame,
-						    buf,
-						    count);
+					rc = copy_from_user(&buf_node->frame,
+							    buf,
+							    count);
 
-				list_add_tail(&buf_node->list,
-					      &audio->in_queue);
+					list_add_tail(&buf_node->list,
+						      &audio->in_queue);
+				} else {
+					MM_ERR("No free DL buffs\n");
+				}
 			} else {
-				MM_ERR("No free DL buffs\n");
+				MM_ERR("Write count %d > sizeof(frame) %d",
+					count,
+					sizeof(struct msm_audio_mvs_frame));
+
+				rc = -ENOMEM;
 			}
 		} else {
-			MM_ERR("Write count %d < sizeof(frame) %d",
-			       count,
-			       sizeof(struct msm_audio_mvs_frame));
+			MM_ERR("Write performed in invalid state %d\n",
+				audio->state);
 
-			rc = -ENOMEM;
+			rc = -EPERM;
 		}
+		mutex_unlock(&audio->in_lock);
+	} else if (rc == 0) {
+		MM_ERR("%s: No free DL buffs\n", __func__);
+
+		rc = -ETIMEDOUT;
 	} else {
-		MM_ERR("Write performed in invalid state %d\n",
-		       audio->state);
+		MM_ERR("%s: write was interrupted\n", __func__);
 
-		rc = -EPERM;
+		rc = -ERESTARTSYS;
 	}
-	mutex_unlock(&audio->in_lock);
-
 	return rc;
 }
 
@@ -1484,7 +1521,8 @@ static long audio_mvs_ioctl(struct file *file,
 	case AUDIO_GET_MVS_CONFIG: {
 		struct msm_audio_mvs_config config;
 
-		MM_DBG("IOCTL GET_MVS_CONFIG\n");
+		MM_DBG("GET_MVS_CONFIG mvs_mode %d rate_type %d\n",
+			config.mvs_mode, config.rate_type);
 
 		mutex_lock(&audio->lock);
 		config.mvs_mode = audio->mvs_mode;
@@ -1582,26 +1620,18 @@ static int audio_mvs_open(struct inode *inode, struct file *file)
 
 	MM_DBG("\n");
 
-	memset(&audio_mvs_info, 0, sizeof(audio_mvs_info));
-	mutex_init(&audio_mvs_info.lock);
-	mutex_init(&audio_mvs_info.in_lock);
-	mutex_init(&audio_mvs_info.out_lock);
+	mutex_lock(&audio_mvs_info.lock);
 
-	init_waitqueue_head(&audio_mvs_info.wait);
-	init_waitqueue_head(&audio_mvs_info.mode_wait);
-	init_waitqueue_head(&audio_mvs_info.out_wait);
+	if (audio_mvs_info.state != AUDIO_MVS_CLOSED) {
+		MM_ERR("MVS driver exists, state %d\n",
+				audio_mvs_info.state);
 
-	INIT_LIST_HEAD(&audio_mvs_info.in_queue);
-	INIT_LIST_HEAD(&audio_mvs_info.free_in_queue);
-	INIT_LIST_HEAD(&audio_mvs_info.out_queue);
-	INIT_LIST_HEAD(&audio_mvs_info.free_out_queue);
+		rc = -EBUSY;
+		mutex_unlock(&audio_mvs_info.lock);
+		goto done;
+	}
 
-	wake_lock_init(&audio_mvs_info.suspend_lock,
-		       WAKE_LOCK_SUSPEND,
-		       "audio_mvs_suspend");
-	wake_lock_init(&audio_mvs_info.idle_lock,
-		       WAKE_LOCK_IDLE,
-		       "audio_mvs_idle");
+	mutex_unlock(&audio_mvs_info.lock);
 
 	audio_mvs_info.rpc_endpt = msm_rpc_connect_compatible(MVS_PROG,
 					MVS_VERS_COMP_VER2,
@@ -1642,8 +1672,11 @@ static int audio_mvs_open(struct inode *inode, struct file *file)
 
 	mutex_lock(&audio_mvs_info.lock);
 
+//Note: disable the state judgement between state with AUDIO_MVS_CLOSED 
+// according to QC SR 01103475. 
+#if 0
 	if (audio_mvs_info.state == AUDIO_MVS_CLOSED) {
-
+#endif
 		if (audio_mvs_info.task != NULL ||
 			audio_mvs_info.rpc_endpt != NULL) {
 			rc = audio_mvs_alloc_buf(&audio_mvs_info);
@@ -1657,13 +1690,16 @@ static int audio_mvs_open(struct inode *inode, struct file *file)
 
 			rc = -ENODEV;
 		}
+//Note: disable the state judgement between state with AUDIO_MVS_CLOSED 
+// according to QC SR 01103475.     
+#if 0
 	} else {
 		MM_ERR("MVS driver exists, state %d\n",
 		       audio_mvs_info.state);
 
 		rc = -EBUSY;
 	}
-
+#endif
 	mutex_unlock(&audio_mvs_info.lock);
 
 done:
@@ -1686,6 +1722,29 @@ struct miscdevice audio_mvs_misc = {
 };
 static int __init audio_mvs_init(void)
 {
+	memset(&audio_mvs_info, 0, sizeof(audio_mvs_info));
+	mutex_init(&audio_mvs_info.lock);
+	mutex_init(&audio_mvs_info.in_lock);
+	mutex_init(&audio_mvs_info.out_lock);
+
+	init_waitqueue_head(&audio_mvs_info.wait);
+	init_waitqueue_head(&audio_mvs_info.mode_wait);
+	init_waitqueue_head(&audio_mvs_info.in_wait);
+	init_waitqueue_head(&audio_mvs_info.out_wait);
+
+	INIT_LIST_HEAD(&audio_mvs_info.in_queue);
+	INIT_LIST_HEAD(&audio_mvs_info.free_in_queue);
+	INIT_LIST_HEAD(&audio_mvs_info.out_queue);
+	INIT_LIST_HEAD(&audio_mvs_info.free_out_queue);
+
+	init_completion(&audio_mvs_info.complete);
+
+	wake_lock_init(&audio_mvs_info.suspend_lock,
+		       WAKE_LOCK_SUSPEND,
+		       "audio_mvs_suspend");
+	pm_qos_add_request(&audio_mvs_info.pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+				PM_QOS_DEFAULT_VALUE);
+
 	return misc_register(&audio_mvs_misc);
 }
 

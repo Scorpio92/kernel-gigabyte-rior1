@@ -3,7 +3,7 @@
  * Verificion code for aDSP VDEC packets from userspace.
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2010, 2012 Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -77,7 +77,7 @@ static int pmem_fixup_high_low(unsigned short *high,
 static int verify_vdec_pkt_cmd(struct msm_adsp_module *module,
 			       void *cmd_data, size_t cmd_size)
 {
-    void *phys_addr;
+	void *phys_addr;
 	unsigned short cmd_id = ((unsigned short *)cmd_data)[0];
 	viddec_cmd_subframe_pkt *pkt;
 	unsigned long subframe_pkt_addr;
@@ -102,7 +102,7 @@ static int verify_vdec_pkt_cmd(struct msm_adsp_module *module,
 		return -1;
 
 	pkt = (viddec_cmd_subframe_pkt *)cmd_data;
-phys_addr = high_low_short_to_ptr(pkt->subframe_packet_high,
+	phys_addr = high_low_short_to_ptr(pkt->subframe_packet_high,
 				pkt->subframe_packet_low);
 
 	if (pmem_fixup_high_low(&(pkt->subframe_packet_high),
@@ -239,7 +239,7 @@ phys_addr = high_low_short_to_ptr(pkt->subframe_packet_high,
 			frame_buffer_low += 2;
 		}
 	}
-	/*Flush the cached pmem subframe packet before sending to DSP*/
+	/*Flush the cached mem subframe packet before sending to DSP*/
 	if (adsp_ion_do_cache_op(module,  phys_addr, (void *)subframe_pkt_addr,
 		MAX_FLUSH_SIZE, offset, ION_IOC_CLEAN_CACHES)){
 		MM_ERR("Cache operation failed for" \

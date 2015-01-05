@@ -22,8 +22,8 @@
 #include <linux/module.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
+#include <mach/proc_comm.h>
 
-#include "proc_comm.h"
 #include "smd_private.h"
 
 static inline void notify_other_proc_comm(void)
@@ -62,6 +62,8 @@ static int msm_proc_comm_disable;
  */
 static int proc_comm_wait_for(unsigned addr, unsigned value)
 {
+	/* merge qcom DEBUG_CODE for RPC crashes */
+#ifndef CONFIG_HUAWEI_RPC_CRASH_DEBUG
 	while (1) {
 		/* Barrier here prevents excessive spinning */
 		mb();
@@ -73,6 +75,37 @@ static int proc_comm_wait_for(unsigned addr, unsigned value)
 
 		udelay(5);
 	}
+#else
+   int ticks = 0;
+   int long_wait = 0;
+
+	while (1) {
+		/* Barrier here prevents excessive spinning */
+		mb();
+		if (readl_relaxed(addr) == value) {
+			if (long_wait)
+				pr_err("%s: total wait time %dus\n", __func__, ticks * 5);
+			return 0;
+		}
+		if (smsm_check_for_modem_crash()) {
+			pr_err("%s: modem crashed while writing %x to %x\n",
+			    __func__, value, addr);
+			if (long_wait)
+				pr_err("%s: total wait time %dus\n",
+					__func__, ticks * 5);
+			return -EAGAIN;
+		}
+		udelay(5);
+		ticks++;
+		
+		if (ticks == 10000 /* 50 ms */) {
+			long_wait = 1;
+			pr_err("%s: excessive wait for PCOM\n",
+				__func__);
+			dump_stack();
+		}
+	}
+#endif
 }
 
 void msm_proc_comm_reset_modem_now(void)
@@ -156,62 +189,3 @@ end:
 	return ret;
 }
 EXPORT_SYMBOL(msm_proc_comm);
-
-
-/*
-        Read NV item
-        App ARM calls this API to read NV item from Modem ARM
-*/
-int msm_read_nv(unsigned int nv_item, void *buf)
-{
-        int ret = -1;
-        uint32_t data1 = nv_item;
-        uint32_t data2 ;
-        unsigned char *dest = buf;
-        unsigned int i;
-        if (NULL == buf)
-                return ret;
-        ret = msm_proc_comm(PCOM_NV_READ, &data1, &data2);
-        if (ret)
-                return ret;
-        switch (nv_item)
-        {
-        case 4678:
-                for(i = 0; i < 6; i++ )
-                {
-                        if(i < 4)
-                        {
-                                *dest++ = (unsigned char)(data2 >> (i*8));
-                        }
-                        else
-                        {
-                                *dest++ = (unsigned char)(data1 >> ((i-4)*8));
-                        }
-                }
-                break;
-        default:
-                printk(KERN_ERR "%s:nv item %d is not supported now\n",__func__,nv_item);
-                ret = -EIO;
-                break;
-        }
-        return ret;
-}
-extern unsigned char wlan_mac_addr[6];
-int read_nv(unsigned int nv_item, void *buf)
-{
-        int ret = -EIO;
-        switch (nv_item)
-        {
-                case 4678:
-                        if(memcmp(wlan_mac_addr,"\0\0\0\0\0\0",sizeof(wlan_mac_addr))!=0){
-                                memcpy(buf,wlan_mac_addr,sizeof(wlan_mac_addr));
-                                ret = 0;
-                        }
-                        break;
-                default:
-                        printk(KERN_ERR "%s:nv item %d is not supported now\n",__func__,nv_item);
-                        break;
-        }
-        return ret;
-}
-EXPORT_SYMBOL(read_nv);

@@ -16,6 +16,8 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/stat.h>
+#include <linux/module.h>
 #include <linux/usb/msm_hsusb.h>
 #include <mach/usb_bam.h>
 #include <mach/sps.h>

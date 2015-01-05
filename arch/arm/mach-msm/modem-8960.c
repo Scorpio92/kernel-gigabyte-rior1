@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -63,6 +63,12 @@ static void log_modem_sfr(void)
 	wmb();
 }
 
+static void restart_modem(void)
+{
+	log_modem_sfr();
+	subsystem_restart("modem");
+}
+
 static void modem_wdog_check(struct work_struct *work)
 {
 	void __iomem *q6_sw_wdog_addr;
@@ -75,31 +81,13 @@ static void modem_wdog_check(struct work_struct *work)
 	regval = readl_relaxed(q6_sw_wdog_addr);
 	if (!regval) {
 		pr_err("modem-8960: Modem watchdog wasn't activated!. Restarting the modem now.\n");
-		log_modem_sfr();
-		subsystem_restart("modem");
+		restart_modem();
 	}
 
 	iounmap(q6_sw_wdog_addr);
 }
 
 static DECLARE_DELAYED_WORK(modem_wdog_check_work, modem_wdog_check);
-
-static void modem_sw_fatal_fn(struct work_struct *work)
-{
-	pr_err("Watchdog bite received from modem SW!\n");
-	log_modem_sfr();
-	subsystem_restart("modem");
-}
-
-static void modem_fw_fatal_fn(struct work_struct *work)
-{
-	pr_err("Watchdog bite received from modem FW!\n");
-	log_modem_sfr();
-	subsystem_restart("modem");
-}
-
-static DECLARE_WORK(modem_sw_fatal_work, modem_sw_fatal_fn);
-static DECLARE_WORK(modem_fw_fatal_work, modem_fw_fatal_fn);
 
 static void smsm_state_cb(void *data, uint32_t old_state, uint32_t new_state)
 {
@@ -109,8 +97,7 @@ static void smsm_state_cb(void *data, uint32_t old_state, uint32_t new_state)
 
 	if (new_state & SMSM_RESET) {
 		pr_err("Probable fatal error on the modem.\n");
-		log_modem_sfr();
-		subsystem_restart("modem");
+		restart_modem();
 	}
 }
 
@@ -118,14 +105,6 @@ static int modem_shutdown(const struct subsys_data *subsys)
 {
 	void __iomem *q6_fw_wdog_addr;
 	void __iomem *q6_sw_wdog_addr;
-	int smsm_notif_unregistered = 0;
-
-	if (!(smsm_get_state(SMSM_MODEM_STATE) & SMSM_RESET)) {
-		smsm_state_cb_deregister(SMSM_MODEM_STATE, SMSM_RESET,
-			smsm_state_cb, 0);
-		smsm_notif_unregistered = 1;
-		smsm_reset_modem(SMSM_RESET);
-	}
 
 	/*
 	 * Cancel any pending wdog_check work items, since we're shutting
@@ -157,10 +136,6 @@ static int modem_shutdown(const struct subsys_data *subsys)
 	pil_force_shutdown("modem_fw");
 	disable_irq_nosync(Q6FW_WDOG_EXPIRED_IRQ);
 	disable_irq_nosync(Q6SW_WDOG_EXPIRED_IRQ);
-
-	if (smsm_notif_unregistered)
-		smsm_state_cb_register(SMSM_MODEM_STATE, SMSM_RESET,
-			smsm_state_cb, 0);
 
 	return 0;
 }
@@ -240,15 +215,15 @@ out:
 
 static irqreturn_t modem_wdog_bite_irq(int irq, void *dev_id)
 {
-	int ret;
-
 	switch (irq) {
 
 	case Q6SW_WDOG_EXPIRED_IRQ:
-		ret = schedule_work(&modem_sw_fatal_work);
+		pr_err("Watchdog bite received from modem software!\n");
+		restart_modem();
 		break;
 	case Q6FW_WDOG_EXPIRED_IRQ:
-		ret = schedule_work(&modem_fw_fatal_work);
+		pr_err("Watchdog bite received from modem firmware!\n");
+		restart_modem();
 		break;
 	break;
 
@@ -306,7 +281,8 @@ static int __init modem_8960_init(void)
 {
 	int ret;
 
-	if (!cpu_is_msm8960() && !cpu_is_msm8930() && !cpu_is_msm9615())
+	if (!cpu_is_msm8960() && !cpu_is_msm8930() && !cpu_is_msm8930aa() &&
+	    !cpu_is_msm9615() && !cpu_is_msm8627())
 		return -ENODEV;
 
 	ret = smsm_state_cb_register(SMSM_MODEM_STATE, SMSM_RESET,
@@ -361,7 +337,7 @@ static int __init modem_8960_init(void)
 		goto out;
 	}
 
-	smem_ramdump_dev = create_ramdump_device("smem");
+	smem_ramdump_dev = create_ramdump_device("smem-modem");
 
 	if (!smem_ramdump_dev) {
 		pr_err("%s: Unable to create smem ramdump device. (%d)\n",

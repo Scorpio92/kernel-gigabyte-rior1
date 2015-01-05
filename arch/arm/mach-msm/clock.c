@@ -317,7 +317,7 @@ EXPORT_SYMBOL(clk_get_rate);
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned long start_rate, flags;
-	int rc;
+	int rc = 0;
 
 	if (IS_ERR_OR_NULL(clk))
 		return -EINVAL;
@@ -326,6 +326,11 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 		return -ENOSYS;
 
 	spin_lock_irqsave(&clk->lock, flags);
+
+	/* Return early if the rate isn't going to change */
+	if (clk->rate == rate)
+		goto out;
+
 	trace_clock_set_rate(clk->dbg_name, rate, smp_processor_id());
 	if (clk->count) {
 		start_rate = clk->rate;
@@ -344,7 +349,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 
 	if (!rc)
 		clk->rate = rate;
-
+out:
 	spin_unlock_irqrestore(&clk->lock, flags);
 	return rc;
 
@@ -501,34 +506,16 @@ void __init msm_clock_init(struct clock_init_data *data)
 		clk_init_data->post_init();
 }
 
-/*
- * The bootloader and/or AMSS may have left various clocks enabled.
- * Disable any clocks that have not been explicitly enabled by a
- * clk_enable() call and don't have the CLKFLAG_SKIP_AUTO_OFF flag.
- */
 static int __init clock_late_init(void)
 {
-	unsigned n, count = 0;
 	struct handoff_clk *h, *h_temp;
-	unsigned long flags;
-	int ret = 0;
+	int n, ret = 0;
 
 	clock_debug_init(clk_init_data);
-	for (n = 0; n < clk_init_data->size; n++) {
-		struct clk *clk = clk_init_data->table[n].clk;
+	for (n = 0; n < clk_init_data->size; n++)
+		clock_debug_add(clk_init_data->table[n].clk);
 
-		clock_debug_add(clk);
-		spin_lock_irqsave(&clk->lock, flags);
-		if (!(clk->flags & CLKFLAG_SKIP_AUTO_OFF)) {
-			if (!clk->count && clk->ops->auto_off) {
-				count++;
-				clk->ops->auto_off(clk);
-			}
-		}
-		spin_unlock_irqrestore(&clk->lock, flags);
-	}
-	pr_info("clock_late_init() disabled %d unused clocks\n", count);
-
+	pr_info("%s: Removing enables held for handed-off clocks\n", __func__);
 	list_for_each_entry_safe(h, h_temp, &handoff_list, list) {
 		clk_disable_unprepare(h->clk);
 		list_del(&h->list);
