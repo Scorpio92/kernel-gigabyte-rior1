@@ -1508,7 +1508,6 @@ static void __init msm7x2x_init(void)
 	msm7x2x_init_host();
 	msm7x27a_pm_init();
 	register_i2c_devices();
-	//msm7627a_bt_power_init() will check QC or BCM bt chip powers inner.
 	msm7627a_bt_power_init();
 	msm7627a_camera_init();
 	msm7627a_add_io_devices();

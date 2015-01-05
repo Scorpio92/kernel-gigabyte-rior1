@@ -994,7 +994,7 @@ static void __init msm_qrd_init(void)
 
 #if defined(CONFIG_BT) && defined(CONFIG_MARIMBA_CORE)
     /* qcomm QRD phone concerned not need by hw product*/
-	//msm7627a_bt_power_init();
+	msm7627a_bt_power_init();
 #endif
 
 	msm7627a_camera_init();
