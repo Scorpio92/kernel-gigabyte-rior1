@@ -60,14 +60,14 @@
 #include <mach/socinfo.h>
 #include "pm-boot.h"
 #include "board-msm7627a.h"
-#ifdef CONFIG_HUAWEI_MTK6252_MODEM
+/*#ifdef CONFIG_HUAWEI_MTK6252_MODEM
 #include <mach/msm_smsm.h>
 #include <linux/mtk6252_dev.h>
-#endif
+#endif*/
 
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
 #include <linux/hardware_self_adapt.h>
-/*added for virtualkeys*/
+
 #ifdef CONFIG_INPUT_HW_ATE
 char buf_virtualkey[500];
 ssize_t  buf_vkey_size=0;
@@ -80,7 +80,7 @@ static ssize_t  buf_vkey_size=0;
 #ifdef CONFIG_HUAWEI_KERNEL
 #include <asm-arm/huawei/smem_vendor_huawei.h>
 #include <asm-arm/huawei/usb_switch_huawei.h>
-#endif
+#endif*/
 
 #define PMEM_KERNEL_EBI1_SIZE	0x3A000
 #define MSM_PMEM_AUDIO_SIZE	0x1F4000
@@ -92,7 +92,7 @@ enum {
 
 /* -------------------- huawei devices -------------------- */
 /* add leds,button-backlight,pmic-leds device */
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
 static struct platform_device rgb_leds_device = {
     .name   = "rgb-leds",
     .id     = 0,
@@ -107,10 +107,10 @@ static struct platform_device msm_device_pmic_leds = {
     .name   = "pmic-leds",
     .id = -1,
 };
-#endif
+#endif*/
 
 /* driver for hw device detect */
-#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+/*#ifdef CONFIG_HUAWEI_HW_DEV_DCT
 static struct platform_device huawei_device_detect = {
 	.name = "hw-dev-detect",
 	.id   =-1,
@@ -121,13 +121,13 @@ static struct resource hw_extern_sdcard_resources[] = {
     {
         .flags  = IORESOURCE_MEM,
     },
-};
+};*/
 
 /* 
  * Define the 'hw_extern_sdcard' device node for MMI sdcard test to  
  * judge if the sd card inserted.
  */
-static struct platform_device hw_extern_sdcard_device = {
+/*static struct platform_device hw_extern_sdcard_device = {
     .name           = "hw_extern_sdcard",
     .id             = -1,
     .num_resources  = ARRAY_SIZE(hw_extern_sdcard_resources),
@@ -144,24 +144,24 @@ static struct resource hw_extern_sdcardMounted_resources[] = {
  * Define the 'hw_extern_sdcardMounted' device node for MMI sdcard test to  
  * judge if the sd card mounted.
  */
-static struct platform_device hw_extern_sdcardMounted_device = {
+/*static struct platform_device hw_extern_sdcardMounted_device = {
     .name           = "hw_extern_sdcardMounted",
     .id             = -1,
     .num_resources  = ARRAY_SIZE(hw_extern_sdcardMounted_resources),
     .resource       = hw_extern_sdcardMounted_resources,
-};
+};*/
 
 /* 
  * Add the device nodes 'hw_extern_sdcard' and 'hw_extern_sdcardMounted' in /dev. 
  * It is used by MMI sdcard test.
  */
-int __init hw_extern_sdcard_add_device(void)
+/*int __init hw_extern_sdcard_add_device(void)
 {
     platform_device_register(&hw_extern_sdcard_device);
     platform_device_register(&hw_extern_sdcardMounted_device);
     return 0;
 }
-#endif
+#endif*/
 
 static struct sx150x_platform_data sx150x_data[] __initdata = {
 	[SX150X_CORE]	= {
@@ -176,12 +176,12 @@ static struct sx150x_platform_data sx150x_data[] __initdata = {
 #endif
 
 
-#if defined(CONFIG_BT) && defined(CONFIG_MARIMBA_CORE)
+//#if defined(CONFIG_BT) && defined(CONFIG_MARIMBA_CORE)
 static struct platform_device msm_wlan_ar6000_pm_device = {
 	.name           = "wlan_ar6000_pm_dev",
 	.id             = -1,
 };
-#endif
+//#endif
 
 #if defined(CONFIG_I2C) && defined(CONFIG_GPIO_SX150X)
 static struct i2c_board_info core_exp_i2c_info[] __initdata = {
@@ -649,7 +649,7 @@ static struct platform_device msm_batt_device = {
 	.dev.platform_data  = &msm_psy_batt_data,
 };
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
-#ifndef CONFIG_HUAWEI_CAMERA
+//#ifndef CONFIG_HUAWEI_CAMERA
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
 static struct smsc911x_platform_config smsc911x_config = {
 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
@@ -687,7 +687,7 @@ static struct msm_gpio smsc911x_gpios[] = {
 							 "eth_fifo_sel" },
 };
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
-#endif
+//#endif
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
 static char *msm_adc_surf_device_names[] = {
 	"XO_ADC",
@@ -709,7 +709,7 @@ static struct platform_device msm_adc_device = {
 
 #define ETH_FIFO_SEL_GPIO	49
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
-#ifndef CONFIG_HUAWEI_CAMERA
+//#ifndef CONFIG_HUAWEI_CAMERA
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
 static void msm7x27a_cfg_smsc911x(void)
 {
@@ -734,7 +734,7 @@ static void msm7x27a_cfg_smsc911x(void)
 	gpio_set_value(ETH_FIFO_SEL_GPIO, 0);
 }
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
-#endif 
+//#endif 
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
 
 #if defined(CONFIG_SERIAL_MSM_HSL_CONSOLE) \
@@ -766,7 +766,7 @@ static void msm7x27a_cfg_uart2dm_serial(void) { }
 
 
 /* delete uart1 serial port */
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_device_dmov,
 	&msm_device_smd,
@@ -776,7 +776,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_gsbi0_qup_i2c_device,
 	&msm_gsbi1_qup_i2c_device,
 };
-#else
+#else*/
 static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_device_dmov,
 	&msm_device_smd,
@@ -787,7 +787,7 @@ static struct platform_device *rumi_sim_devices[] __initdata = {
 	&msm_gsbi0_qup_i2c_device,
 	&msm_gsbi1_qup_i2c_device,
 };
-#endif
+//#endif
 
 static struct platform_device *msm8625_rumi3_devices[] __initdata = {
 	&msm8625_device_dmov,
@@ -807,9 +807,9 @@ static struct platform_device *msm7627a_surf_ffa_devices[] __initdata = {
 	&msm_device_otg,
 	&msm_device_gadget_peripheral,
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
-#ifndef CONFIG_HUAWEI_CAMERA
+//#ifndef CONFIG_HUAWEI_CAMERA
 	&smsc911x_device,
-#endif
+//#endif
 /* lishubin update to 1215 added ifndef CONFIG_HUAWEI_CAMERA & endif*/
 	&msm_kgsl_3d0,
 };
@@ -830,17 +830,17 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_batt_device,
 	
 /* delete all bt devices */
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
 	
-	/* Registration device */
+
 	&rgb_leds_device,
 	&keyboard_backlight_device,
 	&msm_device_pmic_leds,
-    /* Registration device */
+
 #ifdef CONFIG_HUAWEI_HW_DEV_DCT
 	&huawei_device_detect,
 #endif
-#endif
+#endif*/
 	&msm_adc_device,
 #ifdef CONFIG_ION_MSM
 	&ion_dev,
@@ -1205,7 +1205,7 @@ static void __init msm7627a_rumi3_init(void)
 			ARRAY_SIZE(rumi_sim_devices));
 }
 
-static void __init msm8625_rumi3_init(void)
+static void __init msm8625_rumi3_init(void)//!!!
 {
 	msm7x2x_misc_init();
 	msm_adsp_add_pdev();
