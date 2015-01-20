@@ -91,6 +91,8 @@ struct akm8975_platform_data {
 	char layouts[3][3];
 	char project_name[64];
 	int gpio_DRDY;
+    int (*power_on)(void);
+    int (*power_off)(void);
 };
 
 #endif
