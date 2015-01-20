@@ -140,7 +140,7 @@ static struct resource hw_extern_sdcardMounted_resources[] = {
     },
 };
 
-/* 
+
  * Define the 'hw_extern_sdcardMounted' device node for MMI sdcard test to  
  * judge if the sd card mounted.
  */
@@ -265,11 +265,11 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 #define MSM_3M_PMEM_ADSP_SIZE	(0x1048000)
 /*   enlarge the pmem space for HDR on 8950s
  */
-static unsigned int get_pmem_adsp_size(void)
+/*static unsigned int get_pmem_adsp_size(void)
 {
 	if( machine_is_msm8x25_C8950D()
 	|| machine_is_msm8x25_U8950D()
-	/*delete some line; to reduce pmem for releasing memory*/
+
 	||machine_is_msm8x25_U8950()){
 			return CAMERA_ZSL_SIZE;		
 		}
@@ -282,7 +282,7 @@ static unsigned int get_pmem_adsp_size(void)
 	else
 		return MSM_PMEM_ADSP_SIZE;
 
-}
+}*/
 #endif
 
 #ifdef CONFIG_ION_MSM
@@ -882,9 +882,9 @@ static void fix_sizes(void)
 		pmem_mdp_size = MSM7x25A_MSM_PMEM_MDP_SIZE;
 		pmem_adsp_size = MSM7x25A_MSM_PMEM_ADSP_SIZE;
 	} else {
-		pmem_mdp_size = get_mdp_pmem_size();
+		pmem_mdp_size = MSM_PMEM_MDP_SIZE;
 		printk("pmem_mdp_size=%08x\n",pmem_mdp_size);
-		pmem_adsp_size = get_pmem_adsp_size();
+		pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
 		printk("pmem_adsp_size=%08x\n",pmem_adsp_size);
 	}
 /*delete qcom code */
@@ -1241,20 +1241,20 @@ static void __init msm7x27a_init_regulators(void)
 }
 /* add virtual keys fucntion */
 /* modify virtualkey function name */
-static ssize_t virtualkey_show(struct kobject *kobj,
+/*static ssize_t virtualkey_show(struct kobject *kobj,
 			       struct kobj_attribute *attr, char *buf)
 {
         memcpy( buf, buf_virtualkey, buf_vkey_size );
 		return buf_vkey_size; 
-}
+}*/
 
-static struct kobj_attribute synaptics_virtual_keys_attr = {
+/*static struct kobj_attribute synaptics_virtual_keys_attr = {
 	.attr = {
 		.name = "virtualkeys.synaptics",
 		.mode = S_IRUGO,
 	},
 	.show = &virtualkey_show,
-};
+};*/
 
 /*#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
 
@@ -1267,23 +1267,23 @@ static struct kobj_attribute melfas_virtual_keys_attr = {
 };
 #endif*/
 
-static struct attribute *virtualkey_properties_attrs[] = {
+/*static struct attribute *virtualkey_properties_attrs[] = {
 	&synaptics_virtual_keys_attr.attr,
-	/*#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
+	#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
 	&melfas_virtual_keys_attr.attr,
-	#endif*/
+	#endif
 	NULL
-};
-
+};*/
+/*
 static struct attribute_group virtualkey_properties_attr_group = {
 	.attrs = virtualkey_properties_attrs,
-};
+};*/
 
-static void __init virtualkeys_init(void)
+/*static void __init virtualkeys_init(void)
 {
     struct kobject *properties_kobj;
     int ret=0;
-    /*Modify the virtualkeys of touchsreen*/
+
     if(machine_is_msm7x27a_U8815())
     {
     	buf_vkey_size = sprintf(buf_virtualkey,
@@ -1321,18 +1321,17 @@ static void __init virtualkeys_init(void)
         || machine_is_msm8x25_U8950D()
         || machine_is_msm8x25_U8950())
     {
-        /* extend the height of virtual key area (from 80 to 120 pixels)*/
+
         buf_vkey_size = sprintf(buf_virtualkey,
         			__stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:1035:160:120"
         		   ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME) ":270:1035:160:120"
         		   ":" __stringify(EV_KEY) ":" __stringify(KEY_MENU) ":460:1035:160:120"
         		   "\n"); 
     }
-    /*New add FWVGA virtual keys */
+
     else if (machine_is_msm8x25_U8951D()
         || machine_is_msm8x25_C8813()
         || machine_is_msm8x25_U8951())
-	/* modify the area of virtualkeys */
     {
     	buf_vkey_size = sprintf(buf_virtualkey,
         			__stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":71:900:142:80"
@@ -1344,8 +1343,6 @@ static void __init virtualkeys_init(void)
            ||machine_is_msm7x27a_H868C()
            )
     {
-	    /* 3 key configuration for 3.5" TP */
-    /*calibrate virtualkey for H867G and H868C*/
         buf_vkey_size = sprintf(buf_virtualkey,
                   __stringify(EV_KEY) ":" __stringify(KEY_BACK)  ":50:515:80:60"
                   ":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":160:515:80:60"
@@ -1354,7 +1351,6 @@ static void __init virtualkeys_init(void)
     }
     else if (machine_is_msm7x27a_U8655_EMMC())
     {
-    	/*4 virtual keys for att */
     	if (HW_VER_SUB_VE <= get_hw_sub_board_id())
     	{
     	    buf_vkey_size = sprintf(buf_virtualkey,
@@ -1388,7 +1384,7 @@ static void __init virtualkeys_init(void)
 					 &virtualkey_properties_attr_group);
 	if (!properties_kobj || ret)
 		pr_err("failed to create board_properties\n");
-}
+}*/
 
 static void __init msm7x27a_add_footswitch_devices(void)
 {
