@@ -33,6 +33,8 @@
 #include <linux/freezer.h>
 #include <linux/akm8975.h>
 #include <linux/earlysuspend.h>
+#include <linux/module.h>
+
 
 #define AK8975DRV_CALL_DBG 0
 #if AK8975DRV_CALL_DBG
