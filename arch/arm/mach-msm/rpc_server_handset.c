@@ -98,7 +98,7 @@ enum mschine_type{
     HW_MACHINE_8X55 = 0,
     HW_MACHINE_7X2725A,
 };
-static int get_current_machine(void);
+//static int get_current_machine(void);
 /* creates /sys/module/rpc_server_handset/parameters/oeminfo_rpc_debug_mask file */
 static int oeminfo_rpc_debug_mask = 0;
 module_param(oeminfo_rpc_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -108,7 +108,7 @@ module_param(oeminfo_rpc_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 		if (oeminfo_rpc_debug_mask)	  \
 			printk(KERN_ERR x);	  \
 	} while (0)
-static int get_current_machine()
+/*static int get_current_machine()
 {
     if( (machine_is_msm8255_u8800_pro())
 		|| (machine_is_msm8255_u8860()) 
@@ -128,7 +128,7 @@ static int get_current_machine()
         OEMINFO_RPC_DEBUG("27a25a oeminfo. \n");
         return HW_MACHINE_7X2725A;
     }
-}
+}*/
 
 		
 enum hs_event {
@@ -618,12 +618,12 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 	switch (cmd) {
 
 	case RMT_OEMINFO_WAIT_FOR_REQ:
-		if (HW_MACHINE_7X2725A == get_current_machine())
+		/*if (HW_MACHINE_7X2725A == get_current_machine())
 		{
 			if (firstboot == true)
 			{
 				firstboot = false;
-				/* use rpc to set sig TMC_KERNEL_READY_SIG */
+				
 				rc = msm_rpc_client_req(rpc_client, OEMINFO_READY_PROC,
 					NULL, NULL,
 					NULL, NULL, -1);
@@ -633,7 +633,7 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 					pr_err("%s: couldn't send rpc client request OEMINFO_READY_PROC\n", __func__);
 				}
 			}
-		}
+		}*/
 		OEMINFO_RPC_DEBUG("emmc_oeminfo: %s: wait for request ioctl\n", __func__);
 		if (atomic_read(&rms->total_events) == 0) {
 			ret = wait_event_interruptible(rms->event_q,
@@ -670,14 +670,14 @@ static long rmt_oeminfo_ioctl(struct file *fp, unsigned int cmd,
 			break;
 		}
 
-		if (HW_MACHINE_7X2725A == get_current_machine())
+		/*if (HW_MACHINE_7X2725A == get_current_machine())
 		{
 			rc = msm_rpc_client_req(rpc_client, OEMINFO_FINISH_PROC,
 						NULL, NULL,
 						NULL, NULL, -1);
             if (rc)
 			    pr_err("%s: couldn't send rpc client request\n", __func__);
-		}
+		}*/
 		OEMINFO_RPC_DEBUG("%s:kernel memory data: \n", __func__);
         print_oeminfo_data(kdata->data);
 
@@ -846,7 +846,7 @@ static void power_key_dump(void)
 #else
 void del_power_key_timer(void){}
 EXPORT_SYMBOL(del_power_key_timer);
-static void power_key_dump(void){}
+//static void power_key_dump(void){}
 #endif
 
 /*
