@@ -1488,9 +1488,9 @@ static void __init msm7x2x_init(void)
 #endif*/
 
 	msm7x27a_otg_gadget();
-/*#ifndef CONFIG_HUAWEI_CAMERA
+//#ifndef CONFIG_HUAWEI_CAMERA
     msm7x27a_cfg_smsc911x();
-#endif
+/*#endif
 #if (defined(CONFIG_HUAWEI_BT_BCM43XX) && defined(CONFIG_HUAWEI_KERNEL))
 
     bt_wake_msm_config();
