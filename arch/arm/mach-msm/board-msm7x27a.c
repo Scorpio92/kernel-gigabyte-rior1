@@ -1256,8 +1256,8 @@ static struct kobj_attribute synaptics_virtual_keys_attr = {
 	.show = &virtualkey_show,
 };
 
-#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
-/* add melfas virtual key node */
+/*#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
+
 static struct kobj_attribute melfas_virtual_keys_attr = {
 	.attr = {
 		.name = "virtualkeys.melfas-touchscreen",
@@ -1265,13 +1265,13 @@ static struct kobj_attribute melfas_virtual_keys_attr = {
 	},
 	.show = &virtualkey_show,
 };
-#endif
+#endif*/
 
 static struct attribute *virtualkey_properties_attrs[] = {
 	&synaptics_virtual_keys_attr.attr,
-	#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
+	/*#ifdef CONFIG_HUAWEI_MELFAS_TOUCHSCREEN
 	&melfas_virtual_keys_attr.attr,
-	#endif
+	#endif*/
 	NULL
 };
 
@@ -1398,12 +1398,12 @@ static void __init msm7x27a_add_footswitch_devices(void)
 
 static void __init msm7x27a_add_platform_devices(void)
 {
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
     if (machine_is_msm8625_surf() || machine_is_msm8625_ffa()
         || cpu_is_msm8625())
-#else
+#else*/
     if (machine_is_msm8625_surf() || machine_is_msm8625_ffa())
-#endif
+//#endif
     {
 		platform_add_devices(msm8625_surf_devices,
 			ARRAY_SIZE(msm8625_surf_devices));
@@ -1421,15 +1421,15 @@ static void __init msm7x27a_uartdm_config(void)
 	msm7x27a_cfg_uart2dm_serial();
 
     /* set RX intterupt for WCN2243 */
-    if(BT_WCN2243 == get_hw_bt_device_model()) 
-    {
+    //if(BT_WCN2243 == get_hw_bt_device_model()) 
+    //{
         msm_uart_dm1_pdata.wakeup_irq = gpio_to_irq(UART1DM_RX_GPIO);
         if (cpu_is_msm8625())
                 msm8625_device_uart_dm1.dev.platform_data =
                         &msm_uart_dm1_pdata;
         else
                 msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
-    }
+    //}
 }
 
 static void __init msm7x27a_otg_gadget(void)
@@ -1452,12 +1452,12 @@ static void __init msm7x27a_otg_gadget(void)
 
 static void __init msm7x27a_pm_init(void)
 {
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
     if (machine_is_msm8625_surf() || machine_is_msm8625_ffa()
         || cpu_is_msm8625())
-#else
+#else*/
     if (machine_is_msm8625_surf() || machine_is_msm8625_ffa())
-#endif
+//#endif
     {
 		msm_pm_set_platform_data(msm8625_pm_data,
 				ARRAY_SIZE(msm8625_pm_data));
@@ -1487,18 +1487,18 @@ static void __init msm7x2x_init(void)
 	msm7x27a_init_ebi2();
 	msm7x27a_uartdm_config();
 
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
     import_kernel_cmdline();
-#endif
+#endif*/
 
 	msm7x27a_otg_gadget();
-#ifndef CONFIG_HUAWEI_CAMERA
+/*#ifndef CONFIG_HUAWEI_CAMERA
     msm7x27a_cfg_smsc911x();
 #endif
 #if (defined(CONFIG_HUAWEI_BT_BCM43XX) && defined(CONFIG_HUAWEI_KERNEL))
-    /*before bt probe, config the bt_wake_msm gpio*/
+
     bt_wake_msm_config();
-#endif
+#endif*/
 	msm7x27a_add_footswitch_devices();
 	msm7x27a_add_platform_devices();
 	/* Ensure ar6000pm device is registered before MMC/SDC */
@@ -1514,7 +1514,7 @@ static void __init msm7x2x_init(void)
 	/*7x25a kgsl initializations*/
 	msm7x25a_kgsl_3d0_init();
 	
-#ifdef CONFIG_HUAWEI_FEATURE_OEMINFO
+/*#ifdef CONFIG_HUAWEI_FEATURE_OEMINFO
     rmt_oeminfo_add_device();
 #endif
 
@@ -1524,13 +1524,13 @@ static void __init msm7x2x_init(void)
 
 #ifdef CONFIG_HUAWEI_KERNEL
     hw_extern_sdcard_add_device();
-#endif
+#endif*/
     
 	/*8x25 kgsl initializations*/
 	msm8x25_kgsl_3d0_init();
 
 	
-#ifdef CONFIG_HUAWEI_MTK6252_MODEM
+/*#ifdef CONFIG_HUAWEI_MTK6252_MODEM
 	{
 		unsigned smem_size;
 		boot_reason = *(unsigned int *)
@@ -1538,7 +1538,7 @@ static void __init msm7x2x_init(void)
 		printk(KERN_NOTICE "Boot Reason = 0x%02x\n", boot_reason);
 		mtk6252_dev_init();
 	}
-#endif
+#endif*/
 }
 
 static void __init msm7x2x_init_early(void)
