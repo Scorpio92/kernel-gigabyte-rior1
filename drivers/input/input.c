@@ -52,6 +52,66 @@ static DEFINE_MUTEX(input_mutex);
 
 static struct input_handler *input_table[8];
 
+//  begin for add for get TP info , by anxiang.xiao
+#include <linux/proc_fs.h>
+#define TP_PROC_ENTRY_DIR "TPInfo"
+#define TP_PROC_BUFFER_MAX_SIZE  (512) //0xFF
+
+static struct proc_dir_entry *tp_pt_entry = NULL;
+
+static char tp_proc_buffer[TP_PROC_BUFFER_MAX_SIZE + 1];
+
+static int tp_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	int ret = 0;
+		
+	if (off > 0)
+	{
+		*eof = 1;
+		goto ERROR;
+	}
+
+	tp_proc_buffer[TP_PROC_BUFFER_MAX_SIZE] = '\0';
+
+	if (memcpy(page, tp_proc_buffer, sizeof(tp_proc_buffer) / sizeof(tp_proc_buffer[0])))
+	{
+		ret = sizeof(tp_proc_buffer) / sizeof(tp_proc_buffer[0]);
+	}
+
+ERROR:
+	return ret;
+}
+
+int  fix_tp_proc_info(unsigned char  *tp_data, u8 data_len)
+{
+	int ret = 0;
+
+	if (data_len > TP_PROC_BUFFER_MAX_SIZE ||  data_len <=0 || tp_data ==NULL)
+			ret = -1;
+	
+	memcpy(tp_proc_buffer, tp_data,data_len);
+	tp_proc_buffer[data_len] = '\0';
+
+	return 0;
+}
+
+
+void create_tp_info_file(void)
+{
+	tp_pt_entry = create_proc_entry(TP_PROC_ENTRY_DIR, 0755, NULL);
+	if (NULL == tp_pt_entry)
+	{
+		pr_err("%s: Create /proc/TPInfo node failed!\n", TP_PROC_ENTRY_DIR);
+		return;
+	}
+
+	tp_pt_entry->read_proc = tp_proc_read;
+	tp_pt_entry->write_proc = NULL;
+
+	return;
+}
+//  end for add for get TP info 
+
 static inline int is_event_supported(unsigned int code,
 				     unsigned long *bm, unsigned int max)
 {

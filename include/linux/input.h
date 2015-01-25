@@ -19,6 +19,12 @@
 #include <linux/types.h>
 #endif
 
+//  begin for add for get TP info , by anxiang.xiao
+
+int  fix_tp_proc_info(unsigned char  *tp_data, __u8 data_len);
+ void create_tp_info_file(void);
+ //  end for add for get TP info 
+
 /*
  * The event structure itself
  */
