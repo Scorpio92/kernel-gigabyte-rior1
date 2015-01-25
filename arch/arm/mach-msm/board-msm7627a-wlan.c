@@ -22,8 +22,7 @@
 #include "timer.h"
 
 #define GPIO_WLAN_3V3_EN 119
-static const char *id = "WLAN";
-static bool wlan_powered_up;
+static const char *id = "WLPW";
 
 enum {
 	WLAN_VREG_S3 = 0,
@@ -42,15 +41,18 @@ struct wlan_vreg_info {
 
 static struct wlan_vreg_info vreg_info[] = {
 	{"msme1",     1800000, 1800000, 2,  0, NULL},
-	{"bt",        3300000, 3300000, 21, 1, NULL},
-	{"wlan4",     1800000, 1800000, 23, 1, NULL}
+	{"wlan3v3",        3300000, 3300000, 21, 1, NULL},
+	{"wlan1v8",     1800000, 1800000, 0, 0, NULL}
 };
 
-int gpio_wlan_sys_rest_en = 6; 
+int gpio_wlan_sys_rest_en = 124;
 static void gpio_wlan_config(void)
 {
 	if (machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb()
 					|| machine_is_msm8625_evb()
+					|| machine_is_msm8625_qrd5() 
+					|| machine_is_msm7x27a_qrd5a()
+					|| machine_is_msm8625_skua()
 					|| machine_is_msm8625_evt()
 					|| machine_is_msm7627a_qrd3()
 					|| machine_is_msm8625_qrd7())
@@ -200,11 +202,6 @@ static unsigned int msm_AR600X_setup_power(bool on)
 	int rc = 0;
 	static bool init_done;
 
-	if (wlan_powered_up) {
-		pr_info("WLAN already powered up\n");
-		return 0;
-	}
-
 	if (unlikely(!init_done)) {
 		gpio_wlan_config();
 		rc = qrf6285_init_regs();
@@ -241,6 +238,9 @@ static unsigned int msm_AR600X_setup_power(bool on)
 	 */
 	if (machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb()
 					|| machine_is_msm8625_evb()
+					|| machine_is_msm8625_qrd5() 
+					|| machine_is_msm7x27a_qrd5a()  
+					|| machine_is_msm8625_skua()
 					|| machine_is_msm8625_evt()
 					|| machine_is_msm7627a_qrd3()
 					|| machine_is_msm8625_qrd7()) {
@@ -254,9 +254,6 @@ static unsigned int msm_AR600X_setup_power(bool on)
 		}
 		gpio_set_value(gpio_wlan_sys_rest_en, 1);
 	} else {
-	    gpio_tlmm_config(GPIO_CFG(gpio_wlan_sys_rest_en, 0, GPIO_CFG_OUTPUT,
-				    GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-				    GPIO_CFG_ENABLE);	
 		rc = gpio_request(gpio_wlan_sys_rest_en, "WLAN_DEEP_SLEEP_N");
 		if (rc) {
 			pr_err("%s: WLAN sys_rest_en GPIO %d request failed %d\n",
@@ -288,17 +285,13 @@ static unsigned int msm_AR600X_setup_power(bool on)
 	}
 
 	pr_info("WLAN power-up success\n");
-	wlan_powered_up = true;
 	return 0;
 set_clock_fail:
 	setup_wlan_clock(0);
 set_gpio_fail:
 	setup_wlan_gpio(0);
 gpio_fail:
-	if (!(machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb() ||
-	    machine_is_msm8625_evb() || machine_is_msm8625_evt() ||
-	    machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7()))
-			gpio_free(gpio_wlan_sys_rest_en);
+	gpio_free(gpio_wlan_sys_rest_en);
 qrd_gpio_fail:
 	/* GPIO_WLAN_3V3_EN is only required for the QRD7627a */
 	if (machine_is_msm7627a_qrd1())
@@ -307,18 +300,12 @@ reg_disable:
 	wlan_switch_regulators(0);
 out:
 	pr_info("WLAN power-up failed\n");
-	wlan_powered_up = false;
 	return rc;
 }
 
 static unsigned int msm_AR600X_shutdown_power(bool on)
 {
 	int rc = 0;
-
-	if (!wlan_powered_up) {
-		pr_info("WLAN is not powered up, returning success\n");
-		return 0;
-	}
 
 	/* Disable the A0 clock */
 	rc = setup_wlan_clock(on);
@@ -333,6 +320,9 @@ static unsigned int msm_AR600X_shutdown_power(bool on)
 	 */
 	if (machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb()
 					|| machine_is_msm8625_evb()
+					|| machine_is_msm8625_qrd5() 
+					|| machine_is_msm7x27a_qrd5a()
+					|| machine_is_msm8625_skua()
 					|| machine_is_msm8625_evt()
 					|| machine_is_msm7627a_qrd3()
 					|| machine_is_msm8625_qrd7()) {
@@ -346,23 +336,16 @@ static unsigned int msm_AR600X_shutdown_power(bool on)
 		}
 		gpio_set_value(gpio_wlan_sys_rest_en, 0);
 	} else {
-#ifdef CONFIG_HUAWEI_KERNEL
-		/* rollback to 1030 baseline */
-		gpio_request(gpio_wlan_sys_rest_en, "WLAN_DEEP_SLEEP_N");
-		rc = setup_wlan_gpio(on);
-		if (rc) {
-			pr_err("%s: wlan_set_gpio = %d\n", __func__, rc);
-			goto set_gpio_fail;
+		rc = gpio_request(gpio_wlan_sys_rest_en, "WLAN_DEEP_SLEEP_N");
+		if (!rc) {
+			rc = setup_wlan_gpio(on);
+			if (rc) {
+				pr_err("%s: setup_wlan_gpio = %d\n",
+					__func__, rc);
+				goto set_gpio_fail;
+			}
+			gpio_free(gpio_wlan_sys_rest_en);
 		}
-		gpio_free(gpio_wlan_sys_rest_en);
-#else
-		rc = setup_wlan_gpio(on);
-		if (rc) {
-			pr_err("%s: setup_wlan_gpio = %d\n", __func__, rc);
-			goto set_gpio_fail;
-		}
-		gpio_free(gpio_wlan_sys_rest_en);
-#endif
 	}
 
 	/* GPIO_WLAN_3V3_EN is only required for the QRD7627a */
@@ -384,7 +367,7 @@ static unsigned int msm_AR600X_shutdown_power(bool on)
 			__func__, rc);
 		goto reg_disable;
 	}
-	wlan_powered_up = false;
+
 	pr_info("WLAN power-down success\n");
 	return 0;
 set_clock_fail:
@@ -392,21 +375,14 @@ set_clock_fail:
 set_gpio_fail:
 	setup_wlan_gpio(0);
 gpio_fail:
-	if (!(machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb() ||
-	    machine_is_msm8625_evb() || machine_is_msm8625_evt() ||
-	    machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7()))
-			gpio_free(gpio_wlan_sys_rest_en);
+	gpio_free(gpio_wlan_sys_rest_en);
 qrd_gpio_fail:
 	/* GPIO_WLAN_3V3_EN is only required for the QRD7627a */
 	if (machine_is_msm7627a_qrd1())
 		gpio_free(GPIO_WLAN_3V3_EN);
 reg_disable:
 	wlan_switch_regulators(0);
-
-#ifndef CONFIG_HUAWEI_KERNEL
-out:
 	pr_info("WLAN power-down failed\n");
-#endif
 	return rc;
 }
 
@@ -419,3 +395,53 @@ int  ar600x_wlan_power(bool on)
 
 	return 0;
 }
+//EXPORT_SYMBOL(ar600x_wlan_power);
+
+static int __init qrd_wlan_init(void)
+{
+	int rc;
+
+	pr_info("WLAN power init\n");
+	if (machine_is_msm7627a_qrd1() || machine_is_msm7627a_evb()
+					|| machine_is_msm8625_evb()
+					|| machine_is_msm8625_qrd5() 
+					|| machine_is_msm7x27a_qrd5a()
+					|| machine_is_msm8625_skua()
+					|| machine_is_msm8625_evt()
+					|| machine_is_msm7627a_qrd3()
+					|| machine_is_msm8625_qrd7()) {
+		rc = gpio_tlmm_config(GPIO_CFG(gpio_wlan_sys_rest_en, 0,
+					GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+					GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+		if (rc) {
+			pr_err("%s gpio_tlmm_config %d failed,error = %d\n",
+				__func__, gpio_wlan_sys_rest_en, rc);
+			goto exit;
+		}
+		gpio_set_value(gpio_wlan_sys_rest_en, 0);
+	} else {
+		gpio_request(gpio_wlan_sys_rest_en, "WLAN_DEEP_SLEEP_N");
+		rc = setup_wlan_gpio(false);
+		gpio_free(gpio_wlan_sys_rest_en);
+		if (rc) {
+			pr_err("%s: wlan_set_gpio = %d\n", __func__, rc);
+			goto exit;
+		}
+	}
+
+	/* GPIO_WLAN_3V3_EN is only required for the QRD7627a */
+	if (machine_is_msm7627a_qrd1()) {
+		rc = gpio_tlmm_config(GPIO_CFG(GPIO_WLAN_3V3_EN, 0,
+					GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL,
+					GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+		if (rc) {
+			pr_err("%s gpio_tlmm_config %d failed,error = %d\n",
+				__func__, GPIO_WLAN_3V3_EN, rc);
+			goto exit;
+		}
+		gpio_set_value(GPIO_WLAN_3V3_EN, 0);
+	}
+exit:
+	return rc;
+}
+device_initcall(qrd_wlan_init);
