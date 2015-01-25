@@ -1581,14 +1581,14 @@ static uint32_t camera_off_gpio_table[] = {
 static uint32_t camera_on_gpio_table[] = {
 	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),
 };
-
+/*
 #ifdef CONFIG_MSM_CAMERA_FLASH
 static struct msm_camera_sensor_flash_src msm_flash_src = {
 	.flash_sr_type = MSM_CAMERA_FLASH_SRC_EXT,
 	._fsrc.ext_driver_src.led_en = GPIO_CAM_GP_LED_EN1,
 	._fsrc.ext_driver_src.led_flash_en = GPIO_CAM_GP_LED_EN2,
 };
-#endif
+#endif*/
 
 static struct regulator_bulk_data regs_camera[] = {
 	{ .supply = "msme1", .min_uV = 1800000, .max_uV = 1800000 },
@@ -2287,7 +2287,7 @@ static struct platform_device msm_camera_sensor_ov7692 = {
 	},
 };
 #endif
-
+/*
 static struct i2c_board_info i2c_camera_devices[] = {
 	#ifdef CONFIG_S5K4E1
 	{
@@ -2316,7 +2316,7 @@ static struct i2c_board_info i2c_camera_devices[] = {
 		I2C_BOARD_INFO("sc628a", 0x6E),
 	},
 };
-
+*/
 static struct i2c_board_info i2c_camera_devices_qrd[] = {
 	#ifdef CONFIG_OV5640
 	{
