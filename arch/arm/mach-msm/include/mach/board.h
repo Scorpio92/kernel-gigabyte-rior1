@@ -181,6 +181,44 @@ enum msm_camera_type {
 	BACK_CAMERA_INT_3D,
 };
 
+/*lilonghui add it for the camera prodcut 2012-7-2*/
+enum msm_camera_product {
+      CAMERA_PRODUCT_ID_NON = 0,
+      CAMERA_PRODUCT_ID_Q801,
+      CAMERA_PRODUCT_ID_Q802,
+      CAMERA_PRODUCT_ID_Q803,
+      CAMERA_PRODUCT_ID_Q203,
+};
+/*end*/
+/*lilonghui add it for the all the  project camera 2r012-8-11*/
+enum msm_camera_customer {
+      CAMERA_CUSTOMER_NON = 0,
+      CAMERA_CUSTOMER_QC,
+      CAMERA_CUSTOMER_35,
+      CAMERA_CUSTOMER_CY,
+      CAMERA_CUSTOMER_S21,
+      CAMERA_CUSTOMER_S22,
+      CAMERA_CUSTOMER_AMOI,
+      CAMERA_CUSTOMER_ALL,
+      };
+enum msm_camera_module_name {
+      CAMERA_MODULE_NON = 0,  	 
+      CAMERA_MODULE_TRULY,
+       
+};
+enum msm_camera_sensor_ic_name {
+      CAMERA_IC_NAME_NON = 0, 
+      CAMERA_IC_NAME_GC0339,  	 
+      CAMERA_IC_NAME_OV5647,
+      CAMERA_IC_NAME_OV8825,
+      CAMERA_IC_NAME_OV2655,
+      CAMERA_IC_NAME_S5K5CA,
+      CAMERA_IC_NAME_AR0543,
+      CAMERA_IC_NAME_GC2035,
+
+};
+/*end*/
+
 enum msm_sensor_type {
 	BAYER_SENSOR,
 	YUV_SENSOR,

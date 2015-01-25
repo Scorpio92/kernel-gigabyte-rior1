@@ -14,6 +14,25 @@
 #include "msm_sensor.h"
 #define SENSOR_NAME "ov7692"
 
+#ifdef CDBG
+#undef CDBG
+#endif
+#ifdef CDBG_HIGH
+#undef CDBG_HIGH
+#endif
+
+#define OV7692_VERBOSE_DGB
+
+#ifdef OV7692_VERBOSE_DGB
+#define CDBG(fmt, args...) printk(fmt, ##args)
+#define CDBG_HIGH(fmt, args...) printk(fmt, ##args)
+#else
+#define CDBG(fmt, args...) do { } while (0)
+#define CDBG_HIGH(fmt, args...) printk(fmt, ##args)
+#endif
+
+
+
 DEFINE_MUTEX(ov7692_mut);
 static struct msm_sensor_ctrl_t ov7692_s_ctrl;
 
@@ -115,29 +134,29 @@ static struct msm_camera_i2c_reg_conf ov7692_recommend_settings[] = {
 	{0xb0, 0xf3},
 	{0xb1, 0xfb},
 	{0xb2, 0x06},
-	{0x8c, 0x5c},
+	{0x8c, 0x52},
 	{0x8d, 0x11},
 	{0x8e, 0x12},
 	{0x8f, 0x19},
 	{0x90, 0x50},
 	{0x91, 0x20},
-	{0x92, 0x96},
-	{0x93, 0x80},
-	{0x94, 0x13},
+	{0x92, 0x94},
+	{0x93, 0x8e},
+	{0x94, 0x18},
 	{0x95, 0x1b},
-	{0x96, 0xff},
-	{0x97, 0x00},
-	{0x98, 0x3d},
-	{0x99, 0x36},
-	{0x9a, 0x51},
-	{0x9b, 0x43},
+	{0x96, 0xf0},
+	{0x97, 0x10},
+	{0x98, 0x7a},
+	{0x99, 0x75},
+	{0x9a, 0x92},
+	{0x9b, 0x8f},
 	{0x9c, 0xf0},
 	{0x9d, 0xf0},
 	{0x9e, 0xf0},
 	{0x9f, 0xff},
-	{0xa0, 0x68},
-	{0xa1, 0x62},
-	{0xa2, 0x0e},
+	{0xa0, 0xc0},
+	{0xa1, 0xb1},
+	{0xa2, 0x1c},
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_full_settings[] = {
@@ -173,33 +192,24 @@ static struct msm_camera_i2c_conf_array ov7692_confs[] = {
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_saturation[][4] = {
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x00, 0x00, 0x00, 0x00},
-		{0xd9, 0x00, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},/* SATURATION LEVEL0*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x10, 0x00, 0x00, 0x00},
-		{0xd9, 0x10, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL1*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x20, 0x00, 0x00, 0x00},
-		{0xd9, 0x20, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL2*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x30, 0x00, 0x00, 0x00},
-		{0xd9, 0x30, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL3*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x40, 0x00, 0x00, 0x00},
-		{0xd9, 0x40, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL4*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x50, 0x00, 0x00, 0x00},
-		{0xd9, 0x50, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL5*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x60, 0x00, 0x00, 0x00},
-		{0xd9, 0x60, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL6*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x70, 0x00, 0x00, 0x00},
-		{0xd9, 0x70, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL7*/
-	{{0x81, 0x33, 0x00, 0x00, 0xCC}, {0xd8, 0x80, 0x00, 0x00, 0x00},
-		{0xd9, 0x80, 0x00, 0x00, 0x00},
-		{0xd2, 0x02, 0x00, 0x00, 0x00},},	/* SATURATION LEVEL8*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x00, 0x00}, {0xd9, 0x00, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL0*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x10, 0x00}, {0xd9, 0x10, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL1*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x20, 0x00}, {0xd9, 0x20, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL2*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x30, 0x00}, {0xd9, 0x30, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL3*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x40, 0x00}, {0xd9, 0x40, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL4*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x50, 0x00}, {0xd9, 0x50, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL5*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x60, 0x00}, {0xd9, 0x60, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL6*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x70, 0x00}, {0xd9, 0x70, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL7*/
+	{{0x81, 0x33, 0xCC}, {0xd8, 0x80, 0x00}, {0xd9, 0x80, 0x00},
+		{0xd2, 0x02, 0x00},},	/* SATURATION LEVEL8*/
 };
 static struct msm_camera_i2c_conf_array ov7692_saturation_confs[][1] = {
 	{{ov7692_saturation[0], ARRAY_SIZE(ov7692_saturation[0]), 0,
@@ -336,18 +346,12 @@ static struct msm_camera_i2c_enum_conf_array ov7692_contrast_enum_confs = {
 	.data_type = MSM_CAMERA_I2C_BYTE_DATA,
 };
 static struct msm_camera_i2c_reg_conf ov7692_sharpness[][2] = {
-	{{0xb4, 0x20, 0x00, 0x00, 0xDF},
-		{0xb6, 0x00, 0x00, 0x00, 0xE0},},    /* SHARPNESS LEVEL 0*/
-	{{0xb4, 0x20, 0x00, 0x00, 0xDF},
-		{0xb6, 0x01, 0x00, 0x00, 0xE0},},    /* SHARPNESS LEVEL 1*/
-	{{0xb4, 0x00, 0x00, 0x00, 0xDF},
-		{0xb6, 0x00, 0x00, 0x00, 0xE0},},    /* SHARPNESS LEVEL 2*/
-	{{0xb4, 0x20, 0x00, 0x00, 0xDF},
-		{0xb6, 0x66, 0x00, 0x00, 0xE0},},    /* SHARPNESS LEVEL 3*/
-	{{0xb4, 0x20, 0x00, 0x00, 0xDF},
-		{0xb6, 0x99, 0x00, 0x00, 0xE0},},    /* SHARPNESS LEVEL 4*/
-	{{0xb4, 0x20, 0x00, 0x00, 0xDF},
-		{0xb6, 0xcc, 0x00, 0x00, 0xE0},},    /* SHARPNESS LEVEL 5*/
+	{{0xb4, 0x20, 0xDF}, {0xb6, 0x00, 0xE0},},    /* SHARPNESS LEVEL 0*/
+	{{0xb4, 0x20, 0xDF}, {0xb6, 0x01, 0xE0},},    /* SHARPNESS LEVEL 1*/
+	{{0xb4, 0x00, 0xDF}, {0xb6, 0x00, 0xE0},},    /* SHARPNESS LEVEL 2*/
+	{{0xb4, 0x20, 0xDF}, {0xb6, 0x22, 0xE0},},    /* SHARPNESS LEVEL 3*/
+	{{0xb4, 0x20, 0xDF}, {0xb6, 0x44, 0xE0},},    /* SHARPNESS LEVEL 4*/
+	{{0xb4, 0x20, 0xDF}, {0xb6, 0x66, 0xE0},},    /* SHARPNESS LEVEL 5*/
 };
 
 static struct msm_camera_i2c_conf_array ov7692_sharpness_confs[][1] = {
@@ -422,13 +426,13 @@ static struct msm_camera_i2c_enum_conf_array ov7692_exposure_enum_confs = {
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_iso[][1] = {
-	{{0x14, 0x20, 0x00, 0x00, 0x8F},},   /*ISO_AUTO*/
-	{{0x14, 0x20, 0x00, 0x00, 0x8F},},   /*ISO_DEBLUR*/
-	{{0x14, 0x00, 0x00, 0x00, 0x8F},},   /*ISO_100*/
-	{{0x14, 0x10, 0x00, 0x00, 0x8F},},   /*ISO_200*/
-	{{0x14, 0x20, 0x00, 0x00, 0x8F},},   /*ISO_400*/
-	{{0x14, 0x30, 0x00, 0x00, 0x8F},},   /*ISO_800*/
-	{{0x14, 0x40, 0x00, 0x00, 0x8F},},   /*ISO_1600*/
+	{{0x14, 0x20, 0x8F},},   /*ISO_AUTO*/
+	{{0x14, 0x20, 0x8F},},   /*ISO_DEBLUR*/
+	{{0x14, 0x00, 0x8F},},   /*ISO_100*/
+	{{0x14, 0x10, 0x8F},},   /*ISO_200*/
+	{{0x14, 0x20, 0x8F},},   /*ISO_400*/
+	{{0x14, 0x30, 0x8F},},   /*ISO_800*/
+	{{0x14, 0x40, 0x8F},},   /*ISO_1600*/
 };
 
 
@@ -468,7 +472,7 @@ static struct msm_camera_i2c_enum_conf_array ov7692_iso_enum_confs = {
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_no_effect[] = {
-	{0x81, 0x00, 0x00, 0x00, 0xDF},
+	{0x81, 0x00, 0xDF},
 	{0x28, 0x00,},
 	{0xd2, 0x00,},
 	{0xda, 0x80,},
@@ -482,41 +486,32 @@ static struct msm_camera_i2c_conf_array ov7692_no_effect_confs[] = {
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_special_effect[][5] = {
-	{{0x81, 0x20, 0x00, 0x00, 0xDF}, {0x28, 0x00,}, {0xd2, 0x18,},
-		{0xda, 0x80,}, {0xdb, 0x80,},},	/*for special effect OFF*/
-	{{0x81, 0x20, 0x00, 0x00, 0xDF}, {0x28, 0x00,}, {0xd2, 0x18,},
-		{0xda, 0x80,}, {0xdb, 0x80,},},	/*for special effect MONO*/
-	{{0x81, 0x20, 0x00, 0x00, 0xDF}, {0x28, 0x80,}, {0xd2, 0x40,},
-		{0xda, 0x80,}, {0xdb, 0x80,},},	/*for special efefct Negative*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},/*Solarize is not supported by sensor*/
-	{{0x81, 0x20, 0x00, 0x00, 0xDF}, {0x28, 0x00,}, {0xd2, 0x18,},
-		{0xda, 0x40,}, {0xdb, 0xa0,},},	/*for sepia*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/* Posteraize not supported */
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/* White board not supported*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/*Blackboard not supported*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/*Aqua not supported*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/*Emboss not supported */
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/*sketch not supported*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/*Neon not supported*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},		/*MAX value*/
+	{{0x81, 0x20, 0xDF}, {0x28, 0x00,}, {0xd2, 0x18,}, {0xda, 0x80,},
+		{0xdb, 0x80,},},	/*for special effect OFF*/
+	{{0x81, 0x20, 0xDF}, {0x28, 0x00,}, {0xd2, 0x18,}, {0xda, 0x80,},
+		{0xdb, 0x80,},},	/*for special effect MONO*/
+	{{0x81, 0x20, 0xDF}, {0x28, 0x80,}, {0xd2, 0x40,}, {0xda, 0x80,},
+		{0xdb, 0x80,},},	/*for special efefct Negative*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*Solarize is not supported by sensor*/
+	{{0x81, 0x20, 0xDF}, {0x28, 0x00,}, {0xd2, 0x18,}, {0xda, 0x40,},
+		{0xdb, 0xa0,},},	/*for sepia*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/* Posteraize not supported */
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/* White board not supported*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*Blackboard not supported*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*Aqua not supported*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*Emboss not supported */
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*sketch not supported*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*Neon not supported*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},		/*MAX value*/
 };
 
 static struct msm_camera_i2c_conf_array ov7692_special_effect_confs[][1] = {
@@ -575,12 +570,9 @@ static struct msm_camera_i2c_enum_conf_array
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_antibanding[][2] = {
-	{{0x13, 0x20, 0x00, 0x00, 0xDF},
-		{0x14, 0x16, 0x00, 0x00, 0xE8},},   /*ANTIBANDING 60HZ*/
-	{{0x13, 0x20, 0x00, 0x00, 0xDF},
-		{0x14, 0x17, 0x00, 0x00, 0xE8},},   /*ANTIBANDING 50HZ*/
-	{{0x13, 0x20, 0x00, 0x00, 0xDF},
-		{0x14, 0x14, 0x00, 0x00, 0xE8},},   /* ANTIBANDING AUTO*/
+	{{0x13, 0x20, 0xDF}, {0x14, 0x16, 0xE8},},   /*ANTIBANDING 60HZ*/
+	{{0x13, 0x20, 0xDF}, {0x14, 0x17, 0xE8},},   /*ANTIBANDING 50HZ*/
+	{{0x13, 0x20, 0xDF}, {0x14, 0x14, 0xE8},},   /* ANTIBANDING AUTO*/
 };
 
 
@@ -610,16 +602,16 @@ static struct msm_camera_i2c_enum_conf_array ov7692_antibanding_enum_confs = {
 };
 
 static struct msm_camera_i2c_reg_conf ov7692_wb_oem[][4] = {
-	{{-1, -1, -1, -1 , -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},/*WHITEBALNACE OFF*/
-	{{0x13, 0xf7}, {0x15, 0x00}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},}, /*WHITEBALNACE AUTO*/
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},/*WHITEBALNACE OFF*/
+	{{0x13, 0xf7}, {0x15, 0x00}, {-1, -1, -1},
+		{-1, -1, -1},}, /*WHITEBALNACE AUTO*/
 	{{0x13, 0xf5}, {0x01, 0x56}, {0x02, 0x50},
 		{0x15, 0x00},},	/*WHITEBALNACE CUSTOM*/
 	{{0x13, 0xf5}, {0x01, 0x66}, {0x02, 0x40},
 		{0x15, 0x00},},	/*INCANDISCENT*/
-	{{-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1}, {-1, -1, -1, -1, -1},
-		{-1, -1, -1, -1, -1},},	/*FLOURESECT NOT SUPPORTED */
+	{{-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1},
+		{-1, -1, -1},},	/*FLOURESECT NOT SUPPORTED */
 	{{0x13, 0xf5}, {0x01, 0x43}, {0x02, 0x5d},
 		{0x15, 0x00},},	/*DAYLIGHT*/
 	{{0x13, 0xf5}, {0x01, 0x48}, {0x02, 0x63},
@@ -850,10 +842,32 @@ static const struct i2c_device_id ov7692_i2c_id[] = {
 	{ }
 };
 
+int32_t ov7692_sensor_i2c_probe(struct i2c_client *client,
+		const struct i2c_device_id *id)
+{
+	int32_t rc = 0;
+	struct msm_sensor_ctrl_t *s_ctrl;
+
+	CDBG("%s IN\r\n", __func__);
+	s_ctrl = (struct msm_sensor_ctrl_t *)(id->driver_data);
+	s_ctrl->sensor_i2c_addr = s_ctrl->sensor_i2c_addr;
+
+	rc = msm_sensor_i2c_probe(client, id);
+
+	if (client->dev.platform_data == NULL) {
+		CDBG_HIGH("%s: NULL sensor data\n", __func__);
+		return -EFAULT;
+	}
+
+	usleep_range(5000, 5100);
+
+	return rc;
+
+}
 
 static struct i2c_driver ov7692_i2c_driver = {
 	.id_table = ov7692_i2c_id,
-	.probe  = msm_sensor_i2c_probe,
+	.probe  = ov7692_sensor_i2c_probe,
 	.driver = {
 		.name = SENSOR_NAME,
 	},
@@ -889,6 +903,73 @@ static struct v4l2_subdev_ops ov7692_subdev_ops = {
 	.video  = &ov7692_subdev_video_ops,
 };
 
+
+
+int32_t ov7692_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc = 0;
+	struct msm_camera_sensor_info *info = NULL;
+
+	CDBG("%s: %d\n", __func__, __LINE__);
+
+	info = s_ctrl->sensordata;
+
+	CDBG("%s, sensor_pwd:%d, sensor_reset:%d\r\n",__func__, info->sensor_pwd, info->sensor_reset);
+
+	gpio_direction_output(info->sensor_pwd, 1);
+	if (info->sensor_reset_enable){
+		gpio_direction_output(info->sensor_reset, 0);
+	}
+	usleep_range(10000, 11000);
+	if (info->pmic_gpio_enable) {
+		lcd_camera_power_onoff(1);
+	}
+	usleep_range(10000, 11000);
+
+	rc = msm_sensor_power_up(s_ctrl);
+	if (rc < 0) {
+		CDBG("%s: msm_sensor_power_up failed\n", __func__);
+		return rc;
+	}
+
+	/* turn on ldo and vreg */
+	usleep_range(1000, 1100);
+	gpio_direction_output(info->sensor_pwd, 0);
+	msleep(20);
+	if (info->sensor_reset_enable){
+		gpio_direction_output(info->sensor_reset, 1);
+	}
+	msleep(25);
+
+
+	return rc;
+
+}
+
+int32_t ov7692_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc = 0;
+	struct msm_camera_sensor_info *info = NULL;
+
+	CDBG("%s IN\r\n", __func__);
+	info = s_ctrl->sensordata;
+
+	msm_camera_i2c_write(s_ctrl->sensor_i2c_client,
+			0x38, 0x50, MSM_CAMERA_I2C_BYTE_DATA);
+	msleep(80);
+
+	gpio_direction_output(info->sensor_pwd, 1);
+	msleep(40);
+
+	rc = msm_sensor_power_down(s_ctrl);
+	msleep(40);
+	if (s_ctrl->sensordata->pmic_gpio_enable){
+		lcd_camera_power_onoff(0);
+	}
+	return rc;
+}
+
+
 static struct msm_sensor_fn_t ov7692_func_tbl = {
 	.sensor_start_stream = msm_sensor_start_stream,
 	.sensor_stop_stream = msm_sensor_stop_stream,
@@ -897,9 +978,8 @@ static struct msm_sensor_fn_t ov7692_func_tbl = {
 	.sensor_mode_init = msm_sensor_mode_init,
 	.sensor_get_output_info = msm_sensor_get_output_info,
 	.sensor_config = msm_sensor_config,
-	.sensor_power_up = msm_sensor_power_up,
-	.sensor_power_down = msm_sensor_power_down,
-	.sensor_get_csi_params = msm_sensor_get_csi_params,
+	.sensor_power_up = ov7692_sensor_power_up,
+	.sensor_power_down = ov7692_sensor_power_down,
 };
 
 static struct msm_sensor_reg_t ov7692_regs = {
