@@ -2921,23 +2921,8 @@ static long msm_ioctl_config(struct file *filep, unsigned int cmd,
 			ERR_COPY_FROM_USER();
 			rc = -EFAULT;
 		} else
-		{
-            /*Condition that the flash is tps61310 */
-			if(machine_is_msm8255_u8680())
-			{
-				if(LED_FLASH == flash_info.flashtype)
-				{
-					CDBG("tps61310_set_flash enter");
-					rc = tps61310_set_flash(flash_info.ctrl_data.led_state);
-				}
-			}
-            /*other flashes*/
-			else
-			{
-				CDBG("msm_flash_ctrl enter");
-				rc = msm_flash_ctrl(pmsm->sync->sdata, &flash_info);
-			}
-		}
+			rc = msm_flash_ctrl(pmsm->sync->sdata, &flash_info);
+
 		break;
 	}
 
@@ -4184,20 +4169,20 @@ int msm_camera_drv_start(struct platform_device *dev,
         camera_num = sinfo->slave_sensor;
 #endif
 
-	CDBG("%s: setting camera node %d\n", __func__, camera_num);
-	rc = msm_device_init(pmsm, sync, camera_num);
+	CDBG("%s: setting camera node %d\n", __func__, camera_node);
+	rc = msm_device_init(pmsm, sync, camera_node);
 	if (rc < 0) {
 		msm_sync_destroy(sync);
 		kfree(pmsm);
 		return rc;
 	}
 
-	camera_type[camera_num] = sync->sctrl.s_camera_type;
-	sensor_mount_angle[camera_num] = sync->sctrl.s_mount_angle;
-	camera_node_succee[camera_num] = 1;
+	camera_type[camera_node] = sync->sctrl.s_camera_type;
+	sensor_mount_angle[camera_node] = sync->sctrl.s_mount_angle;
+	//camera_node_succee[camera_node] = 1;
 	camera_node++;
 	CDBG("num:%d, id:%d, type:%d, mount_angle:%d\n", 
-		camera_node, camera_num, camera_type[camera_num], sensor_mount_angle[camera_num]);
+		camera_node, camera_node, camera_type[camera_node], sensor_mount_angle[camera_node]);
 	list_add(&sync->list, &msm_sensors);
 	return rc;
 }
