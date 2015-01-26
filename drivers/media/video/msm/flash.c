@@ -23,6 +23,10 @@
 #include <mach/camera.h>
 #include <mach/gpio.h>
 
+#include <linux/board-ragentek-cfg.h>
+
+struct i2c_client *sx150x_client;
+
 #ifdef CONFIG_HUAWEI_KERNEL
 
 #include <linux/mfd/pmic8058.h>
@@ -32,8 +36,6 @@
 #include <mach/msm_battery.h>
 #define CAMERA_FLASH_CUR_DIV 10
 #endif
-
-struct i2c_client *sx150x_client;
 
 #define CAMERA_LED_TORCH_MA 50
 #define CAMERA_LED_TORCH_LOW_MA    50
@@ -582,34 +584,6 @@ static int msm_camera_flash_pwm(
 		if (rc >= 0)
 			rc = pwm_enable(flash_pwm);
 		break;
-	case MSM_CAMERA_LED_TORCH:
-		rc = pwm_config(flash_pwm,
-			(PWM_PERIOD/pwm->max_load)*CAMERA_LED_TORCH_MA,
-			PWM_PERIOD);
-		if (rc >= 0)
-			rc = pwm_enable(flash_pwm);
-		break;
-    case MSM_CAMERA_LED_TORCH_LOW:
-        rc = pwm_config(flash_pwm,
-			(PWM_PERIOD/pwm->max_load)*CAMERA_LED_TORCH_LOW_MA,
-			PWM_PERIOD);
-		if (rc >= 0)
-			rc = pwm_enable(flash_pwm);
-        break;
-    case MSM_CAMERA_LED_TORCH_MIDDLE:
-        rc = pwm_config(flash_pwm,
-			(PWM_PERIOD/pwm->max_load)*CAMERA_LED_TORCH_MIDDLE_MA,
-			PWM_PERIOD);
-		if (rc >= 0)
-			rc = pwm_enable(flash_pwm);
-        break;
-    case MSM_CAMERA_LED_TORCH_HIGH:
-        rc = pwm_config(flash_pwm,
-			(PWM_PERIOD/pwm->max_load)*CAMERA_LED_TORCH_HIGH_MA,
-			PWM_PERIOD);
-		if (rc >= 0)
-			rc = pwm_enable(flash_pwm);
-        break;
 	case MSM_CAMERA_LED_OFF:
 		pwm_disable(flash_pwm);
 		break;
