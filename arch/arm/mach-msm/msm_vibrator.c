@@ -83,7 +83,7 @@ static void set_pmic_vibrator(int on)
 static void set_pmic_vibrator(int on)
 {
 	static struct msm_rpc_endpoint *vib_endpoint;
-	int ret=0;
+	//int ret=0;
 	struct set_vib_on_off_req {
 		struct rpc_request_hdr hdr;
 		#ifndef CONFIG_HUAWEI_SETTING_TIMER_FOR_VIBRATOR_OFF
