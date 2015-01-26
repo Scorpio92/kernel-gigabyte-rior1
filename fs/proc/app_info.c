@@ -419,7 +419,7 @@ static int app_version_read_proc(char *page, char **start, off_t off,
 	{
 		touch_info = "Unknow touch";
 	}
-	battery_name = get_battery_manufacturer_info();
+	battery_name = NULL;
 	if (NULL == battery_name)
 	{
 		battery_name = "Unknown battery";

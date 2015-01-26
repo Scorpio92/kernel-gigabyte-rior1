@@ -1855,7 +1855,8 @@ char *get_touch_info(void)
 {
 	char *touch_info = NULL;
 
-	touch_info = get_synaptics_touch_info();
+	//touch_info = get_synaptics_touch_info();
+    touch_info = NULL;
 	if (touch_info != NULL)
 		return touch_info;
 
@@ -1866,7 +1867,7 @@ char *get_touch_info(void)
 	return NULL;
 }
 /*4pin battery voltage id*/
-char* get_battery_manufacturer_info()
+/*char* get_battery_manufacturer_info()
 {
 	hw_battery_id_mv batt_id;
 	char *pmanufacturer_name = "Unknown battery";
@@ -1892,7 +1893,7 @@ char* get_battery_manufacturer_info()
 		break;
 	}
 	return pmanufacturer_name;
-}
+}*/
 hw_camera_flash_number get_hw_camera_flash_number(void)
 {
     hw_camera_flash_number ret = CAMERA_FLASH_LED_SINGLE;
