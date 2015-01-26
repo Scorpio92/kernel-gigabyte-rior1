@@ -4781,22 +4781,6 @@ static void msmsdcc_early_suspend(struct early_suspend *h)
 	host->polling_enabled = host->mmc->caps & MMC_CAP_NEEDS_POLL;
 	host->mmc->caps &= ~MMC_CAP_NEEDS_POLL;
 	spin_unlock_irqrestore(&host->lock, flags);
-    /*we delete scan sdcard work which will run 20s later and force it runs now*/
-#ifndef CONFIG_HUAWEI_KERNEL    
-    if (SDCC_SDCARD_SLOT == host->pdev_id )
-    {
-        if( (machine_is_msm8255_c8860())
-            || (machine_is_msm8255_u8860())
-            || (machine_is_msm8255_u8860_92())
-            || machine_is_msm8255_u8860_r()
-            || (machine_is_msm8255_u8860lp()))
-        {
-            printk("%s :  cancel_delayed_work_sync \n", __FUNCTION__ );
-            cancel_delayed_work_sync(&host->mmc->detect);
-            mmc_schedule_delayed_work(&host->mmc->detect, 0);
-        }
-    }
-#endif
 };
 static void msmsdcc_late_resume(struct early_suspend *h)
 {
@@ -5475,7 +5459,9 @@ msmsdcc_probe(struct platform_device *pdev)
 
     }
 #endif
-	mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+		//delete BUG_ID:QELS-2641  zengchuiguo 20121231 (start)
+	//mmc->caps2 |= MMC_CAP2_INIT_BKOPS | MMC_CAP2_BKOPS;
+	//delete BUG_ID:QELS-2641  zengchuiguo 20121231 (end)
 
 	if (plat->is_sdio_al_client)
 		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
