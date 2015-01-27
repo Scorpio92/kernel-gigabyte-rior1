@@ -61,6 +61,10 @@
 #include "pm-boot.h"
 #include "board-msm7x27a-regulator.h"
 #include "board-msm7627a.h"
+#include "board-msm7627a-sensor.h"
+
+#include <linux/fs.h>
+#include <linux/proc_fs.h>
 
 //Start=====Allen
 #include <mach/msm_smsm.h>
@@ -700,7 +704,7 @@ static struct platform_device fmem_device = {
 	.id = 1,
 	.dev = { .platform_data = &fmem_pdata },
 };
-
+/*
 #define GPIO_VREG_INIT(_id, _reg_name, _gpio_label, _gpio, _active_low) \
 	[GPIO_VREG_ID_##_id] = { \
 		.init_data = { \
@@ -733,15 +737,15 @@ static struct regulator_consumer_supply vreg_consumers_EXT_1P8V[] = {
 	REGULATOR_SUPPLY("cam_ov8825_vdd", "0-000d"),
 	REGULATOR_SUPPLY("lcd_vddi", "mipi_dsi.1"),
 };
-
+*/
 /* GPIO regulator constraints */
-static struct gpio_regulator_platform_data msm_gpio_regulator_pdata[] = {
+/*static struct gpio_regulator_platform_data msm_gpio_regulator_pdata[] = {
 	GPIO_VREG_INIT(EXT_2P85V, "ext_2p85v", "ext_2p85v_en", 35, 0),
 	GPIO_VREG_INIT(EXT_1P8V, "ext_1p8v", "ext_1p8v_en", 40, 0),
-};
+};*/
 
 /* GPIO regulator */
-static struct platform_device qrd_vreg_gpio_ext_2p85v __devinitdata = {
+/*static struct platform_device qrd_vreg_gpio_ext_2p85v __devinitdata = {
 	.name	= GPIO_REGULATOR_DEV_NAME,
 	.id	= 35,
 	.dev	= {
@@ -758,7 +762,7 @@ static struct platform_device qrd_vreg_gpio_ext_1p8v __devinitdata = {
 			&msm_gpio_regulator_pdata[GPIO_VREG_ID_EXT_1P8V],
 	},
 };
-
+*/
 static struct platform_device *common_devices[] __initdata = {
 	&android_usb_device,
 	&android_pmem_device,
@@ -767,7 +771,7 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_batt_device,
 	&msm_device_adspdec,
 	&msm_device_snd,
-	&msm_device_cad, //???
+	//&msm_device_cad, //???
 	&asoc_msm_pcm,
 	&asoc_msm_dai0,
 	&asoc_msm_dai1,
@@ -1902,7 +1906,7 @@ MACHINE_START(MSM7627A_EVB, "QRD MSM7627a EVB")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_SKUA, "QRD MSM8625 SKUA")
-	.boot_params	= 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
@@ -1922,7 +1926,7 @@ MACHINE_START(MSM8625_EVB, "QRD MSM8625 EVB")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_QRD5, "QRD MSM8625 SKU5")
-	.boot_params	= 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
@@ -1932,7 +1936,7 @@ MACHINE_START(MSM8625_QRD5, "QRD MSM8625 SKU5")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7X27A_QRD5A, "QRD MSM7x27A QRD5A")
-	.boot_params	= 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1952,7 +1956,7 @@ MACHINE_START(MSM8625_QRD7, "QRD MSM8625 QRD7")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_SKUB, "QRD MSM8625 SKUB")
-	.boot_params	= 0x100,
+	.atag_offset	= 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
