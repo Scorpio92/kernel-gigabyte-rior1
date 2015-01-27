@@ -88,6 +88,7 @@ Defines a read-only address of the fuse ROM of the AK8975.*/
 #define ECS_IOCTL_APP_GET_DEVID 	_IOR(AKMIO, 0x1F, char[20])
 
 struct akm8975_platform_data {
+	char layout;
 	char layouts[3][3];
 	char project_name[64];
 	int gpio_DRDY;
