@@ -1659,6 +1659,18 @@ static uint32_t rmt_storage_get_sid(const char *path)
 	return 0;
 }
 
+static int __init boot_up_mode_setup(char *bootupmode)
+{
+	if(!strcmp(bootupmode,"recovery"))
+		current_qcomm_mode = MSM_BOOT_NORMAL;  //FIX FOR RECOVERY MODE QCN UPDATE
+	else if(!strcmp(bootupmode,"ftm"))
+		current_qcomm_mode = MSM_BOOT_FTM;
+	else
+		current_qcomm_mode = MSM_BOOT_NORMAL;
+	return 1;
+}
+__setup("androidboot.bootupmode=", boot_up_mode_setup);
+
 static int __init rmt_storage_init(void)
 {
 #ifdef CONFIG_MSM_SDIO_SMEM

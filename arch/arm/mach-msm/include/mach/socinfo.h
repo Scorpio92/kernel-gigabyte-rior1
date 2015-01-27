@@ -55,6 +55,12 @@
 
 #define PLATFORM_SUBTYPE_SGLTE	6
 
+enum msm_boot_mode {
+	MSM_BOOT_NORMAL = 0,
+	MSM_BOOT_RECOVERY,
+	MSM_BOOT_FTM
+};
+
 enum msm_cpu {
 	MSM_CPU_UNKNOWN = 0,
 	MSM_CPU_7X01,
