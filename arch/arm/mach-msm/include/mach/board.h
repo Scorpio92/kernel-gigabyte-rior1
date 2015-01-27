@@ -609,6 +609,9 @@ struct msm_i2c_platform_data {
 	int src_clk_rate;
 	int use_gsbi_shared_mode;
 	void (*msm_i2c_config_gpio)(int iface, int config_type);
+	//Start === Allen
+	void (*msm_i2c_config_gpi_for_recovery)(int iface, int config_type);
+	//End === Allen
 };
 
 struct msm_i2c_ssbi_platform_data {
