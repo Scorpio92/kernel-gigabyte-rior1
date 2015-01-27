@@ -10,9 +10,53 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
-#include <linux/kernel.h>
 #include "board-msm7x27a-regulator.h"
+
+#define VREG_CONSUMERS(_id) \
+	static struct regulator_consumer_supply vreg_consumers_##_id[]
+
+VREG_CONSUMERS(EXT_2V8) = {
+	REGULATOR_SUPPLY("ext_2v8", NULL),
+};
+
+VREG_CONSUMERS(EXT_1V8) = {
+	REGULATOR_SUPPLY("ext_1v8", NULL),
+};
+
+#define GPIO_VREG(_id, _reg_name, _gpio_label, _gpio, _supply_regulator) \
+	[MSM7X27A_GPIO_VREG_ID_##_id] = { \
+		.init_data = { \
+			.constraints = { \
+				.valid_ops_mask	= REGULATOR_CHANGE_STATUS, \
+			}, \
+			.num_consumer_supplies	= \
+					ARRAY_SIZE(vreg_consumers_##_id), \
+			.consumer_supplies	= vreg_consumers_##_id, \
+			.supply_regulator	= _supply_regulator, \
+		}, \
+		.regulator_name = _reg_name, \
+		.gpio_label	= _gpio_label, \
+		.gpio		= _gpio, \
+	}
+
+/* GPIO regulator constraints */
+struct gpio_regulator_platform_data msm7x27a_evb_gpio_regulator_pdata[] = {
+	/*        ID			vreg_name		gpio_label		gpio	supply */
+	GPIO_VREG(EXT_2V8,		"ext_2v8",		"ext_2v8_en",	35,		NULL),
+	GPIO_VREG(EXT_1V8,		"ext_1v8",		"ext_1v8_en",	40,		NULL),
+};
+
+struct gpio_regulator_platform_data msm7x27a_sku3_gpio_regulator_pdata[] = {
+	/*        ID			vreg_name		gpio_label		gpio	supply */
+	GPIO_VREG(EXT_2V8,		"ext_2v8",		"ext_2v8_en",	35,		NULL),
+	GPIO_VREG(EXT_1V8,		"ext_1v8",		"ext_1v8_en",	34,		NULL),
+};
+
+struct gpio_regulator_platform_data msm7x27a_sku7_gpio_regulator_pdata[] = {
+	/*        ID			vreg_name		gpio_label		gpio	supply */
+	GPIO_VREG(EXT_2V8,		"ext_2v8",		"ext_2v8_en",	35,		NULL),
+	GPIO_VREG(EXT_1V8,		"ext_1v8",		"ext_1v8_en",	58,		NULL),
+};
 
 #define VOLTAGE_RANGE(min_uV, max_uV, step_uV)	((max_uV - min_uV) / step_uV)
 
@@ -188,6 +232,7 @@ PCOM_VREG_CONSUMERS(ldo16) = {
 PCOM_VREG_CONSUMERS(ldo17) = {
 	REGULATOR_SUPPLY("ldo17",	NULL),
 	REGULATOR_SUPPLY("bt",		NULL),
+	REGULATOR_SUPPLY("wlan3v3",          NULL),
 };
 
 PCOM_VREG_CONSUMERS(ldo18) = {
@@ -197,7 +242,7 @@ PCOM_VREG_CONSUMERS(ldo18) = {
 
 PCOM_VREG_CONSUMERS(ldo19) = {
 	REGULATOR_SUPPLY("ldo19",	NULL),
-	REGULATOR_SUPPLY("wlan4",	NULL),
+	REGULATOR_SUPPLY("wlan1v8",	NULL),
 };
 
 PCOM_VREG_CONSUMERS(ncp)   = {
@@ -218,11 +263,11 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	PCOM_VREG_SMP(smps2,  4, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps3,  2, NULL, 1800000, 1800000, 0, -1, 0, 0, 0, 0, s),
 	PCOM_VREG_SMP(smps4, 24, NULL, 2100000, 2100000, 0, -1, 0, 0, 0, 0, s),
-	PCOM_VREG_LDO(ldo01, 12, NULL, 1800000, 2100000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo01, 12, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo02, 13, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo03, 49, NULL, 1200000, 1200000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo04, 50, NULL, 1100000, 1100000, 0, -1, 0, 0, 0, 0, n),
-	PCOM_VREG_LDO(ldo05, 45, NULL, 1300000, 1350000, 0, -1, 0, 0, 0, 0, n),
+	PCOM_VREG_LDO(ldo05, 45, NULL, 1500000, 1500000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo06, 51, NULL, 1200000, 1200000, 0, -1, 0, 0, 0, 0, n),
 	PCOM_VREG_LDO(ldo07,  0, NULL, 2600000, 2600000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo08,  9, NULL, 2850000, 2850000, 0, -1, 0, 0, 0, 0, p),
@@ -234,9 +279,10 @@ static struct proccomm_regulator_info msm7x27a_pcom_vreg_info[] = {
 	PCOM_VREG_LDO(ldo14, 16, NULL, 3300000, 3300000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo15, 54, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo16, 19, NULL, 1800000, 2850000, 0, -1, 0, 0, 0, 0, p),
-	PCOM_VREG_LDO(ldo17, 56, NULL,  2850000,  3300000, 0, -1, 0, 0, 0, 0, p),
+	PCOM_VREG_LDO(ldo17, 56, NULL, 2900000, 3300000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo18, 11, NULL, 2700000, 2700000, 0, -1, 0, 0, 0, 0, p),
 	PCOM_VREG_LDO(ldo19, 57, NULL, 1200000, 1800000, 0, -1, 0, 0, 0, 0, p),
+
 	PCOM_VREG_NCP(ncp,   31, NULL, -1800000, -1800000, 0,     0, 0, 0, 0),
 };
 
