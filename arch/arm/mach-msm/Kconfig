@@ -552,6 +552,22 @@ config MACH_MSM8625_SURF
 	help
 	  Support for the Qualcomm MSM8625 SURF.
 
+config MACH_MSM8625_SKUA
+	depends on ARCH_MSM8625
+	depends on !MSM_STACKED_MEMORY
+	default y
+	bool "MSM8625 SKUA"
+	help
+	  Support for the Qualcomm MSM8625 Reference Design.
+
+config MACH_MSM8625_SKUB
+	depends on ARCH_MSM8625
+	depends on !MSM_STACKED_MEMORY
+	default y
+	bool "MSM8625 SKUB"
+	help
+	  Support for the Qualcomm MSM8625 Reference Design.
+
 config MACH_MSM8625_FFA
 	depends on ARCH_MSM8625
 	depends on !MSM_STACKED_MEMORY
@@ -575,6 +591,14 @@ config MACH_MSM8625_QRD5
 	bool "QRD MSM8625 SKU5"
 	help
 	  Support for the Qualcomm MSM8625 Reference Design.
+
+config MACH_MSM7X27A_QRD5A
+	depends on ARCH_MSM7X27A
+	depends on !MSM_STACKED_MEMORY
+	default y
+	bool "QRD MSM7x27a SKU5A"
+	help
+	  Support for the Qualcomm MSM7X27A QRD5A Reference Design.
 
 config MACH_MSM8625_QRD7
 	depends on ARCH_MSM8625
