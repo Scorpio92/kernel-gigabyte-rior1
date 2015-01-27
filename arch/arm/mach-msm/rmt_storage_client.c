@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
+#include <mach/socinfo.h>
 #include <mach/msm_rpcrouter.h>
 #ifdef CONFIG_MSM_SDIO_SMEM
 #include <mach/sdio_smem.h>
@@ -116,6 +117,7 @@ static void rmt_storage_sdio_smem_work(struct work_struct *work);
 #endif
 
 static struct rmt_storage_client_info *rmc;
+extern uint8_t current_qcomm_mode;
 
 #ifdef CONFIG_MSM_SDIO_SMEM
 DECLARE_DELAYED_WORK(sdio_smem_work, rmt_storage_sdio_smem_work);
@@ -1678,6 +1680,8 @@ static int __init rmt_storage_init(void)
 #endif
 	int ret = 0;
 
+    if(current_qcomm_mode)
+		return ret;
 	rmc = kzalloc(sizeof(struct rmt_storage_client_info), GFP_KERNEL);
 	if (!rmc) {
 		pr_err("%s: Unable to allocate memory\n", __func__);
@@ -1750,6 +1754,7 @@ unreg_msm_rpc:
 rmc_free:
 	rmt_storage_destroy_rmc();
 	kfree(rmc);
+	rmc = NULL;
 	return ret;
 }
 
