@@ -61,6 +61,7 @@ struct msm_camera_device_platform_data {
 	struct msm_camera_io_ext ioext;
 	struct msm_camera_io_clk ioclk;
 	uint8_t csid_core;
+	uint8_t is_csic;
 	uint8_t is_vpe;
 	struct msm_bus_scale_pdata *cam_bus_scale_table;
 #ifdef CONFIG_HUAWEI_CAMERA  
@@ -99,6 +100,7 @@ struct msm_camera_legacy_device_platform_data {
 #define MSM_CAMERA_FLASH_SRC_EXT     (0x00000001<<3)
 #define MSM_CAMERA_FLASH_SRC_LED (0x00000001<<3)
 #define MSM_CAMERA_FLASH_SRC_LED1 (0x00000001<<4)
+#define MSM_CAMERA_FLASH_SRC_LED2 (0x00000001<<5)
 
 struct msm_camera_sensor_flash_pmic {
 	uint8_t num_of_src;
@@ -368,6 +370,12 @@ struct msm_camera_sensor_info {
 	#endif
 	void (* get_camera_vreg)(struct msm_camera_sensor_platform_info *);
 	/*patch from Qualcomm*/
+	/*lilonghui add it for the camera 2012-8-11*/
+	enum msm_camera_sensor_ic_name  camera_sensor_ic_name; 
+	enum msm_camera_product camera_product_type;
+	enum msm_camera_customer  customer_name;
+	enum msm_camera_module_name  module_sensor_name; 
+	/*end*/
 };
 
 struct msm_camera_board_info {

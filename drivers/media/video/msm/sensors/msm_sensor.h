@@ -281,4 +281,8 @@ struct msm_sensor_ctrl_t *get_sctrl(struct v4l2_subdev *sd);
 #define VIDIOC_MSM_SENSOR_CSID_INFO\
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct msm_sensor_csi_info *)
 
+#if defined(CONFIG_OV5647)
+	extern int lcd_camera_power_onoff(int on);
+#endif
+
 #endif
