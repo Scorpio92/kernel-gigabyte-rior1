@@ -62,3 +62,7 @@ obj-$(CONFIG_INPUT_PMIC8058_VIBRA_MEMLESS) += pmic8058-vib-memless.o
 obj-$(CONFIG_BOSCH_BMA150)              += bma150.o
 obj-$(CONFIG_HUAWEI_FEATURE_PROXIMITY_EVERLIGHT_APS_12D)  += aps-12d.o
 obj-$(CONFIG_HUAWEI_FEATURE_PROXIMITY_EVERLIGHT_APS_9900)  += aps-9900.o
+obj-$(CONFIG_INPUT_LTR502) 		+= ltr502.o
+obj-$(CONFIG_BOSCH_BMA250)		+= bma250.o
+obj-$(CONFIG_ROHM_RPR400)            += rpr400.o
+obj-$(CONFIG_AVAGO_APDS990X)            += apds990x.o

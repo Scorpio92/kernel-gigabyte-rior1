@@ -73,3 +73,4 @@ obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
 obj-$(CONFIG_QSEECOM) += qseecom.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
 obj-$(CONFIG_HUAWEI_MTK6252_MODEM) += mtk6252.o
+obj-y				+= mmc3280ma/

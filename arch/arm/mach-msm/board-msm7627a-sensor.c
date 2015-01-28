@@ -470,7 +470,7 @@ static int rpi1040_setup(void) {
 #endif//add by hxh  for rpi1040 gsensor 2012.11.27 end
 void __init msm7627a_sensor_init(void)
 {
-	//int rc = 0;
+	int rc = 0;
 #if (defined(CONFIG_AVAGO_APDS990X) || defined(CONFIG_ROHM_RPR400))
 	if (machine_is_msm8625_skua() || machine_is_msm7627a_evb() || machine_is_msm8625_evb() || machine_is_msm8625_qrd5() || machine_is_msm7x27a_qrd5a() ) {
 		apds990x_setup();

@@ -1004,3 +1004,7 @@ config HUAWEI_GT968_TOUCHSCREEN
          If unsure, say N.
 
          To compile this driver as a module, choose M here
+
+config TOUCHSCREEN_GT868	
+       tristate "Goodix"
+       depends on I2C

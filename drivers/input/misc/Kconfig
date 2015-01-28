@@ -12,6 +12,34 @@ menuconfig INPUT_MISC
 
 if INPUT_MISC
 
+config INPUT_LTR502
+	tristate "LTR502 light/proximity sensor support"
+	depends on I2C
+	default n
+	help
+	  Driver for LTR502 light/proximity sensor.
+
+config BOSCH_BMA250
+	tristate "BMA250 acceleration sensor support"
+	depends on I2C=y
+	help
+	  If you say yes here you get support for Bosch Sensortec's
+	  acceleration sensors BMA250.
+
+config ROHM_RPR400
+   tristate "ROHM  light/proximity sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for Avago
+          light/proximity sensors rpr400.
+
+config AVAGO_APDS990X
+        tristate "Avago apds990x light/proximity sensor support"
+        depends on I2C=y
+        help
+          If you say yes here you get support for Avago
+          light/proximity sensors apds990x.
+
 config INPUT_88PM860X_ONKEY
 	tristate "88PM860x ONKEY support"
 	depends on MFD_88PM860X

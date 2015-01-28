@@ -133,5 +133,7 @@ obj-$(CONFIG_SENSORS_EPM_ADC)	+= epm_adc.o
 
 obj-$(CONFIG_PMBUS)		+= pmbus/
 
+obj-$(CONFIG_MXC_MMA8452)      += mxc_mma8452.o
+
 ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
 
