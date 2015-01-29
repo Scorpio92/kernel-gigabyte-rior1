@@ -55,6 +55,12 @@
 
 #define PLATFORM_SUBTYPE_SGLTE	6
 
+#define HW_VERSION2(major, minor)  (((major) << 16) | (minor))
+#define hw_version_is(major,minor)  \
+        ({ \
+                HW_VERSION2((major),(minor))==socinfo_get_platform_version(); \
+        })
+
 enum msm_boot_mode {
 	MSM_BOOT_NORMAL = 0,
 	MSM_BOOT_RECOVERY,

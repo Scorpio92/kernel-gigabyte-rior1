@@ -57,6 +57,9 @@ obj-$(CONFIG_HUAWEI_LEDS_PMIC)		+= leds-msm-pmic.o
 
 obj-$(CONFIG_HUAWEI_FEATURE_PTT_KEY_LIGHT) += leds_ptt.o
 obj-$(CONFIG_HUAWEI_FEATURE_RGB_KEY_LIGHT) += leds_rgb.o
+
+obj-$(CONFIG_LEDS_TRICOLOR_FLAHSLIGHT)  += leds-tricolor.o
+
 # LED SPI Drivers
 obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
 
