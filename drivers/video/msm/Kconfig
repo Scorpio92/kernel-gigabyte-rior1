@@ -115,7 +115,7 @@ config FB_MSM_MIPI_DSI
 
 config FB_MSM_LCDC
 	bool
-	default n
+	default y
 
 config FB_MSM_LVDS
 	bool
@@ -172,7 +172,7 @@ config FB_MSM_LCDC_AUTO_DETECT
 config FB_MSM_LCDC_PANEL
 	bool
 	select FB_MSM_LCDC
-	default n
+	default y
 
 config FB_MSM_MIPI_DSI_TOSHIBA
 	bool
@@ -389,6 +389,33 @@ config FB_MSM_LCDC_AUO_WVGA
 	bool
 	select FB_MSM_LCDC_PANEL
 	default n
+
+config FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS                   
+	bool
+	select FB_MSM_LCDC_PANEL
+	default n
+
+config FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_SECOND                     
+	bool
+	select FB_MSM_LCDC_PANEL
+	default n
+
+config  FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_PANEL     
+	depends on FB_MSM_LCDC_HW
+	bool "LCDC DNJ OTM 8018B WVGA IPS Panel"
+	select FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS       
+	default n
+	---help---
+	  Support for LCDC Dnj WVGA IPS panel.
+
+
+config  FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_SECOND_PANEL     
+	depends on FB_MSM_LCDC_HW
+	bool "LCDC DNJ OTM 8018B WVGA IPS  Second Panel"
+	select FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_SECOND       
+	default n
+	---help---
+	  Support for LCDC Dnj WVGA IPS panel.
 
 config FB_MSM_LCDC_TRULY_HVGA_IPS3P2335
         bool
@@ -674,6 +701,7 @@ config FB_MSM_MIPI_PANEL_DETECT
 	select FB_MSM_MIPI_SIMULATOR_VIDEO
 	select FB_MSM_MIPI_CHIMEI_WXGA
 	select FB_MSM_MIPI_CHIMEI_WUXGA
+        select FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_SECOND
 	---help---
 	  Support for MIPI panel auto detect
 
