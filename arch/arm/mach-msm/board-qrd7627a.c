@@ -1876,7 +1876,7 @@ late_initcall(qrd7627a_logbuf_init);
 #endif
 
 MACHINE_START(MSM7627A_QRD1, "QRD MSM7627a QRD1")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1886,7 +1886,7 @@ MACHINE_START(MSM7627A_QRD1, "QRD MSM7627a QRD1")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7627A_QRD3, "QRD MSM7627a QRD3")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1896,7 +1896,7 @@ MACHINE_START(MSM7627A_QRD3, "QRD MSM7627a QRD3")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7627A_EVB, "QRD MSM7627a EVB")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1906,7 +1906,7 @@ MACHINE_START(MSM7627A_EVB, "QRD MSM7627a EVB")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_SKUA, "QRD MSM8625 SKUA")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
@@ -1916,7 +1916,7 @@ MACHINE_START(MSM8625_SKUA, "QRD MSM8625 SKUA")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_EVB, "QRD MSM8625 EVB")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm8625_reserve,
 	.init_irq	= msm8625_init_irq,
@@ -1926,7 +1926,7 @@ MACHINE_START(MSM8625_EVB, "QRD MSM8625 EVB")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_QRD5, "QRD MSM8625 SKU5")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
@@ -1935,8 +1935,9 @@ MACHINE_START(MSM8625_QRD5, "QRD MSM8625 SKU5")
 	.init_early	= qrd7627a_init_early,
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
+
 MACHINE_START(MSM7X27A_QRD5A, "QRD MSM7x27A QRD5A")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1945,10 +1946,11 @@ MACHINE_START(MSM7X27A_QRD5A, "QRD MSM7x27A QRD5A")
 	.init_early	= qrd7627a_init_early,
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
+
 MACHINE_START(MSM8625_QRD7, "QRD MSM8625 QRD7")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm8625_map_io,
-	.reserve	= msm8625_reserve,
+	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
 	.init_machine	= msm_qrd_init,
 	.timer		= &msm_timer,
@@ -1956,7 +1958,7 @@ MACHINE_START(MSM8625_QRD7, "QRD MSM8625 QRD7")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_SKUB, "QRD MSM8625 SKUB")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm7627a_reserve,
 	.init_irq	= msm8625_init_irq,
@@ -1966,7 +1968,7 @@ MACHINE_START(MSM8625_SKUB, "QRD MSM8625 SKUB")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_EVT, "QRD MSM8625 EVT")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm8625_map_io,
 	.reserve	= msm8625_reserve,
 	.init_irq	= msm8625_init_irq,

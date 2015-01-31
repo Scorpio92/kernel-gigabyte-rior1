@@ -1685,7 +1685,7 @@ static void __init msm7x2x_init_early(void)
 }
 
 MACHINE_START(MSM7X27A_RUMI3, "QCT MSM7x27a RUMI3")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7x27a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1695,7 +1695,7 @@ MACHINE_START(MSM7X27A_RUMI3, "QCT MSM7x27a RUMI3")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7X27A_SURF, "QCT MSM7x27a SURF")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7x27a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1705,7 +1705,7 @@ MACHINE_START(MSM7X27A_SURF, "QCT MSM7x27a SURF")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7X27A_FFA, "QCT MSM7x27a FFA")
-	.atag_offset	= 0x100,
+	.atag_offset	= PHYS_OFFSET + 0x100,
 	.map_io		= msm_common_io_init,
 	.reserve	= msm7x27a_reserve,
 	.init_irq	= msm_init_irq,
@@ -1715,7 +1715,7 @@ MACHINE_START(MSM7X27A_FFA, "QCT MSM7x27a FFA")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7625A_SURF, "QCT MSM7625a SURF")
-	.atag_offset    = 0x100,
+	.atag_offset    = PHYS_OFFSET + 0x100,
 	.map_io         = msm_common_io_init,
 	.reserve        = msm7x27a_reserve,
 	.init_irq       = msm_init_irq,
@@ -1725,7 +1725,7 @@ MACHINE_START(MSM7625A_SURF, "QCT MSM7625a SURF")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM7625A_FFA, "QCT MSM7625a FFA")
-	.atag_offset    = 0x100,
+	.atag_offset    = PHYS_OFFSET + 0x100,
 	.map_io         = msm_common_io_init,
 	.reserve        = msm7x27a_reserve,
 	.init_irq       = msm_init_irq,
@@ -1735,7 +1735,7 @@ MACHINE_START(MSM7625A_FFA, "QCT MSM7625a FFA")
 	.handle_irq	= vic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_RUMI3, "QCT MSM8625 RUMI3")
-	.atag_offset    = 0x100,
+	.atag_offset    = PHYS_OFFSET + 0x100,
 	.map_io         = msm8625_map_io,
 	.reserve        = msm8625_reserve,
 	.init_irq       = msm8625_init_irq,
@@ -1744,79 +1744,6 @@ MACHINE_START(MSM8625_RUMI3, "QCT MSM8625 RUMI3")
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
 MACHINE_START(MSM8625_SURF, "QCT MSM8625 SURF")
-	.atag_offset    = 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM7X27A_U8655_EMMC, "MSM7x27a U8655Pro BOARD")
-	.atag_offset	= PHYS_OFFSET + 0x100,
-	.map_io		= msm_common_io_init,
-	.reserve	= msm7x27a_reserve,
-	.init_irq	= msm_init_irq,
-	.init_machine	= msm7x2x_init,
-	.timer		= &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= vic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM7X27A_M660, "MSM7x27a M660 BOARD")
-	.atag_offset	= PHYS_OFFSET + 0x100,
-	.map_io		= msm_common_io_init,
-	.reserve	= msm7x27a_reserve,
-	.init_irq	= msm_init_irq,
-	.init_machine	= msm7x2x_init,
-	.timer		= &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= vic_handle_irq,
-MACHINE_END
-
-MACHINE_START(MSM7X27A_C8820, "MSM7x27a C8820 BOARD")
-	.atag_offset	= PHYS_OFFSET + 0x100,
-	.map_io		= msm_common_io_init,
-	.reserve	= msm7x27a_reserve,
-	.init_irq	= msm_init_irq,
-	.init_machine	= msm7x2x_init,
-	.timer		= &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= vic_handle_irq,
-MACHINE_END
-
-MACHINE_START(MSM7X27A_H867G, "MSM7x27a H867G BOARD")
-    .atag_offset    = PHYS_OFFSET + 0x100,
-    .map_io         = msm_common_io_init,
-    .reserve        = msm7x27a_reserve,
-    .init_irq       = msm_init_irq,
-    .init_machine   = msm7x2x_init,
-    .timer          = &msm_timer,
-    .init_early     = msm7x2x_init_early,
-    .handle_irq     = vic_handle_irq,
-MACHINE_END
-
-MACHINE_START(MSM7X27A_U8815, "MSM7x27a U8815 BOARD")
-    .atag_offset    = PHYS_OFFSET + 0x100,
-    .map_io         = msm_common_io_init,
-    .reserve        = msm7x27a_reserve,
-    .init_irq       = msm_init_irq,
-    .init_machine   = msm7x2x_init,
-    .timer          = &msm_timer,
-    .init_early     = msm7x2x_init_early,
-    .handle_irq     = vic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM7X27A_H868C, "MSM7x27a H868C BOARD")
-    .atag_offset    = PHYS_OFFSET + 0x100,
-    .map_io         = msm_common_io_init,
-    .reserve        = msm7x27a_reserve,
-    .init_irq       = msm_init_irq,
-    .init_machine   = msm7x2x_init,
-    .timer          = &msm_timer,
-    .init_early     = msm7x2x_init_early,
-    .handle_irq     = vic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8825, "MSM8x25 U8825 BOARD")
 	.atag_offset    = PHYS_OFFSET + 0x100,
 	.map_io         = msm8625_map_io,
 	.reserve        = msm8625_reserve,
@@ -1826,147 +1753,7 @@ MACHINE_START(MSM8X25_U8825, "MSM8x25 U8825 BOARD")
 	.init_early     = msm7x2x_init_early,
 	.handle_irq	= gic_handle_irq,
 MACHINE_END
-MACHINE_START(MSM8X25_U8825D, "MSM8x25 U8825D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8951D, "MSM8x25 U8951D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8951, "MSM8x25 U8951 BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_C8825D, "MSM8x25 C8825D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8950D, "MSM8x25 U8950D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_C8950D, "MSM8x25 C8950D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8950, "MSM8x25 U8950D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_C8812P, "MSM8x25 C8812P BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_C8833D, "MSM8x25 C8833D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8833D, "MSM8x25 U8833D BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_U8833, "MSM8x25 U8833 BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_C8813, "MSM8x25 C8813 BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_H881C, "MSM8x25 H881C BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_Y301_A1, "MSM8x25 Y301_A1 BOARD")
-	.atag_offset    = PHYS_OFFSET + 0x100,
-	.map_io         = msm8625_map_io,
-	.reserve        = msm8625_reserve,
-	.init_irq       = msm8625_init_irq,
-	.init_machine   = msm7x2x_init,
-	.timer          = &msm_timer,
-	.init_early     = msm7x2x_init_early,
-	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM8X25_Y300_J1, "MSM8x25 Y300_J1 BOARD")
+MACHINE_START(MSM8625_FFA, "QCT MSM8625 FFA")
 	.atag_offset    = PHYS_OFFSET + 0x100,
 	.map_io         = msm8625_map_io,
 	.reserve        = msm8625_reserve,
