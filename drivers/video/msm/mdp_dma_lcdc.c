@@ -121,7 +121,7 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	uint32 dma_base;
 	uint32 timer_base = LCDC_BASE;
 	uint32 block = MDP_DMA2_BLOCK;
-	int ret;
+	int ret=0;
 	uint32_t mask, curr;
 
 #ifdef CONFIG_HUAWEI_KERNEL
@@ -198,6 +198,16 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		       mfd->panel_info.bpp);
 		return -ENODEV;
 	}
+
+printk("luke:%s  mfd->cont_splash_done =%d,%d \n ",__func__,mfd->cont_splash_done,__LINE__);
+#if 1
+//hxh: add for continue
+	if (!(mfd->cont_splash_done)) {
+		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+		MDP_OUTP(MDP_BASE + timer_base, 0);
+	}
+//hxh: add end
+#endif
 
 	/* DMA register config */
 
@@ -329,32 +339,15 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		MDP_OUTP(MDP_BASE + timer_base + 0x38, active_v_end);
 	}
 
-#ifdef CONFIG_HUAWEI_KERNEL
-	ret = 0;
-    lcdtype = get_lcd_panel_type();
-	if( (LCD_HX8357C_TIANMA_HVGA != lcdtype )&&(LCD_HX8357B_TIANMA_HVGA != lcdtype ))
-	{
-		ret = panel_next_on(pdev);
-	}
-#else
-	ret = panel_next_on(pdev);
-#endif
-	if (ret == 0) {
+	//ret = panel_next_on(pdev); // luke: modify
+	//if (ret == 0) {
 		/* enable LCDC block */
 		MDP_OUTP(MDP_BASE + timer_base, 1);
 		mdp_pipe_ctrl(block, MDP_BLOCK_POWER_ON, FALSE);
-	}
+	//}
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
-#ifdef CONFIG_HUAWEI_KERNEL
-	/*need to send 2 frame pclk data before sending sleep out command*/
-	if( (LCD_HX8357C_TIANMA_HVGA == lcdtype )||(LCD_HX8357B_TIANMA_HVGA == lcdtype ))
-	{
-		msleep(50);
-		ret = panel_next_on(pdev);
-	}
-#endif
 /* delete some line */
 
 	if (!vsync_cntrl.sysfs_created) {
@@ -391,19 +384,18 @@ int mdp_lcdc_off(struct platform_device *pdev)
 #endif
 
 /*still need to send 2 frame data after sending sleep in command*/
-#ifdef CONFIG_HUAWEI_KERNEL
-	ret = panel_next_off(pdev);
-#endif
+
     down(&mfd->dma->mutex);
 	/* MDP cmd block enable */
+        ret = panel_next_off(pdev); // add by luke
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	MDP_OUTP(MDP_BASE + timer_base, 0);
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	mdp_pipe_ctrl(block, MDP_BLOCK_POWER_OFF, FALSE);
-#ifndef CONFIG_HUAWEI_KERNEL
-	ret = panel_next_off(pdev);
-#endif
+
+	//ret = panel_next_off(pdev);
+
 	up(&mfd->dma->mutex);
 	atomic_set(&vsync_cntrl.suspend, 1);
 	atomic_set(&vsync_cntrl.vsync_resume, 0);

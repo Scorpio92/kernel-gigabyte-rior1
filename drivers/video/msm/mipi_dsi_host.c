@@ -1463,7 +1463,7 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 {
 
 	unsigned long flags;
-    lcd_panel_type panel_type = get_lcd_panel_type();
+    //lcd_panel_type panel_type = get_lcd_panel_type();
 
 #ifdef DSI_HOST_DEBUG
 	int i;
@@ -1499,23 +1499,8 @@ int mipi_dsi_cmd_dma_tx(struct dsi_buf *tp)
 	MIPI_OUTP(MIPI_DSI_BASE + 0x08c, 0x01);	/* trigger */
 	wmb();
 	spin_unlock_irqrestore(&dsi_mdp_lock, flags);
-
-	/* remove otm8009a panel */
-	/* remove hx8369a panel */
-    /* judge the panel type */
-    if( ((MIPI_CMD_OTM8009A_CHIMEI_WVGA == panel_type) && LCD_OTM8009A_CMI_ESD_SIGN)
-        || (MIPI_CMD_NT35510_BOE_FWVGA == panel_type)
-        || (MIPI_CMD_NT35510_BOE_WVGA == panel_type)
-        || (MIPI_CMD_NT35510_CHIMEI_WVGA == panel_type)
-        ||(MIPI_CMD_OTM8009A_CHIMEI_WVGA == panel_type))
-    {
-        /* set the time out. thread will go on beyond the time restriction */
-        wait_for_completion_timeout(&dsi_dma_comp,HZ/10);
-    }
-    else
-    {        
+      
         wait_for_completion(&dsi_dma_comp);
-    }
 
 	dma_unmap_single(&dsi_dev, tp->dmap, tp->len, DMA_TO_DEVICE);
 	tp->dmap = 0;

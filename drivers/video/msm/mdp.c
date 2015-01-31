@@ -1831,7 +1831,7 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 		}
 	}
 
-	if (mdp_rev >= MDP_REV_30) {
+	//if (mdp_rev >= MDP_REV_30) {
 		/* Only DMA_P histogram exists for this MDP rev*/
 		if (mdp_interrupt & MDP_HIST_DONE) {
 			ret = mdp_histogram_block2mgmt(MDP_BLOCK_DMA_P, &mgmt);
@@ -1900,7 +1900,7 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 									TRUE);
 			complete(&dma->comp);
 		}
-	}
+	//}
 
 	/* DMA2 LCD-Out Complete */
 	if (mdp_interrupt & MDP_DMA_P_DONE) {
@@ -1923,9 +1923,9 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 #else
 		if (mdp_prim_panel_type == MIPI_CMD_PANEL) {
 			dma = &dma2_data;
-			spin_lock_irqsave(&mdp_spin_lock, flag);
+			//spin_lock_irqsave(&mdp_spin_lock, flag);
 			dma->busy = FALSE;
-			spin_unlock_irqrestore(&mdp_spin_lock, flag);
+			//spin_unlock_irqrestore(&mdp_spin_lock, flag);
 			mdp_pipe_ctrl(MDP_DMA2_BLOCK, MDP_BLOCK_POWER_OFF,
 				TRUE);
 			mdp_disable_irq_nosync(MDP_DMA2_TERM);
