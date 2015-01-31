@@ -232,4 +232,13 @@ struct gpio_led_platform_data {
 struct platform_device *gpio_led_register_device(
 		int id, const struct gpio_led_platform_data *pdata);
 
+//Start===Allen
+enum{
+        KEY_LED_USER_BUTTON,
+        KEY_LED_USER_CIT,
+        KEY_LED_USER_LCD,
+};
+void keyboard_led_light(int user, unsigned int on);
+//End===Allen
+
 #endif		/* __LINUX_LEDS_H_INCLUDED */
