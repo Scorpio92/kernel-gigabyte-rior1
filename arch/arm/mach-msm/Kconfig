@@ -1503,6 +1503,12 @@ config MSM_SMD_DEBUG
 	  Support for debugging the SMD for communication
 	  between the ARM9 and ARM11
 
+config MSM_FAST_BOOT
+	default n
+	bool "MSM fast power on support"
+	help
+	  Enable the fast power on support in MSM platform.
+
 config MSM_SDIO_AL
 	depends on ((ARCH_MSM7X30 || MACH_MSM8X60_FUSN_FFA || MACH_TYPE_MSM8X60_FUSION) && HAS_WAKELOCK)
 	default y
