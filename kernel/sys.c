@@ -126,7 +126,7 @@ struct pid *cad_pid;
 EXPORT_SYMBOL(cad_pid);
 
 /* power key detect solution for ANR */
-void del_power_key_timer(void);
+//void del_power_key_timer(void);
 
 /*
  * If set, this is used for preparing the system to power off.
@@ -515,7 +515,7 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 	int ret = 0;
 
     /* power key detect solution for ANR */
-    del_power_key_timer();
+    //del_power_key_timer();
 
 
     DBG("SYSCALL_DEFINE4  power off debug begin");

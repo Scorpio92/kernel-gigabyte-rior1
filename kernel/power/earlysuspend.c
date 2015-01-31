@@ -39,7 +39,7 @@ void set_up_threshold(int screen_on);
 #endif
 
 /* power key detect solution for ANR */
-void del_power_key_timer(void);
+//void del_power_key_timer(void);
 
 static DEFINE_MUTEX(early_suspend_lock);
 static LIST_HEAD(early_suspend_handlers);
@@ -128,7 +128,7 @@ abort:
 	spin_unlock_irqrestore(&state_lock, irqflags);
 
 	/* power key detect solution for ANR */
-	del_power_key_timer();
+	//del_power_key_timer();
 
 }
 
@@ -173,7 +173,7 @@ abort:
 	mutex_unlock(&early_suspend_lock);
 
 	/* power key detect solution for ANR */
-	del_power_key_timer();
+	//del_power_key_timer();
 
 }
 
