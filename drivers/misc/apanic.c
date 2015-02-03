@@ -288,7 +288,7 @@ static int apanic_proc_read(char *buffer, char **start, off_t offset,
 		mutex_unlock(&drv_mutex);
 		return -EINVAL;
 	}
-	rc = ctx->mtd->read(ctx->mtd,
+	rc = ctx->mtd->_read(ctx->mtd,
 		phy_offset(ctx->mtd, (page_no * ctx->mtd->writesize)),
 		ctx->mtd->writesize,
 		&len, ctx->bounce);
@@ -333,7 +333,7 @@ static void mtd_panic_erase(void)
 			continue;
 		}
 
-		rc = ctx->mtd->erase(ctx->mtd, &erase);
+		rc = ctx->mtd->_erase(ctx->mtd, &erase);
 		if (rc) {
 			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&wait_q, &wait);
@@ -342,7 +342,7 @@ static void mtd_panic_erase(void)
 			       (unsigned long long) erase.addr,
 			       (unsigned long long) erase.len);
 			if (rc == -EIO) {
-				if (ctx->mtd->block_markbad(ctx->mtd,
+				if (ctx->mtd->_block_markbad(ctx->mtd,
 							    erase.addr)) {
 					printk(KERN_ERR
 					       "apanic: Err marking blk bad\n");
@@ -469,7 +469,7 @@ static void mtd_panic_notify_add(struct mtd_info *mtd)
 		goto out_err;
 	}
 
-	rc = mtd->read(mtd, phy_offset(mtd, 0), mtd->writesize,
+	rc = mtd->_read(mtd, phy_offset(mtd, 0), mtd->writesize,
 			&len, ctx->bounce);
 	if (rc && rc == -EBADMSG) {
 		printk(KERN_WARNING
@@ -584,10 +584,10 @@ static int apanic_writeflashpage(struct mtd_info *mtd, loff_t to,
 	size_t wlen;
 	int panic = in_interrupt() | in_atomic();
 
-	if (panic && !mtd->panic_write) {
+	if (panic && !mtd->_panic_write) {
 		printk(KERN_EMERG "%s: No panic_write available\n", __func__);
 		return 0;
-	} else if (!panic && !mtd->write) {
+	} else if (!panic && !mtd->_write) {
 		printk(KERN_EMERG "%s: No write available\n", __func__);
 		return 0;
 	}
@@ -599,9 +599,9 @@ static int apanic_writeflashpage(struct mtd_info *mtd, loff_t to,
 	}
 
 	if (panic)
-		rc = mtd->panic_write(mtd, to, mtd->writesize, &wlen, buf);
+		rc = mtd->_panic_write(mtd, to, mtd->writesize, &wlen, buf);
 	else
-		rc = mtd->write(mtd, to, mtd->writesize, &wlen, buf);
+		rc = mtd->_write(mtd, to, mtd->writesize, &wlen, buf);
 
 	if (rc) {
 		printk(KERN_EMERG
@@ -901,7 +901,7 @@ static int apanic_meminfo_proc_get(void)
 /*
  * Modified by xiemingliang,20110810
  */
-static int apanic_stat_proc_get(void)
+/*static int apanic_stat_proc_get(void)
 {
 	int i, j;
 	unsigned long jif;
@@ -957,7 +957,7 @@ static int apanic_stat_proc_get(void)
 		(unsigned long long)cputime64_to_clock_t(guest));
 	for_each_online_cpu(i) {
 
-		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
+
 		user = kstat_cpu(i).cpustat.user;
 		nice = kstat_cpu(i).cpustat.nice;
 		system = kstat_cpu(i).cpustat.system;
@@ -983,7 +983,7 @@ static int apanic_stat_proc_get(void)
 	}
     data_end += sprintf(&data_buf[data_end],"intr %llu\n", (unsigned long long)sum);
 
-	/* sum again ? it could be updated? */
+
 	for_each_irq_nr(j) {
 		per_irq_sum = 0;
 		for_each_possible_cpu(i){
@@ -1014,7 +1014,7 @@ static int apanic_stat_proc_get(void)
     data_end += sprintf(&data_buf[data_end],"%s","\n");
 
 	return 0;
-}
+}*/
 /* ****************************************** */
 
 /*===============vmalloc info==================*/
@@ -1367,7 +1367,7 @@ static int apanic(struct notifier_block *this, unsigned long event,
    
     /* get data to buffer*/
     apanic_meminfo_proc_get();
-    apanic_stat_proc_get();
+    //apanic_stat_proc_get();
     apanic_zoneinfo_proc_get();
     apanic_vmstat_proc_get();
     apanic_vmalloc_proc_get();
