@@ -178,7 +178,7 @@ static int msm_get_sensor_info(
 	info.actuator_enabled = sdata->actuator_info ? 1 : 0;
 	info.strobe_flash_enabled = sdata->strobe_flash_data ? 1 : 0;
 	info.ispif_supported = mctl->ispif_sdev ? 1 : 0;
-	info.flip_and_mirror = ( HW_MIRROR_AND_FLIP == (get_hw_camera_mirror_type() & HW_MIRROR_AND_FLIP) )? 1 : 0;
+	//info.flip_and_mirror = ( HW_MIRROR_AND_FLIP == (get_hw_camera_mirror_type() & HW_MIRROR_AND_FLIP) )? 1 : 0;
 
 	/* copy back to user space */
 	if (copy_to_user((void *)arg,

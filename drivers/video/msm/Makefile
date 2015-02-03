@@ -80,8 +80,8 @@ obj-$(CONFIG_FB_HUAWEI_MDDI_NT35560) += mddi_nt35560.o
 obj-$(CONFIG_FB_HUAWEI_MDDI_RSP61408) += mddi_rsp61408.o
 obj-$(CONFIG_FB_HUAWEI_MDDI_HX8369A) += mddi_hx8369a.o
 obj-$(CONFIG_FB_HUAWEI_MDDI_HX8357C) += mddi_hx8357c.o
-obj-y += hw_backlight.o
-obj-y += hw_lcd_common.o
+#obj-y += hw_backlight.o
+#obj-y += hw_lcd_common.o
 obj-y += lcd_hw_debug.o
 
 # External MDDI
