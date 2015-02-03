@@ -120,9 +120,14 @@ CONFIG_DEBUG_PREEMPT=y +
 CONFIG_FRAME_POINTER=y ?
 CONFIG_SUPPORT_SYSTEMTAP=y +
 
-
-
-
+Кем выполнялись модификации:
+Allen (Allen Cheng)
+luke
+qiaoyongfeng
+fangxing
+by hxh
+xianglong
+daizhiyi
 
 
 
