@@ -77,24 +77,23 @@ obj-$(CONFIG_FB_MSM_MIPI_DSI_TOSHIBA) += mipi_toshiba.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_NOVATEK) += mipi_novatek.o
 #obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE) += mipi_orise.o 
                         
-obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE_OTM8009A) += mipi_orise_otm8009a.o 
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TCL_NT35510) += mipi_nt35510_tcl.o  
-obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE_OTM9608A) += mipi_orise_otm9608a.o 
-obj-$(CONFIG_FB_MSM_MIPI_DSI_DNJ_ORISE_OTM9608A) += mipi_dnj_orise_otm9608a.o 
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY_ORISE_OTM9608A) += mipi_truly_orise_otm9608a.o ####
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY_IPS_NT35516) += mipi_truly_ips_nt35516.o  
+
+
+
+
+
+
 obj-$(CONFIG_FB_MSM_MIPI_DSI_RENESAS) += mipi_renesas.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY) += mipi_truly.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_HIMAX) += mipi_himax.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_NT35510) += mipi_NT35510.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_NT35510_ALASKA) += mipi_NT35510_alaska.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_NT35516) += mipi_truly_tft540960_1_e.o
+
+
+
 obj-$(CONFIG_FB_MSM_MIPI_DSI_SIMULATOR) += mipi_simulator.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_DIJING_IPS_NT35516) += mipi_dijing_ips_nt35516.o  
-obj-$(CONFIG_FB_MSM_MIPI_DSI_DJN_OTM8018B) += mipi_djn_otm8018b.o 
-obj-$(CONFIG_FB_MSM_MIPI_DSI_AZET_OTM8018B) += mipi_azet_otm8018b.o 
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY_OTM8018B) += mipi_truly_otm8018b.o 
-obj-$(CONFIG_FB_MSM_MIPI_DSI_AZET_NT35510) += mipi_azet_nt35510.o
+
+ 
+
+
+
 # MIPI Bridge
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TC358764_DSI2LVDS) += mipi_tc358764_dsi2lvds.o
 
@@ -133,62 +132,55 @@ endif
 ifeq ($(CONFIG_FB_MSM_MIPI_PANEL_DETECT),y)
 obj-y += mipi_toshiba_video_wvga_pt.o mipi_toshiba_video_wsvga_pt.o mipi_toshiba_video_wuxga.o
 obj-y += mipi_novatek_video_qhd_pt.o mipi_novatek_cmd_qhd_pt.o
-obj-y += mipi_orise_video_720p_pt.o mipi_orise_cmd_720p_pt.o
 
-obj-y += mipi_orise_otm8009a_wvga_pt.o
-obj-y += mipi_nt35510_tcl_cmd_wvga_pt.o
-obj-y += mipi_truly_nt35516_qhd_ips.o 
-obj-y += mipi_orise_otm9608a_qhd_pt.o
-obj-y += mipi_dnj_orise_otm9608a_qhd_pt.o
-obj-y += mipi_truly_orise_otm9608a_qhd_pt.o  ####
-obj-y += mipi_dijing_nt35516_qhd_ips.o 
+
+
+
+
+
+
 #obj-y += mipi_djn_otm8018b_cmd_wvga_pt.o 
-obj-y += mipi_djn_otm8018b_video_wvga_pt.o
-obj-y += mipi_azet_otm8018b_video_wvga_pt.o
-obj-y += mipi_truly_otm8018b_video_wvga_pt.o
-#obj-y += mipi_orise_otm9608a_video_qhd_pt.o
-obj-y += mipi_azet_nt35510_cmd_wvga_pt.o
+
+
+
 obj-y += mipi_renesas_video_fwvga_pt.o mipi_renesas_cmd_fwvga_pt.o
-obj-y += mipi_NT35510_video_wvga_pt.o mipi_NT35510_cmd_wvga_pt.o
-obj-y += mipi_NT35510_alaska_video_wvga_pt.o mipi_NT35510_alaska_cmd_wvga_pt.o
-obj-y += mipi_truly_tft540960_1_e_video_qhd_pt.o mipi_truly_tft540960_1_e_cmd_qhd_pt.o
+
+
+
 obj-y += mipi_chimei_wxga_pt.o
 obj-y += mipi_chimei_wuxga.o
 obj-y += mipi_truly_video_wvga_pt.o
-obj-y += mipi_himax_video_wvga_pt.o
+
 else
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT) += mipi_toshiba_video_wvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT) += mipi_toshiba_video_wsvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA) += mipi_toshiba_video_wuxga.o
 obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_VIDEO_QHD_PT) += mipi_novatek_video_qhd_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_ORISE_VIDEO_720P_PT) += mipi_orise_video_720p_pt.o
+
 obj-$(CONFIG_FB_MSM_MIPI_ORISE_CMD_720P_PT) += mipi_orise_cmd_720p_pt.o
 
-obj-$(CONFIG_FB_MSM_MIPI_ORISE_CMD_OTM8009A_PT) += mipi_orise_otm8009a_wvga_pt.o;
-obj-$(CONFIG_FB_MSM_MIPI_NT35510_TCL_PT) += mipi_nt35510_tcl_cmd_wvga_pt.o;
-obj-$(CONFIG_FB_MSM_MIPI_TRULY_IPS_CMD_NT35516_PT) += mipi_truly_nt35516_qhd_ips.o; 
-obj-$(CONFIG_FB_MSM_MIPI_ORISE_CMD_OTM9608A_PT) += mipi_orise_otm9608a_qhd_pt.o;
-obj-$(CONFIG_FB_MSM_MIPI_DNJ_ORISE_CMD_OTM9608A_PT) += mipi_dnj_orise_otm9608a_qhd_pt.o;
-obj-$(CONFIG_FB_MSM_MIPI_TRULY_ORISE_CMD_OTM9608A_PT) += mipi_truly_orise_otm9608a_qhd_pt.o; ####
-obj-$(CONFIG_FB_MSM_MIPI_DIJING_IPS_CMD_NT35516_PT) += mipi_dijing_nt35516_qhd_ips.o; 
-#obj-$(CONFIG_FB_MSM_MIPI_ORISE_CMD_OTM9608A_PT) += mipi_orise_otm9608a_video_qhd_pt.o;
+
+
+
+
+
+
+
+
 #obj-$(CONFIG_FB_MSM_MIPI_DSI_DJN_OTM8018B_CMD_WVGA_PT) += mipi_djn_otm8018b_cmd_wvga_pt.o;
-obj-$(CONFIG_FB_MSM_MIPI_DSI_DJN_OTM8018B_CMD_WVGA_PT) +=mipi_djn_otm8018b_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_AZET_OTM8018B_VIDEO_WVGA_PT) +=mipi_azet_otm8018b_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY_OTM8018B_VIDEO_WVGA_PT) +=mipi_truly_otm8018b_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_AZET_NT35510_CMD_WVGA_PT) +=mipi_azet_nt35510_cmd_wvga_pt.o
+
+
+
+
 obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_CMD_QHD_PT) += mipi_novatek_cmd_qhd_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_RENESAS_VIDEO_FWVGA_PT) += mipi_renesas_video_fwvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_RENESAS_CMD_FWVGA_PT) += mipi_renesas_cmd_fwvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_RENESAS_VIDEO_FWVGA_PT) += mipi_renesas_video_fwvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TRULY_VIDEO_WVGA_PT) += mipi_truly_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_HIMAX_VIDEO_WVGA_PT) += mipi_himax_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NT35510_CMD_WVGA_PT) += mipi_NT35510_cmd_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NT35510_VIDEO_WVGA_PT) += mipi_NT35510_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NT35510_ALASKA_CMD_PT) += mipi_NT35510_alaska_cmd_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NT35510_ALASKA_VIDEO_PT) += mipi_NT35510_alaska_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NT35516_CMD_QHD_PT) += mipi_truly_tft540960_1_e_cmd_qhd_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_NT35516_VIDEO_QHD_PT) += mipi_truly_tft540960_1_e_video_qhd_pt.o
+
+
+
+
 obj-$(CONFIG_FB_MSM_MIPI_SIMULATOR_VIDEO) += mipi_simulator_video.o
 obj-$(CONFIG_FB_MSM_MIPI_CHIMEI_WXGA) += mipi_chimei_wxga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_CHIMEI_WUXGA) += mipi_chimei_wuxga.o
@@ -215,12 +207,11 @@ obj-$(CONFIG_FB_MSM_LVDS_CHIMEI_WXGA) += lvds_chimei_wxga.o
 obj-$(CONFIG_FB_MSM_HDMI_MSM_PANEL) += hdmi_msm.o
 obj-$(CONFIG_FB_MSM_EXT_INTERFACE_COMMON) += external_common.o
 obj-$(CONFIG_FB_MSM_LCDC_TRULY_HVGA_IPS3P2335) += lcdc_truly_ips3p2335.o
-obj-$(CONFIG_FB_MSM_LCDC_HX8369_WVGA_PT) += lcdc_hx8369_wvga_pt.o
-obj-$(CONFIG_FB_MSM_LCDC_DNJ_WVGA_PT) += lcdc_dnj_wvga_pt.o
-obj-$(CONFIG_FB_MSM_LCDC_DNJ_OTM8018B_WVGA_PT) += lcdc_dnj_otm8018b_wvga_pt.o 
+
+
 obj-$(CONFIG_FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS) += lcdc_dnj_otm8018b_wvga_ips.o
 obj-$(CONFIG_FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_SECOND) +=lcdc_dnj_otm8018b_wvga_ips_2.o
-obj-$(CONFIG_FB_MSM_LCDC_AZET_NT35510_WVGA_PT) += lcdc_azet_nt35510_wvga_pt.o 
+
 obj-$(CONFIG_FB_MSM_TVOUT) += tvout_msm.o
 
 ccflags-y := -I$(src)/mhl
