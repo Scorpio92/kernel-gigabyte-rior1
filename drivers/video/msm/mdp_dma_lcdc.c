@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2009, 2012 Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2009, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,8 +50,9 @@ extern uint32 mdp_intr_mask;
 
 int first_pixel_start_x;
 int first_pixel_start_y;
+static bool firstupdate = TRUE;			////LCD_LUYA_20100610_01
 
-static ssize_t vsync_show_event(struct device *dev,
+ssize_t mdp_dma_lcdc_show_event(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
@@ -68,15 +69,6 @@ static ssize_t vsync_show_event(struct device *dev,
 	buf[strlen(buf) + 1] = '\0';
 	return ret;
 }
-
-static DEVICE_ATTR(vsync_event, S_IRUGO, vsync_show_event, NULL);
-static struct attribute *vsync_fs_attrs[] = {
-	&dev_attr_vsync_event.attr,
-	NULL,
-};
-static struct attribute_group vsync_fs_attr_group = {
-	.attrs = vsync_fs_attrs,
-};
 
 int mdp_lcdc_on(struct platform_device *pdev)
 {
@@ -132,8 +124,8 @@ int mdp_lcdc_on(struct platform_device *pdev)
 
 	fbi = mfd->fbi;
 	var = &fbi->var;
-    vsync_cntrl.dev = mfd->fbi->dev;
-    atomic_set(&vsync_cntrl.suspend, 0);
+	vsync_cntrl.dev = mfd->fbi->dev;
+	atomic_set(&vsync_cntrl.suspend, 0);
 
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
@@ -180,15 +172,7 @@ int mdp_lcdc_on(struct platform_device *pdev)
 		       mfd->panel_info.bpp);
 		return -ENODEV;
 	}
-printk("luke:%s  mfd->cont_splash_done =%d,%d \n ",__func__,mfd->cont_splash_done,__LINE__);
-#if 1
-//hxh: add for continue
-	if (!(mfd->cont_splash_done)) {
-		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-		MDP_OUTP(MDP_BASE + timer_base, 0);
-	}
-//hxh: add end
-#endif
+
 	/* DMA register config */
 
 	dma_base = DMA_P_BASE;
@@ -199,7 +183,7 @@ printk("luke:%s  mfd->cont_splash_done =%d,%d \n ",__func__,mfd->cont_splash_don
 #endif
 
 	/* starting address */
-	MDP_OUTP(MDP_BASE + dma_base + 0x8, (uint32) buf);
+//	MDP_OUTP(MDP_BASE + dma_base + 0x8, (uint32) buf);
 	/* active window width and height */
 	MDP_OUTP(MDP_BASE + dma_base + 0x4, ((fbi->var.yres) << 16) |
 						(fbi->var.xres));
@@ -313,29 +297,14 @@ printk("luke:%s  mfd->cont_splash_done =%d,%d \n ",__func__,mfd->cont_splash_don
 		MDP_OUTP(MDP_BASE + timer_base + 0x38, active_v_end);
 	}
 
-	//ret = panel_next_on(pdev); // luke: modify
-	//if (ret == 0) {
+	ret = panel_next_on(pdev);
+	if (ret == 0) {
 		/* enable LCDC block */
 		MDP_OUTP(MDP_BASE + timer_base, 1);
 		mdp_pipe_ctrl(block, MDP_BLOCK_POWER_ON, FALSE);
-	//}
+	}
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-        ret = panel_next_on(pdev);   //luke:  
-
-    if (!vsync_cntrl.sysfs_created) {
-		ret = sysfs_create_group(&vsync_cntrl.dev->kobj,
-			&vsync_fs_attr_group);
-		if (ret) {
-			pr_err("%s: sysfs creation failed, ret=%d\n",
-				__func__, ret);
-			return ret;
-		}
-
-		kobject_uevent(&vsync_cntrl.dev->kobj, KOBJ_ADD);
-		pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
-		vsync_cntrl.sysfs_created = 1;
-	}
 
 	return ret;
 }
@@ -356,41 +325,40 @@ int mdp_lcdc_off(struct platform_device *pdev)
 	}
 #endif
 
-	down(&mfd->dma->mutex);
 	/* MDP cmd block enable */
-        ret = panel_next_off(pdev); // add by luke
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	MDP_OUTP(MDP_BASE + timer_base, 0);
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	mdp_pipe_ctrl(block, MDP_BLOCK_POWER_OFF, FALSE);
 
-	/* delay to make sure the last frame finishes */
-	msleep(16);
-	//ret = panel_next_off(pdev); //del by luke
-	up(&mfd->dma->mutex);
-
+	ret = panel_next_off(pdev);
 	atomic_set(&vsync_cntrl.suspend, 1);
 	atomic_set(&vsync_cntrl.vsync_resume, 0);
 	complete_all(&vsync_cntrl.vsync_wait);
+
+	/* delay to make sure the last frame finishes */
+	msleep(16);
 
 	return ret;
 }
 
 void mdp_dma_lcdc_vsync_ctrl(int enable)
 {
-    unsigned long flag;
-    int disabled_clocks;
+	unsigned long flag;
+	int disabled_clocks;
 	if (vsync_cntrl.vsync_irq_enabled == enable)
 		return;
-    spin_lock_irqsave(&mdp_spin_lock, flag);
-    if (!enable)
-    INIT_COMPLETION(vsync_cntrl.vsync_wait);
+
+	spin_lock_irqsave(&mdp_spin_lock, flag);
+	if (!enable)
+		INIT_COMPLETION(vsync_cntrl.vsync_wait);
+
 	vsync_cntrl.vsync_irq_enabled = enable;
-    if (!enable)
+	if (!enable)
 		vsync_cntrl.disabled_clocks = 0;
 	disabled_clocks = vsync_cntrl.disabled_clocks;
-    spin_unlock_irqrestore(&mdp_spin_lock, flag);
+	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
 	if (enable && disabled_clocks) {
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
@@ -401,9 +369,10 @@ void mdp_dma_lcdc_vsync_ctrl(int enable)
 		mdp_enable_irq(MDP_VSYNC_TERM);
 		spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	}
-    if (vsync_cntrl.vsync_irq_enabled &&
-    atomic_read(&vsync_cntrl.suspend) == 0)
-    atomic_set(&vsync_cntrl.vsync_resume, 1);
+
+	if (vsync_cntrl.vsync_irq_enabled &&
+		atomic_read(&vsync_cntrl.suspend) == 0)
+		atomic_set(&vsync_cntrl.vsync_resume, 1);
 }
 
 void mdp_lcdc_update(struct msm_fb_data_type *mfd)
@@ -421,7 +390,6 @@ void mdp_lcdc_update(struct msm_fb_data_type *mfd)
 	if (!mfd->panel_power_on)
 		return;
 
-	down(&mfd->dma->mutex);
 	/* no need to power on cmd block since it's lcdc mode */
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
@@ -437,9 +405,16 @@ void mdp_lcdc_update(struct msm_fb_data_type *mfd)
 		dma_base = DMA_E_BASE;
 	}
 #endif
+	if(firstupdate)			/////LCD_LUYA_20100610_01
+	{
+		firstupdate = FALSE;
 
+	}
+	else
+	{
 	/* starting address */
 	MDP_OUTP(MDP_BASE + dma_base + 0x8, (uint32) buf);
+	}
 
 	/* enable LCDC irq */
 	spin_lock_irqsave(&mdp_spin_lock, flag);
@@ -458,5 +433,4 @@ void mdp_lcdc_update(struct msm_fb_data_type *mfd)
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 	wait_for_completion_killable(&mfd->dma->comp);
 	mdp_disable_irq(irq_block);
-	up(&mfd->dma->mutex);
 }

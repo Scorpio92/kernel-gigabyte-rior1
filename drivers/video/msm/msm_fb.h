@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,6 +23,7 @@
 #include "linux/proc_fs.h"
 
 #include <mach/hardware.h>
+#include <mach/msm_subsystem_map.h>
 #include <linux/io.h>
 #include <mach/board.h>
 
@@ -54,6 +55,71 @@ extern struct wake_lock mdp_idle_wakelock;
 #define MFD_KEY  0x11161126
 #define MSM_FB_MAX_DEV_LIST 32
 
+
+/********************************
+LCD_PANEL_ID   ZTE_LCD_LHT_20100611_001
+********************************/
+typedef enum {
+	LCD_PANEL_NOPANEL,
+	LCD_PANEL_P726_ILI9325C,
+	LCD_PANEL_P726_HX8347D,
+	LCD_PANEL_P726_S6D04M0X01,
+	LCD_PANEL_P722_HX8352A		=10,
+	LCD_PANEL_P727_HX8352A		=20,
+	LCD_PANEL_R750_ILI9481_1	=30,
+	LCD_PANEL_R750_ILI9481_2,
+	LCD_PANEL_R750_ILI9481_3,
+	LCD_PANEL_P729_TL2796		=40,
+	LCD_PANEL_P729_TFT_TRULY,
+	LCD_PANEL_P729_TFT_LEAD,
+	LCD_PANEL_P729_TFT_LEAD_CMI,
+	LCD_PANEL_P729_TFT_TRULY_LG,
+	LCD_PANEL_P729_TFT_LEAD_CASIO,
+	LCD_PANEL_V9_NT39416I		=50,
+	LCD_PANEL_4P3_NT35510		=60,
+	LCD_PANEL_4P3_HX8369A,
+	LCD_PANEL_3P8_NT35510_1		=70,
+	LCD_PANEL_3P8_NT35510_2,
+	LCD_PANEL_3P8_HX8363A,
+	LCD_PANEL_3P5_ILI9481_1		=80,
+	LCD_PANEL_3P5_ILI9481_2,
+	LCD_PANEL_3P5_R61581,
+	LCD_PANEL_2P6_HX8368A_1		=90,
+	LCD_PANEL_2P6_HX8368A_2,
+	LCD_PANEL_3P5_HX8369_LG		=100,
+	LCD_PANEL_3P5_HX8369_HYDIS,
+	LCD_PANEL_4P0_NT35510_HYDIS_YUSHUN		=200,
+	LCD_PANEL_4P0_HX8369_LG_TRULY,
+	LCD_PANEL_4P0_HX8369_LG_LEAD,
+	LCD_PANEL_4P0_NT35510_LEAD,
+	LCD_PANEL_3P5_N766_R61581_TRULY,
+	LCD_PANEL_3P5_N766_R61581_TRULY_VER2,
+	LCD_PANEL_3P5_N766_R61581_BOE,
+	LCD_PANEL_4P0_HX8363_CMI_YASSY,
+	LCD_PANEL_3P5_N766_HX8357C_LEAD,
+
+
+	LCD_PANEL_4P0_HIMAX8369_TIANMA_TN,
+	LCD_PANEL_4P0_HIMAX8369_TIANMA_IPS,
+	LCD_PANEL_4P0_HIMAX8369_LEAD,
+	LCD_PANEL_4P0_HIMAX8369_LEAD_HANNSTAR,
+	LCD_PANEL_4P0_R61408_TRULY_LG,
+	LCD_PANEL_3P95_HX8357_BOE_BOE		=250,
+	LCD_PANEL_3P95_HX8357_TIANMA_TIANMA,
+	LCD_PANEL_3P95_HX8357_IVO_YUSHUN,
+	LCD_PANEL_3P95_HX8357_HANSTAR_LEAD,
+	LCD_PANEL_4P0_HX8363_IVO_YUSHUN,
+	
+	//< 2012/6/8-P752T10_add_new_lcd_config-lizhiye- < short commond here >
+	LCD_PANEL_3P5_ILI9486_YUSHUN		=260,	
+	LCD_PANEL_3P5_HX8357_TRULY,	
+	LCD_PANEL_3P5_HX8357_LEAD,
+	LCD_PANEL_3P5_HX8357_BOE,
+	//>2012/6/8-P752T10_add_new_lcd_config-lizhiye
+	
+	LCD_PANEL_MAX
+} LCD_PANEL_ID;
+
 struct disp_info_type_suspend {
 	boolean op_enable;
 	boolean sw_refreshing_enable;
@@ -83,7 +149,7 @@ struct msm_fb_data_type {
 	DISP_TARGET dest;
 	struct fb_info *fbi;
 
-    struct device *dev;
+	struct device *dev;
 	boolean op_enable;
 	uint32 fb_imgType;
 	boolean sw_currently_refreshing;
@@ -129,6 +195,7 @@ struct msm_fb_data_type {
 	__u32 channel_irq;
 
 	struct mdp_dma_data *dma;
+	struct device_attribute dev_attr;
 	void (*dma_fnc) (struct msm_fb_data_type *mfd);
 	int (*cursor_update) (struct fb_info *info,
 			      struct fb_cursor *cursor);
@@ -136,9 +203,9 @@ struct msm_fb_data_type {
 			      struct fb_cmap *cmap);
 	int (*do_histogram) (struct fb_info *info,
 			      struct mdp_histogram_data *hist);
-	int (*start_histogram) (struct mdp_histogram_start_req *req);
-	int (*stop_histogram) (struct fb_info *info, uint32_t block);
-    void (*vsync_ctrl) (int enable);
+	void (*vsync_ctrl) (int enable);
+	void (*vsync_init) (int cndx);
+	void *vsync_show;
 	void *cursor_buf;
 	void *cursor_buf_phys;
 
@@ -180,8 +247,7 @@ struct msm_fb_data_type {
 	struct list_head writeback_register_queue;
 	wait_queue_head_t wait_q;
 	struct ion_client *iclient;
-	unsigned long display_iova;
-	unsigned long rotator_iova;
+	struct msm_mapped_buffer *map_buffer;
 	struct mdp_buf_type *ov0_wb_buf;
 	struct mdp_buf_type *ov1_wb_buf;
 	u32 ov_start;
@@ -190,14 +256,15 @@ struct msm_fb_data_type {
 	u32 use_ov0_blt, ov0_blt_state;
 	u32 use_ov1_blt, ov1_blt_state;
 	u32 writeback_state;
-	bool writeback_active_cnt;
 	int cont_splash_done;
+	int vsync_sysfs_created;
 };
 
 struct dentry *msm_fb_get_debugfs_root(void);
 void msm_fb_debugfs_file_create(struct dentry *root, const char *name,
 				u32 *var);
-void msm_fb_set_backlight(struct msm_fb_data_type *mfd, __u32 bkl_lvl);
+void msm_fb_set_backlight(struct msm_fb_data_type *mfd, __u32 bkl_lvl,
+				u32 save);
 
 struct platform_device *msm_fb_add_device(struct platform_device *pdev);
 struct fb_info *msm_fb_get_writeback_fb(void);
@@ -222,7 +289,8 @@ int msm_fb_check_frame_rate(struct msm_fb_data_type *mfd,
 				struct fb_info *info);
 
 #ifdef CONFIG_FB_MSM_LOGO
-#define INIT_IMAGE_FILE "/initlogo.rle"
-int load_565rle_image(char *filename, bool bf_supported);
+#define INIT_IMAGE_FILE "/logo.bmp"
+extern int load_565rle_image(char *filename);
 #endif
+
 #endif /* MSM_FB_H */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -313,13 +313,10 @@ void	mdp3_dsi_cmd_dma_busy_wait(struct msm_fb_data_type *mfd)
 	}
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
-	if (need_wait) {/* wait until DMA finishes the current job */
-printk("luke : %s    %d\n",__func__, __LINE__); 
-		//wait_for_completion(&mfd->dma->comp);            //3            // if block,  block here
-                wait_for_completion_timeout(&mfd->dma->comp, HZ/200);
-printk("luke : %s    %d\n",__func__, __LINE__);
+	if (need_wait) {
+		/* wait until DMA finishes the current job */
+		wait_for_completion(&mfd->dma->comp);
 	}
-              
 }
 #endif
 
@@ -547,8 +544,9 @@ void mdp_dma_vsync_ctrl(int enable)
 		return;
 
 	spin_lock_irqsave(&mdp_spin_lock, flag);
-    if (!enable)
+	if (!enable)
 		INIT_COMPLETION(vsync_cntrl.vsync_wait);
+
 	vsync_cntrl.vsync_irq_enabled = enable;
 	disabled_clocks = vsync_cntrl.disabled_clocks;
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
@@ -569,7 +567,7 @@ void mdp_dma_vsync_ctrl(int enable)
 		vsync_cntrl.disabled_clocks = 0;
 	}
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
-    if (vsync_cntrl.vsync_irq_enabled &&
+	if (vsync_cntrl.vsync_irq_enabled &&
 		atomic_read(&vsync_cntrl.suspend) == 0)
 		atomic_set(&vsync_cntrl.vsync_resume, 1);
 }
@@ -594,9 +592,8 @@ void mdp_set_dma_pan_info(struct fb_info *info, struct mdp_dirty_region *dirty,
 	down(&mfd->sem);
 
 	iBuf = &mfd->ibuf;
-
-	if (mfd->display_iova)
-		iBuf->buf = (uint8 *)mfd->display_iova;
+	if (mfd->map_buffer)
+		iBuf->buf = (uint8 *)mfd->map_buffer->iova[0];
 	else
 		iBuf->buf = (uint8 *) info->fix.smem_start;
 
