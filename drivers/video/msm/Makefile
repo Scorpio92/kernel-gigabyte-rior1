@@ -72,31 +72,6 @@ obj-$(CONFIG_FB_MSM_EXTMDDI) += msm_mddi_ext.o
 msm_mipi-objs := mipi_dsi.o mipi_dsi_host.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI) += msm_mipi.o
 
-# MIPI manufacture
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TOSHIBA) += mipi_toshiba.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_NOVATEK) += mipi_novatek.o
-#obj-$(CONFIG_FB_MSM_MIPI_DSI_ORISE) += mipi_orise.o 
-                        
-
-
-
-
-
-
-obj-$(CONFIG_FB_MSM_MIPI_DSI_RENESAS) += mipi_renesas.o
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY) += mipi_truly.o
-
-
-
-obj-$(CONFIG_FB_MSM_MIPI_DSI_SIMULATOR) += mipi_simulator.o
-
- 
-
-
-
-# MIPI Bridge
-obj-$(CONFIG_FB_MSM_MIPI_DSI_TC358764_DSI2LVDS) += mipi_tc358764_dsi2lvds.o
-
 # TVEnc
 obj-$(CONFIG_FB_MSM_TVOUT) += tvenc.o
 ifeq ($(CONFIG_FB_MSM_OVERLAY),y)
@@ -105,112 +80,8 @@ endif
 
 # MSM FB Panel
 obj-y += msm_fb_panel.o
-obj-$(CONFIG_FB_MSM_EBI2_TMD_QVGA_EPSON_QCIF) += ebi2_tmd20.o
-obj-$(CONFIG_FB_MSM_EBI2_TMD_QVGA_EPSON_QCIF) += ebi2_l2f.o
-
-ifeq ($(CONFIG_FB_MSM_MDDI_AUTO_DETECT),y)
-obj-y += mddi_prism.o
-obj-y += mddi_toshiba.o
-obj-y += mddi_toshiba_vga.o
-obj-y += mddi_toshiba_wvga_pt.o
-obj-y += mddi_toshiba_wvga.o
-obj-y += mddi_sharp.o
-obj-y += mddi_orise.o
-obj-y += mddi_quickvx.o
-else
-obj-$(CONFIG_FB_MSM_MDDI_PRISM_WVGA) += mddi_prism.o
-obj-$(CONFIG_FB_MSM_MDDI_TOSHIBA_COMMON) += mddi_toshiba.o
-obj-$(CONFIG_FB_MSM_MDDI_TOSHIBA_COMMON_VGA) += mddi_toshiba_vga.o
-obj-$(CONFIG_FB_MSM_MDDI_TOSHIBA_WVGA_PORTRAIT) += mddi_toshiba_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MDDI_TOSHIBA_WVGA) += mddi_toshiba_wvga.o
-obj-$(CONFIG_FB_MSM_MDDI_SHARP_QVGA_128x128) += mddi_sharp.o
-obj-$(CONFIG_FB_MSM_MDDI_ORISE) += mddi_orise.o
-obj-$(CONFIG_FB_MSM_MDDI_QUICKVX) += mddi_quickvx.o
-endif
-
-
-ifeq ($(CONFIG_FB_MSM_MIPI_PANEL_DETECT),y)
-obj-y += mipi_toshiba_video_wvga_pt.o mipi_toshiba_video_wsvga_pt.o mipi_toshiba_video_wuxga.o
-obj-y += mipi_novatek_video_qhd_pt.o mipi_novatek_cmd_qhd_pt.o
-
-
-
-
-
-
-
-#obj-y += mipi_djn_otm8018b_cmd_wvga_pt.o 
-
-
-
-obj-y += mipi_renesas_video_fwvga_pt.o mipi_renesas_cmd_fwvga_pt.o
-
-
-
-obj-y += mipi_chimei_wxga_pt.o
-obj-y += mipi_chimei_wuxga.o
-obj-y += mipi_truly_video_wvga_pt.o
-
-else
-obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT) += mipi_toshiba_video_wvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT) += mipi_toshiba_video_wsvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA) += mipi_toshiba_video_wuxga.o
-obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_VIDEO_QHD_PT) += mipi_novatek_video_qhd_pt.o
-
-obj-$(CONFIG_FB_MSM_MIPI_ORISE_CMD_720P_PT) += mipi_orise_cmd_720p_pt.o
-
-
-
-
-
-
-
-
-
-#obj-$(CONFIG_FB_MSM_MIPI_DSI_DJN_OTM8018B_CMD_WVGA_PT) += mipi_djn_otm8018b_cmd_wvga_pt.o;
-
-
-
-
-obj-$(CONFIG_FB_MSM_MIPI_NOVATEK_CMD_QHD_PT) += mipi_novatek_cmd_qhd_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_RENESAS_VIDEO_FWVGA_PT) += mipi_renesas_video_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_RENESAS_CMD_FWVGA_PT) += mipi_renesas_cmd_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_RENESAS_VIDEO_FWVGA_PT) += mipi_renesas_video_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_TRULY_VIDEO_WVGA_PT) += mipi_truly_video_wvga_pt.o
-
-
-
-
-obj-$(CONFIG_FB_MSM_MIPI_SIMULATOR_VIDEO) += mipi_simulator_video.o
-obj-$(CONFIG_FB_MSM_MIPI_CHIMEI_WXGA) += mipi_chimei_wxga_pt.o
-obj-$(CONFIG_FB_MSM_MIPI_CHIMEI_WUXGA) += mipi_chimei_wuxga.o
-endif
-
-
-obj-$(CONFIG_FB_MSM_LCDC_PANEL) += lcdc_panel.o
-obj-$(CONFIG_FB_MSM_LCDC_PRISM_WVGA) += lcdc_prism.o
-obj-$(CONFIG_FB_MSM_LCDC_SAMSUNG_WSVGA) += lcdc_samsung_wsvga.o
-obj-$(CONFIG_FB_MSM_LCDC_CHIMEI_WXGA) += lcdc_chimei_wxga.o
-obj-$(CONFIG_FB_MSM_LCDC_NT35582_WVGA) += lcdc_nt35582_wvga.o
-obj-$(CONFIG_FB_MSM_LCDC_EXTERNAL_WXGA) += lcdc_external.o
-obj-$(CONFIG_FB_MSM_HDMI_SII_EXTERNAL_720P) += hdmi_sii9022.o
-obj-$(CONFIG_FB_MSM_LCDC_GORDON_VGA) += lcdc_gordon.o
-obj-$(CONFIG_FB_MSM_LCDC_WXGA) += lcdc_wxga.o
-obj-$(CONFIG_FB_MSM_LCDC_TOSHIBA_WVGA_PT) += lcdc_toshiba_wvga_pt.o
-obj-$(CONFIG_FB_MSM_LCDC_TOSHIBA_FWVGA_PT) += lcdc_toshiba_fwvga_pt.o
-obj-$(CONFIG_FB_MSM_LCDC_SHARP_WVGA_PT) += lcdc_sharp_wvga_pt.o
-obj-$(CONFIG_FB_MSM_LCDC_AUO_WVGA) += lcdc_auo_wvga.o
-obj-$(CONFIG_FB_MSM_LCDC_SAMSUNG_OLED_PT) += lcdc_samsung_oled_pt.o
-obj-$(CONFIG_FB_MSM_HDMI_ADV7520_PANEL) += adv7520.o
-obj-$(CONFIG_FB_MSM_LCDC_ST15_WXGA) += lcdc_st15.o
-obj-$(CONFIG_FB_MSM_LVDS_CHIMEI_WXGA) += lvds_chimei_wxga.o
-obj-$(CONFIG_FB_MSM_HDMI_MSM_PANEL) += hdmi_msm.o
-obj-$(CONFIG_FB_MSM_EXT_INTERFACE_COMMON) += external_common.o
-obj-$(CONFIG_FB_MSM_LCDC_TRULY_HVGA_IPS3P2335) += lcdc_truly_ips3p2335.o
-
 
 obj-$(CONFIG_FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS) += lcdc_dnj_otm8018b_wvga_ips.o
-obj-$(CONFIG_FB_MSM_LCDC_DNJ_OTM8018B_WVGA_IPS_SECOND) +=lcdc_dnj_otm8018b_wvga_ips_2.o
 
 obj-$(CONFIG_FB_MSM_TVOUT) += tvout_msm.o
 
