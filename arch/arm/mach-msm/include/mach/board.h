@@ -487,6 +487,8 @@ struct msm_panel_common_pdata {
 	int (*vga_switch)(int select_vga);
 	int *gpio_num;
 	u32 mdp_max_clk;
+	unsigned num_mdp_clk;
+	int *mdp_core_clk_table;
 #ifdef CONFIG_MSM_BUS_SCALING
 	struct msm_bus_scale_pdata *mdp_bus_scale_table;
 #endif

@@ -42,6 +42,8 @@ static unsigned long subsystem_to_domain_tbl[] = {
 	DISPLAY_WRITE_DOMAIN,
 	ROTATOR_SRC_DOMAIN,
 	ROTATOR_DST_DOMAIN,
+	DISPLAY_DOMAIN,
+	ROTATOR_DOMAIN,
 	0xFFFFFFFF
 };
 
