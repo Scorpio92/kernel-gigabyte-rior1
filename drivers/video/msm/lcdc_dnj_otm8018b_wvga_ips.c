@@ -597,11 +597,11 @@ static int lcdc_panel_on(struct platform_device *pdev)
 
 //luke: add for continue
 	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
-	if((lcdc_pdata->cont_splash_enabled)&&(!mfd->cont_splash_done)){
+	//if((lcdc_pdata->cont_splash_enabled)&&(!mfd->cont_splash_done)){
 		printk("luke: %s cont_splash_enabled! %d \n",__func__,__LINE__);
         	mfd->cont_splash_done = 1;
         	//return 0;
-	}
+	//}
 //luke: add end
 	if (lcdc_pdata->panel_config_gpio){
 		lcdc_pdata->panel_config_gpio(1);

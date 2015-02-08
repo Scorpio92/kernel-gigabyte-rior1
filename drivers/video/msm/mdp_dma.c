@@ -301,11 +301,8 @@ void	mdp3_dsi_cmd_dma_busy_wait(struct msm_fb_data_type *mfd)
 
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 #ifdef DSI_CLK_CTRL
-
-	spin_lock_bh(&dsi_clk_lock);
 	if (mipi_dsi_clk_on == 0)
 		mipi_dsi_turn_on_clks();
-	spin_unlock_bh(&dsi_clk_lock);
 #endif
 
 	if (mfd->dma->busy == TRUE) {
@@ -316,10 +313,13 @@ void	mdp3_dsi_cmd_dma_busy_wait(struct msm_fb_data_type *mfd)
 	}
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
-	if (need_wait) {
-		/* wait until DMA finishes the current job */
-		wait_for_completion(&mfd->dma->comp);
+	if (need_wait) {/* wait until DMA finishes the current job */
+printk("luke : %s    %d\n",__func__, __LINE__); 
+		//wait_for_completion(&mfd->dma->comp);            //3            // if block,  block here
+                wait_for_completion_timeout(&mfd->dma->comp, HZ/200);
+printk("luke : %s    %d\n",__func__, __LINE__);
 	}
+              
 }
 #endif
 
@@ -501,7 +501,6 @@ void mdp_dma2_update(struct msm_fb_data_type *mfd)
 		mfd->ibuf_flushed = TRUE;
 		mdp_dma2_update_lcd(mfd);
 
-		spin_lock_irqsave(&mdp_spin_lock, flag);
 		mdp_enable_irq(MDP_DMA2_TERM);
 		mfd->dma->busy = TRUE;
 		INIT_COMPLETION(mfd->dma->comp);
@@ -548,9 +547,8 @@ void mdp_dma_vsync_ctrl(int enable)
 		return;
 
 	spin_lock_irqsave(&mdp_spin_lock, flag);
-	if (!enable)
+    if (!enable)
 		INIT_COMPLETION(vsync_cntrl.vsync_wait);
-
 	vsync_cntrl.vsync_irq_enabled = enable;
 	disabled_clocks = vsync_cntrl.disabled_clocks;
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
@@ -571,7 +569,7 @@ void mdp_dma_vsync_ctrl(int enable)
 		vsync_cntrl.disabled_clocks = 0;
 	}
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
-	if (vsync_cntrl.vsync_irq_enabled &&
+    if (vsync_cntrl.vsync_irq_enabled &&
 		atomic_read(&vsync_cntrl.suspend) == 0)
 		atomic_set(&vsync_cntrl.vsync_resume, 1);
 }

@@ -24,15 +24,13 @@
 #include <linux/irq.h>
 #include <asm/system.h>
 
+//#include <splash.h>
+
 #define fb_width(fb)	((fb)->var.xres)
 #define fb_height(fb)	((fb)->var.yres)
-#ifndef CONFIG_HUAWEI_KERNEL
-/* for 565BMP format, 2 bytes per pixel */
 #define fb_size(fb)	((fb)->var.xres * (fb)->var.yres * 2)
-#else
-/* for 888BMP format, 3 bytes per pixel */
-#define fb_size(fb)	((fb)->var.xres * (fb)->var.yres * 3)
-#endif
+
+#define DEBUG
 
 static void memset16(void *_ptr, unsigned short val, unsigned count)
 {
@@ -99,97 +97,59 @@ int load_565rle_image(char *filename, bool bf_supported)
 		ptr += 2;
 		count -= 4;
 	}
-
 err_logo_free_data:
 	kfree(data);
 err_logo_close_file:
 	sys_close(fd);
+	return err;
+}
+#if 0
+// add by wangtao 
+static int display_RGB8888_logo(void)
+{
+    struct fb_info *info = registered_fb[0];
+    unsigned i = 0;
+    unsigned total_x = fb_width(info);
+    unsigned total_y = fb_height(info);
+    unsigned bytes_per_bpp = (info->var.bits_per_pixel / 8);
+    unsigned image_base = ((((total_y/2) - (SPLASH_IMAGE_WIDTH / 2) - 1) *
+			    (total_x)) + (total_x/2 - (SPLASH_IMAGE_HEIGHT / 2)));
+//printk("wangtao: %s======start ======  %d \n", __func__, __LINE__);
+    if (bytes_per_bpp == 4)
+    {
+        for (i = 0; i < SPLASH_IMAGE_WIDTH; i++)
+        {
+            memcpy (info->screen_base + ((image_base + (i * (total_x))) * bytes_per_bpp),
+		    imageBuffer_argb8888 + (i * SPLASH_IMAGE_HEIGHT * bytes_per_bpp),
+		    SPLASH_IMAGE_HEIGHT * bytes_per_bpp);
+	}
+    }
+//printk("wangtao: %s======end ======  %d \n", __func__, __LINE__);
+    return 0;
+}
+#endif
+
+
+int load_565rle_image(char *filename)
+{
+	struct fb_info *info;
+	unsigned bytes_per_bpp;
+	int err = 0;
+
+	info = registered_fb[0];
+	bytes_per_bpp = (info->var.bits_per_pixel / 8);
+
+	if(bytes_per_bpp == 2) {
+		err = __load_565rle_image(filename);
+	}
+	else if(bytes_per_bpp == 4) {
+		//err = display_RGB8888_logo();
+	}
+	else {
+		err = -EIO;
+	}
+
 	return err;
 }
 EXPORT_SYMBOL(load_565rle_image);
-
-
-#ifdef CONFIG_HUAWEI_KERNEL
-static void memset32(void *pDst, uint32_t Value, int Count)
-{
-	uint8_t *ptr = pDst, *endptr;
-	uint8_t w,x,y,z;
-
-	endptr = ptr+4*Count;
-	w = Value & 0xFF; x = (Value >> 8) & 0xFF; y = (Value >> 16) & 0xFF; z = (Value >> 24) & 0xFF;
-
-	while(ptr < endptr){
-		*ptr++ = w;
-		*ptr++ = x;
-		*ptr++ = y;
-		*ptr++ = z;
-	}
-}
-
-
-/* 888RLE image format: [count(4 bytes), rle(4 bytes)] */
-/* load 888rle image to fb */
-int load_888rle_image(char *filename)
-{
-	struct fb_info *info;
-	int fd, err = 0;
-	unsigned count, max;
-	unsigned *data, *bits, *ptr;
-
-	info = registered_fb[0];
-	if (!info) {
-		printk(KERN_WARNING "%s: Can not access framebuffer\n",
-			__func__);
-		return -ENODEV;
-	}
-
-	fd = sys_open(filename, O_RDONLY, 0);
-	if (fd < 0) {
-		printk(KERN_WARNING "%s: Can not open %s\n",
-			__func__, filename);
-		return -ENOENT;
-	}
-	count = (unsigned)sys_lseek(fd, (off_t)0, 2);
-	if (count == 0) {
-		sys_close(fd);
-		err = -EIO;
-		goto err_logo_close_file;
-	}
-    
-	sys_lseek(fd, (off_t)0, 0);
-	data = kmalloc(count, GFP_KERNEL);
-	if (!data) {
-		printk(KERN_WARNING "%s: Can not alloc data\n", __func__);
-		err = -ENOMEM;
-		goto err_logo_close_file;
-	}
-	if ((unsigned)sys_read(fd, (char *)data, count) != count) {
-		err = -EIO;
-		goto err_logo_free_data;
-	}
-
-	max = fb_width(info) * fb_height(info);
-    
-	ptr = data;
-	bits = (unsigned *)(info->screen_base);
-	while (count > 3) {
-		unsigned n = ptr[0];
-		if (n > max)
-			break;
-		memset32(bits, ptr[1], n);
-		bits += n;
-		max -= n;
-		ptr += 2;
-		count -= 8;
-	}
-
-err_logo_free_data:
-	kfree(data);
-err_logo_close_file:
-	sys_close(fd);
-	return err;
-}
-EXPORT_SYMBOL(load_888rle_image);
-#endif
-
 

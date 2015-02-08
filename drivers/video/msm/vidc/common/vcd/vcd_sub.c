@@ -41,8 +41,6 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 	unsigned long buffer_size = 0;
 	int ret = 0;
 	unsigned long ionflag = 0;
-	ion_phys_addr_t phyaddr = 0;
-	size_t len = 0;
 
 	if (!kernel_vaddr || !phy_addr || !cctxt) {
 		pr_err("\n%s: Invalid parameters", __func__);
@@ -86,9 +84,6 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 		}
 		*phy_addr = (u8 *) mapped_buffer->iova[0];
 		*kernel_vaddr = (u8 *) mapped_buffer->vaddr;
-		VCD_MSG_LOW("vcd_pmem_alloc: phys(0x%x), virt(0x%x), "\
-			"sz(%u), flags(0x%x)", (u32)*phy_addr,
-			(u32)*kernel_vaddr, sz, (u32)flags);
 	} else {
 		map_buffer->alloc_handle = ion_alloc(
 			    cctxt->vcd_ion_client, sz, SZ_4K,
@@ -111,8 +106,7 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 			pr_err("%s() ION map failed", __func__);
 			goto ion_free_bailout;
 		}
-		if (res_trk_get_core_type() != (u32)VCD_CORE_720P) {
-			ret = ion_map_iommu(cctxt->vcd_ion_client,
+		ret = ion_map_iommu(cctxt->vcd_ion_client,
 				map_buffer->alloc_handle,
 				VIDEO_DOMAIN,
 				VIDEO_MAIN_POOL,
@@ -121,34 +115,18 @@ static int vcd_pmem_alloc(size_t sz, u8 **kernel_vaddr, u8 **phy_addr,
 				(unsigned long *)&iova,
 				(unsigned long *)&buffer_size,
 				UNCACHED, 0);
-			if (ret || !iova) {
-				pr_err(
-				"%s() ION iommu map failed, ret = %d, iova = 0x%lx",
-					__func__, ret, iova);
-				goto ion_map_bailout;
-			}
-			map_buffer->phy_addr = iova;
-		} else {
-			ret = ion_phys(cctxt->vcd_ion_client,
-				map_buffer->alloc_handle,
-				&phyaddr,
-				&len);
-			if (ret) {
-				pr_err("%s() ion_phys failed", __func__);
-				goto ion_map_bailout;
-			}
-			map_buffer->phy_addr = phyaddr;
+		if (ret) {
+			pr_err("%s() ION iommu map failed", __func__);
+			goto ion_map_bailout;
 		}
+		map_buffer->phy_addr = iova;
 		if (!map_buffer->phy_addr) {
 			pr_err("%s() acm alloc failed", __func__);
 			goto free_map_table;
 		}
-		*phy_addr = (u8 *)map_buffer->phy_addr;
+		*phy_addr = (u8 *)iova;
 		mapped_buffer = NULL;
 		map_buffer->mapped_buffer = NULL;
-		VCD_MSG_LOW("vcd_ion_alloc: phys(0x%x), virt(0x%x), "\
-			"sz(%u), ionflags(0x%x)", (u32)*phy_addr,
-			(u32)*kernel_vaddr, sz, (u32)ionflag);
 	}
 
 	return 0;
@@ -198,13 +176,10 @@ static int vcd_pmem_free(u8 *kernel_vaddr, u8 *phy_addr,
 	if (map_buffer->mapped_buffer)
 		msm_subsystem_unmap_buffer(map_buffer->mapped_buffer);
 	if (cctxt->vcd_enable_ion) {
-		VCD_MSG_LOW("vcd_ion_free: phys(0x%x), virt(0x%x)",
-			(u32)phy_addr, (u32)kernel_vaddr);
 		if (map_buffer->alloc_handle) {
 			ion_unmap_kernel(cctxt->vcd_ion_client,
 					map_buffer->alloc_handle);
-			if (res_trk_get_core_type() != (u32)VCD_CORE_720P)
-				ion_unmap_iommu(cctxt->vcd_ion_client,
+			ion_unmap_iommu(cctxt->vcd_ion_client,
 					map_buffer->alloc_handle,
 					VIDEO_DOMAIN,
 					VIDEO_MAIN_POOL);
@@ -212,8 +187,6 @@ static int vcd_pmem_free(u8 *kernel_vaddr, u8 *phy_addr,
 			map_buffer->alloc_handle);
 		}
 	} else {
-		VCD_MSG_LOW("vcd_pmem_free: phys(0x%x), virt(0x%x)",
-			(u32)phy_addr, (u32)kernel_vaddr);
 		free_contiguous_memory_by_paddr(
 			(unsigned long)map_buffer->phy_addr);
 	}
@@ -772,8 +745,7 @@ u32 vcd_free_one_buffer_internal(
 		return VCD_ERR_ILLEGAL_PARM;
 	}
 	if (buf_entry->in_use) {
-		VCD_MSG_ERROR("Buffer is in use and is not flushed: %p, %d\n",
-			buf_entry, buf_entry->in_use);
+		VCD_MSG_ERROR("\n Buffer is in use and is not flushed");
 		return VCD_ERR_ILLEGAL_OP;
 	}
 
@@ -812,8 +784,9 @@ u32 vcd_free_buffers_internal(
 			}
 		}
 
-    	vcd_reset_buffer_pool_for_reuse(buf_pool);
 	}
+
+	vcd_reset_buffer_pool_for_reuse(buf_pool);
 
 	return rc;
 }
@@ -1070,7 +1043,6 @@ u32 vcd_flush_buffers(struct vcd_clnt_ctxt *cctxt, u32 mode)
 {
 	u32 rc = VCD_S_SUCCESS;
 	struct vcd_buffer_entry *buf_entry;
-	struct vcd_buffer_entry *orig_frame = NULL;
 
 	VCD_MSG_LOW("vcd_flush_buffers:");
 
@@ -1094,19 +1066,9 @@ u32 vcd_flush_buffers(struct vcd_clnt_ctxt *cctxt, u32 mode)
 							 vcd_frame_data),
 						cctxt,
 						cctxt->client_data);
-				orig_frame = vcd_find_buffer_pool_entry(
-						&cctxt->in_buf_pool,
-						buf_entry->virtual);
 				}
 
-			if (orig_frame) {
-				orig_frame->in_use--;
-				if (orig_frame != buf_entry)
-					kfree(buf_entry);
-			} else {
-				buf_entry->in_use = false;
-				VCD_MSG_ERROR("Original frame not found in buffer pool\n");
-			}
+			buf_entry->in_use = false;
 			VCD_BUFFERPOOL_INUSE_DECREMENT(
 				cctxt->in_buf_pool.in_use);
 			buf_entry = NULL;
@@ -2071,12 +2033,10 @@ u32 vcd_handle_input_done_in_eos(
 		transc->in_use = true;
 		if ((codec_config &&
 			 (status != VCD_ERR_BITSTREAM_ERR)) ||
-			(codec_config && (status == VCD_ERR_BITSTREAM_ERR) &&
+			((status == VCD_ERR_BITSTREAM_ERR) &&
 			 !(cctxt->status.mask & VCD_FIRST_IP_DONE) &&
-			(core_type == VCD_CORE_720P))) {
-			VCD_MSG_HIGH("handle EOS for codec config");
+			 (core_type == VCD_CORE_720P)))
 			vcd_handle_eos_done(cctxt, transc, VCD_S_SUCCESS);
-		}
 	}
 	return rc;
 }
@@ -3457,7 +3417,7 @@ u32 vcd_set_num_slices(struct vcd_clnt_ctxt *cctxt)
 	struct vcd_property_slice_delivery_info slice_delivery_info;
 	u32 rc = VCD_S_SUCCESS;
 	prop_hdr.prop_id = VCD_I_SLICE_DELIVERY_MODE;
-	prop_hdr.sz =
+	prop_hdr.sz = prop_hdr.sz =
 		sizeof(struct vcd_property_slice_delivery_info);
 	rc = ddl_get_property(cctxt->ddl_handle, &prop_hdr,
 				&slice_delivery_info);

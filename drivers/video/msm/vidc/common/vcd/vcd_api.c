@@ -11,7 +11,6 @@
  *
  */
 
-#include <linux/export.h>
 #include <media/msm/vidc_type.h>
 #include "vcd.h"
 

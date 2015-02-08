@@ -73,19 +73,6 @@ static struct msm_fb_data_type *vsync_mfd;
 static unsigned char timer_shutdown_flag;
 static uint32 vsync_cnt_cfg;
 
-
-void vsync_clk_prepare_enable(void)
-{
-	if (mdp_vsync_clk)
-		clk_prepare_enable(mdp_vsync_clk);
-}
-
-void vsync_clk_disable_unprepare(void)
-{
-	if (mdp_vsync_clk)
-		clk_disable_unprepare(mdp_vsync_clk);
-}
-
 void mdp_hw_vsync_clk_enable(struct msm_fb_data_type *mfd)
 {
 	if (vsync_clk_status == 1)
@@ -268,16 +255,7 @@ void mdp_vsync_cfg_regs(struct msm_fb_data_type *mfd,
 	 * load the last line + 1 to be in the
 	 * safety zone
 	 */
-				/* set the value with which the read pointer 
-				 * gets loaded at primary vsync edge. 
-				 * qualcomm default : 0; (lead to mdp block) 
-				 * huawei default : lcd_y / 2
-				 */
-#ifdef CONFIG_HUAWEI_KERNEL
-				vsync_load_cnt =  mfd->panel_info.yres/2;
-#else
-				vsync_load_cnt = mfd->panel_info.yres;
-#endif
+	vsync_load_cnt = mfd->panel_info.yres;
 
 	/* line counter init value at the next pulse */
 	MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_INIT_VAL,
