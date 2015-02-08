@@ -84,3 +84,4 @@ obj-$(CONFIG_HUAWEI_FEATURE_RMI_TOUCH)  += synaptics_i2c_rmi_1564.o hw_tp_config
 obj-$(CONFIG_HUAWEI_MELFAS_TOUCHSCREEN)  += melfas_i2c_ts.o
 obj-$(CONFIG_HUAWEI_GT968_TOUCHSCREEN)  += gt968.o goodix_tool.o gt968_update.o
 obj-$(CONFIG_TOUCHSCREEN_GT868)	+= gt818x.o gt818x_update.o goodix_tool.o
+obj-$(CONFIG_TOUCHSCREEN_FT5X06)	+= ft5x06_ts.o

@@ -20,12 +20,15 @@
 
 #include <linux/err.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 #include <mach/rpc_hsusb.h>
 #include <asm/mach-types.h>
+#include <linux/module.h>
 
 static struct msm_rpc_endpoint *usb_ep;
 static struct msm_rpc_endpoint *chg_ep;
+//QELS-1791 pengjinlong del 20121122 (start) 
+static int is_chg_connected = 0; //Sym
+//QELS-1791 pengjinlong del 20121122 (end) 
 
 #define MSM_RPC_CHG_PROG 0x3000001a
 
@@ -53,6 +56,9 @@ struct msm_hsusb_rpc_ids {
 
 static struct msm_hsusb_rpc_ids usb_rpc_ids;
 static struct msm_chg_rpc_ids chg_rpc_ids;
+//QELS-1791 pengjinlong del 20121122 (start) 
+extern void ft5x06_does_when_chg_connected(int is_chg_connected);//sym
+//QELS-1791 pengjinlong del 20121122 (end) 
 
 static int msm_hsusb_init_rpc_ids(unsigned long vers)
 {
@@ -100,10 +106,10 @@ static int msm_chg_init_rpc(unsigned long vers)
 		if (IS_ERR(chg_ep))
 			return -ENODATA;
 		chg_rpc_ids.vers_comp				= vers;
-		chg_rpc_ids.chg_usb_charger_connected_proc 	= 7;
-		chg_rpc_ids.chg_usb_charger_disconnected_proc 	= 8;
-		chg_rpc_ids.chg_usb_i_is_available_proc 	= 9;
-		chg_rpc_ids.chg_usb_i_is_not_available_proc 	= 10;
+		chg_rpc_ids.chg_usb_charger_connected_proc 	= 3;
+		chg_rpc_ids.chg_usb_charger_disconnected_proc 	= 4;
+		chg_rpc_ids.chg_usb_i_is_available_proc 	= 5;
+		chg_rpc_ids.chg_usb_i_is_not_available_proc 	= 6;
 		return 0;
 	} else
 		return -ENODATA;
@@ -609,8 +615,6 @@ int usb_diag_update_pid_and_serial_num(uint32_t pid, const char *snum)
 		ret = msm_hsusb_is_serial_num_null(1);
 		if (ret)
 			return ret;
-		/* fixup qcom bug by yanzhijun 20110420 */
-		return 0;
 	}
 
 	ret = msm_hsusb_is_serial_num_null(0);
@@ -646,17 +650,45 @@ void hsusb_chg_connected(enum chg_type chgtype)
 	char *chg_types[] = {"STD DOWNSTREAM PORT",
 			"CARKIT",
 			"DEDICATED CHARGER",
-			"INVALID"};
+			"UNKNOWN",
+			"INVALID",
+	};
 
 	if (chgtype == USB_CHG_TYPE__INVALID) {
 		msm_chg_usb_i_is_not_available();
 		msm_chg_usb_charger_disconnected();
+//QELS-1791 pengjinlong del 20121122 (start) 
+		//add by sym
+		is_chg_connected = 0;   
+		#ifdef CONFIG_TOUCHSCREEN_FT5X06
+		ft5x06_does_when_chg_connected(0);
+		#endif
+//QELS-1791 pengjinlong del 20121122 (end) 
+
 		return;
 	}
+//QELS-1791 pengjinlong del 20121122 (start) 
+
+	is_chg_connected = 1;	
+	#ifdef CONFIG_TOUCHSCREEN_FT5X06
+	ft5x06_does_when_chg_connected(1);
+	#endif
+
+//QELS-1791 pengjinlong del 20121122 (end) 
 
 	pr_info("\nCharger Type: %s\n", chg_types[chgtype]);
 
 	msm_chg_usb_charger_connected(chgtype);
 }
 EXPORT_SYMBOL(hsusb_chg_connected);
+//QELS-1791 pengjinlong del 20121122 (start) 
+
+int  sym_chg_connected(void)   //add by sym
+{
+	return is_chg_connected;
+}
+EXPORT_SYMBOL(sym_chg_connected);
+
+//QELS-1791 pengjinlong del 20121122 (end) 
+
 #endif
