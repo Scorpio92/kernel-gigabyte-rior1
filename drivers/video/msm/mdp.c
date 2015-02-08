@@ -1741,7 +1741,8 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 		if (mdp_interrupt & LCDC_FRAME_START) {
 			dma = &dma2_data;
 			spin_lock_irqsave(&mdp_spin_lock, flag);
-			vsync_isr = vsync_cntrl.vsync_irq_enabled;
+			vsync_isr = vsync_cntrl.vsync_irq_enabled; 
+                        disabled_clocks = vsync_cntrl.disabled_clocks;
 			/* let's disable LCDC interrupt */
 			//mdp_intr_mask &= ~LCDC_FRAME_START;
 			//outp32(MDP_INTR_ENABLE, mdp_intr_mask);
@@ -1750,7 +1751,7 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 				complete(&dma->comp);
 			}
 
-		    if (!vsync_isr){
+		    if (!vsync_isr && !vsync_cntrl.disabled_clocks) {
 				mdp_intr_mask &= ~LCDC_FRAME_START;
 				outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 				mdp_disable_irq_nosync(MDP_VSYNC_TERM);
@@ -1760,7 +1761,7 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 			}
 			spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
-            if (!vsync_isr)
+            if (!vsync_isr && !disabled_clocks)
 				mdp_pipe_ctrl(MDP_CMD_BLOCK,
 					MDP_BLOCK_POWER_OFF, TRUE);
             complete_all(&vsync_cntrl.vsync_wait);
@@ -1806,12 +1807,12 @@ irqreturn_t mdp_isr(int irq, void *ptr)
 #else
 		if (mdp_prim_panel_type == MIPI_CMD_PANEL) {
 			dma = &dma2_data;
-			//spin_lock_irqsave(&mdp_spin_lock, flag);
+			spin_lock_irqsave(&mdp_spin_lock, flag);
 			dma->busy = FALSE;
-			//spin_unlock_irqrestore(&mdp_spin_lock, flag);
+			spin_unlock_irqrestore(&mdp_spin_lock, flag);
 			mdp_pipe_ctrl(MDP_DMA2_BLOCK, MDP_BLOCK_POWER_OFF,
 				TRUE);
-            mdp_disable_irq_nosync(MDP_DMA2_TERM);
+                        mdp_disable_irq_nosync(MDP_DMA2_TERM);
 			complete(&dma->comp);
 		}
 #endif
