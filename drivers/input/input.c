@@ -34,6 +34,9 @@ MODULE_LICENSE("GPL");
 
 #define INPUT_DEVICES	256
 
+//add BUG_ID:QELS-1036 jiabaojun 20121113 
+#define HEADSETHOOK      226
+
 static LIST_HEAD(input_dev_list);
 static LIST_HEAD(input_handler_list);
 
@@ -1680,17 +1683,11 @@ static int input_dev_suspend(struct device *dev)
 static int input_dev_resume(struct device *dev)
 {
 	struct input_dev *input_dev = to_input_dev(dev);
-#ifdef CONFIG_HUAWEI_KERNEL
-    /* before call input_reset_device set the flag to true */
-    g_bypass_release_key = true ;
-#endif
-
+	//add BUG_ID:QELS-1036 jiabaojun 20121113 (begin)
+      if(!is_event_supported(HEADSETHOOK, input_dev->keybit, KEY_MAX))
+      //add BUG_ID:QELS-1036 jiabaojun 20121113 (end)
 	input_reset_device(input_dev);
 
-#ifdef CONFIG_HUAWEI_KERNEL
-    /* clear the  flag of skipping release key */
-    g_bypass_release_key = false ;
-#endif
 	return 0;
 }
 
